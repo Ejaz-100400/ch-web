@@ -110,6 +110,12 @@ export interface EmployeeInput {
   active?: boolean;
 }
 
+export interface ProductInput {
+  name: string;
+  category: "car_glasses" | "car_modifications";
+  active?: boolean;
+}
+
 export interface UpdateExtractionInput {
   customerName?: string;
   carMake?: string;
@@ -171,6 +177,10 @@ export const api = {
 
   products: {
     list: (category?: string) => request<Product[]>(`/products${query({ category })}`),
+    create: (dto: ProductInput) => request<Product>("/products", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: Partial<ProductInput>) =>
+      request<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    remove: (id: string) => request<{ deleted: true }>(`/products/${id}`, { method: "DELETE" }),
   },
 
   followUps: {

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Users, BarChart3, Download, LogOut, PhoneIncoming, ClipboardList, Phone, UserCog } from "lucide-react";
+import { Users, BarChart3, Download, LogOut, PhoneIncoming, ClipboardList, Phone, UserCog, Package } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
 import { Logo } from "../ui/Logo";
-import { useAuth } from "../../lib/auth-context";
+import { useAuth, canManage } from "../../lib/auth-context";
 import { api } from "../../lib/api";
 
 const NAV_ITEMS = [
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { to: "/business-numbers", label: "Business Numbers", icon: Phone },
 ];
 
+const MANAGER_NAV_ITEMS = [{ to: "/products", label: "Products", icon: Package }];
 const ADMIN_NAV_ITEMS = [{ to: "/employees", label: "Employees", icon: UserCog }];
 
 const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager", viewer: "Viewer" };
@@ -85,7 +86,11 @@ export function Sidebar({ onLogout }: { onLogout: () => void }) {
       </div>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {[...NAV_ITEMS, ...(appUser?.role === "admin" ? ADMIN_NAV_ITEMS : [])].map(({ to, label, icon: Icon }) => (
+        {[
+          ...NAV_ITEMS,
+          ...(canManage(appUser?.role) ? MANAGER_NAV_ITEMS : []),
+          ...(appUser?.role === "admin" ? ADMIN_NAV_ITEMS : []),
+        ].map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

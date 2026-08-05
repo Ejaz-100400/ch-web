@@ -11,6 +11,7 @@ import FollowUps from "./pages/FollowUps";
 import Reports from "./pages/Reports";
 import Export from "./pages/Export";
 import Employees from "./pages/Employees";
+import Products from "./pages/Products";
 import BusinessNumbers from "./pages/BusinessNumbers";
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/export" element={<Export />} />
                 <Route path="/employees" element={<Employees />} />
+                <Route path="/products" element={<Products />} />
                 <Route path="/business-numbers" element={<BusinessNumbers />} />
               </Route>
               <Route path="/" element={<Navigate to="/customers" replace />} />
