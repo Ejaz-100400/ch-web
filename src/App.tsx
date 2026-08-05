@@ -10,6 +10,7 @@ import CallDetails from "./pages/CallDetails";
 import FollowUps from "./pages/FollowUps";
 import Reports from "./pages/Reports";
 import Export from "./pages/Export";
+import Import from "./pages/Import";
 import Employees from "./pages/Employees";
 import Products from "./pages/Products";
 import BusinessNumbers from "./pages/BusinessNumbers";
@@ -29,6 +30,7 @@ export default function App() {
                 <Route path="/follow-ups" element={<FollowUps />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/export" element={<Export />} />
+                <Route path="/import" element={<Import />} />
                 <Route path="/employees" element={<Employees />} />
                 <Route path="/products" element={<Products />} />
                 <Route path="/business-numbers" element={<BusinessNumbers />} />

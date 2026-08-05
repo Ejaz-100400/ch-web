@@ -116,6 +116,12 @@ export interface ProductInput {
   active?: boolean;
 }
 
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: { row: number; reason: string }[];
+}
+
 export interface UpdateExtractionInput {
   customerName?: string;
   carMake?: string;
@@ -204,6 +210,15 @@ export const api = {
 
   export: {
     calls: (format: "xlsx" | "pdf", q: CallsQuery = {}) => requestBlob(`/export/calls.${format}${query(q)}`),
+  },
+
+  import: {
+    template: () => requestBlob("/import/calls/template"),
+    calls: (file: File) => {
+      const body = new FormData();
+      body.append("file", file);
+      return request<ImportResult>("/import/calls", { method: "POST", body });
+    },
   },
 };
 
