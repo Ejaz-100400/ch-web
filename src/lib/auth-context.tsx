@@ -10,6 +10,7 @@ interface AuthContextValue {
   /** True while the initial session restore (or the /auth/me fetch after a fresh sign-in) is in flight. */
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -72,6 +73,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }
 
+  async function signInWithGoogle() {
+    // Full-page redirect flow -- Supabase handles the callback and restores
+    // the session automatically (detectSessionInUrl, on by default), so
+    // there's nothing to await here besides surfacing a config error, e.g.
+    // if the Google provider isn't enabled in the Supabase dashboard yet.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     setAppUser(null);
@@ -79,7 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, appUser, loading: sessionLoading || (Boolean(session) && userLoading), signIn, signOut }}
+      value={{
+        session,
+        appUser,
+        loading: sessionLoading || (Boolean(session) && userLoading),
+        signIn,
+        signInWithGoogle,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

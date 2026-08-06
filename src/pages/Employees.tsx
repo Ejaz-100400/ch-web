@@ -322,9 +322,11 @@ const fieldLabelStyle = {
   fontSize: 12,
   fontWeight: 600,
   color: "var(--text-soft)",
+  minWidth: 0,
 } as const;
 
 const inputStyle = {
+  width: "100%",
   padding: "8px 10px",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-sm)",

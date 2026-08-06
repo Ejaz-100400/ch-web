@@ -6,6 +6,17 @@ import { Logo } from "../components/ui/Logo";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { useAuth } from "../lib/auth-context";
 
+function GoogleIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.93-2.9l-3.88-3.02c-1.07.72-2.45 1.15-4.05 1.15-3.11 0-5.75-2.1-6.69-4.93H1.3v3.1A12 12 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.31 14.3A7.2 7.2 0 0 1 4.93 12c0-.8.14-1.57.38-2.3V6.6H1.3A12 12 0 0 0 0 12c0 1.94.46 3.77 1.3 5.4z" />
+      <path fill="#EA4335" d="M12 4.77c1.76 0 3.34.6 4.58 1.79l3.44-3.44C17.94 1.19 15.24 0 12 0A12 12 0 0 0 1.3 6.6l4.01 3.1C6.25 6.87 8.89 4.77 12 4.77z" />
+    </svg>
+  );
+}
+
 function backgroundWave(seed: number, len: number) {
   const out: number[] = [];
   let x = seed;
@@ -19,15 +30,28 @@ function backgroundWave(seed: number, len: number) {
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session, loading, signIn } = useAuth();
+  const { session, loading, signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
   if (!loading && session) {
     const redirectTo = (location.state as { from?: string } | null)?.from ?? "/customers";
     return <Navigate to={redirectTo} replace />;
+  }
+
+  async function handleGoogleSignIn() {
+    setError("");
+    setGoogleSubmitting(true);
+    try {
+      await signInWithGoogle();
+      // Browser navigates away to Google -- nothing more happens here on success.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign-in failed. Try again.");
+      setGoogleSubmitting(false);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -195,8 +219,38 @@ export default function Login() {
             {!submitting && <ArrowRight size={16} />}
           </button>
 
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "20px 0" }}>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+            <span style={{ fontSize: 11.5, color: "var(--text-faint)", fontWeight: 600 }}>OR</span>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={googleSubmitting}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              padding: "11px 16px",
+              background: "var(--paper-raised)",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              fontSize: 14,
+              fontWeight: 600,
+              opacity: googleSubmitting ? 0.7 : 1,
+            }}
+          >
+            <GoogleIcon size={16} />
+            {googleSubmitting ? "Redirecting…" : "Sign in with Google"}
+          </button>
+
           <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--text-faint)", marginTop: 20 }}>
-            New here? Ask an admin to create your account in Supabase Auth.
+            New here? Ask an admin to create your account first — with a password or your work Google account.
           </p>
         </form>
       </div>

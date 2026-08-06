@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, ClipboardList, Phone, UserCog, Package } from "lucide-react";
+import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, ClipboardList, Phone, UserCog, Package, X } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
 import { Logo } from "../ui/Logo";
@@ -22,7 +22,15 @@ const ADMIN_NAV_ITEMS = [{ to: "/employees", label: "Employees", icon: UserCog }
 
 const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager", viewer: "Viewer" };
 
-export function Sidebar({ onLogout }: { onLogout: () => void }) {
+export function Sidebar({
+  onLogout,
+  mobileOpen = false,
+  onCloseMobile,
+}: {
+  onLogout: () => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
+}) {
   const { appUser } = useAuth();
   const [inFlight, setInFlight] = useState<number | null>(null);
 
@@ -50,7 +58,7 @@ export function Sidebar({ onLogout }: { onLogout: () => void }) {
 
   return (
     <aside
-      className="app-sidebar"
+      className={`app-sidebar${mobileOpen ? " is-open" : ""}`}
       style={{
         width: 232,
         flexShrink: 0,
@@ -78,12 +86,20 @@ export function Sidebar({ onLogout }: { onLogout: () => void }) {
         >
           <Logo size={17} color="var(--on-brand)" />
         </div>
-        <span className="app-sidebar-label" style={{ display: "flex", flexDirection: "column", lineHeight: 1.08 }}>
+        <span className="app-sidebar-label" style={{ display: "flex", flexDirection: "column", lineHeight: 1.08, flex: 1 }}>
           <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 14, letterSpacing: "0.01em" }}>CUSTOM</span>
           <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 10.5, color: "var(--text-inverse-soft)", letterSpacing: "0.06em" }}>
             HEADLIGHTS
           </span>
         </span>
+        <button
+          onClick={onCloseMobile}
+          aria-label="Close menu"
+          className="mobile-sidebar-close"
+          style={{ background: "transparent", border: "none", color: "var(--text-inverse-soft)", padding: 6, borderRadius: 6, flexShrink: 0 }}
+        >
+          <X size={18} />
+        </button>
       </div>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -96,6 +112,7 @@ export function Sidebar({ onLogout }: { onLogout: () => void }) {
             key={to}
             to={to}
             title={label}
+            onClick={onCloseMobile}
             style={({ isActive }) => ({
               display: "flex",
               alignItems: "center",

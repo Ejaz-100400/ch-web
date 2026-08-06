@@ -275,7 +275,7 @@ a {
     padding: 24px 20px 48px !important;
   }
   .grid-responsive-4 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, 1fr) !important;
   }
   .grid-responsive-2 {
     grid-template-columns: 1fr !important;
@@ -296,6 +296,53 @@ a {
 
 @media (max-width: 620px) {
   .grid-responsive-4 {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Below 640px, the icon-rail sidebar (still 72px wide -- ~1/5 of a phone
+   screen) gives up too much space permanently. Turn it into an off-canvas
+   drawer instead: hidden by default, slides in full-width-labeled over a
+   backdrop when the topbar's menu button opens it. */
+.mobile-topbar-btn,
+.mobile-sidebar-close {
+  display: none;
+}
+
+.mobile-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 8, 0.45);
+  z-index: 90;
+  animation: fade-in-up 150ms ease both;
+}
+
+@media (max-width: 640px) {
+  .mobile-topbar-btn {
+    display: flex;
+  }
+  .app-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 240px !important;
+    transform: translateX(-100%);
+    transition: transform 220ms ease;
+    z-index: 100;
+    box-shadow: var(--shadow-pop);
+  }
+  .app-sidebar.is-open {
+    transform: translateX(0);
+  }
+  .app-sidebar .app-sidebar-label,
+  .app-sidebar .app-sidebar-footer-text {
+    display: block !important;
+  }
+  .mobile-sidebar-close {
+    display: flex !important;
+  }
+  .app-main-inner {
+    padding: 20px 16px 40px !important;
   }
 }
