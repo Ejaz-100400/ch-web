@@ -100,6 +100,7 @@ export interface Call {
   extraction?: CallExtraction | null;
   transcript?: Transcript | null;
   products?: { product: Product }[];
+  importedBy?: { name: string; email: string } | null;
 }
 
 export interface FollowUp {

@@ -79,10 +79,14 @@ export function FollowUpStatusBadge({ status }: { status: FollowUpStatus }) {
  * because anything failed, so it's worth a quiet visual distinction rather
  * than looking like a broken live call.
  */
-export function ImportedBadge() {
+export function ImportedBadge({ importedByName }: { importedByName?: string | null }) {
   return (
     <span
-      title="Added from a historical data import -- no recording exists for this call"
+      title={
+        importedByName
+          ? `Added from a historical data import by ${importedByName} -- no recording exists for this call`
+          : "Added from a historical data import -- no recording exists for this call"
+      }
       style={{
         display: "inline-flex",
         alignItems: "center",

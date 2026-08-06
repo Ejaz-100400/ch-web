@@ -247,7 +247,7 @@ export default function CallDetails() {
             <Row label="Status">
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <CallStatusBadge status={call.status} />
-                {isImported && <ImportedBadge />}
+                {isImported && <ImportedBadge importedByName={call.importedBy?.name} />}
               </span>
             </Row>
             {call.status === "failed" && call.failureReason && (
@@ -269,7 +269,8 @@ export default function CallDetails() {
               <RecordingPlayer callId={call.id} />
             ) : isImported ? (
               <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>
-                No recording — this call was added from a historical data import, not the live call pipeline.
+                No recording — this call was added from a historical data import
+                {call.importedBy?.name ? ` by ${call.importedBy.name}` : ""}, not the live call pipeline.
               </p>
             ) : (
               <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>No recording stored for this call yet.</p>

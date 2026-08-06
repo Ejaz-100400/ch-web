@@ -204,7 +204,9 @@ export default function CallList() {
                     <span style={{ color: "var(--text-faint)" }}>{call.customer?.phoneNumber ?? "Unknown"}</span>
                   )}
                 </span>
-                {call.extraction?.extractedByModel === "manual_import" && <ImportedBadge />}
+                {call.extraction?.extractedByModel === "manual_import" && (
+                  <ImportedBadge importedByName={call.importedBy?.name} />
+                )}
               </span>
               <span style={{ color: "var(--text-soft)" }}>{call.employee?.name ?? "Unassigned"}</span>
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
