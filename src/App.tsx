@@ -14,6 +14,8 @@ import Import from "./pages/Import";
 import Employees from "./pages/Employees";
 import Products from "./pages/Products";
 import BusinessNumbers from "./pages/BusinessNumbers";
+import Team from "./pages/Team";
+import SetPassword from "./pages/SetPassword";
 
 export default function App() {
   return (
@@ -23,6 +25,7 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/set-password" element={<SetPassword />} />
               <Route element={<AppShell />}>
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/calls" element={<CallList />} />
@@ -32,6 +35,7 @@ export default function App() {
                 <Route path="/export" element={<Export />} />
                 <Route path="/import" element={<Import />} />
                 <Route path="/employees" element={<Employees />} />
+                <Route path="/team" element={<Team />} />
                 <Route path="/products" element={<Products />} />
                 <Route path="/business-numbers" element={<BusinessNumbers />} />
               </Route>

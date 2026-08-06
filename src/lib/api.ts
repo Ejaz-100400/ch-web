@@ -17,6 +17,7 @@ import type {
   SentimentType,
   TopCarModelPoint,
   TopProductPoint,
+  UserRole,
 } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -115,6 +116,13 @@ export interface ProductInput {
   name: string;
   category: "car_glasses" | "car_modifications";
   active?: boolean;
+}
+
+export interface InviteTeamMemberInput {
+  name: string;
+  email: string;
+  role: UserRole;
+  redirectTo: string;
 }
 
 export interface ImportResult {
@@ -222,6 +230,13 @@ export const api = {
       return request<ImportResult>("/import/calls", { method: "POST", body });
     },
     history: () => request<AuditLogEntry[]>("/import/calls/history"),
+  },
+
+  team: {
+    list: () => request<AppUser[]>("/team"),
+    invite: (dto: InviteTeamMemberInput) => request<AppUser>("/team/invite", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: { role?: UserRole; active?: boolean }) =>
+      request<AppUser>(`/team/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
   },
 };
 

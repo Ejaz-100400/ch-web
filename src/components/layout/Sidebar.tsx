@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, ClipboardList, Phone, UserCog, Package, X } from "lucide-react";
+import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, ClipboardList, Phone, UserCog, Package, UsersRound, X } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
 import { Logo } from "../ui/Logo";
@@ -18,7 +18,10 @@ const NAV_ITEMS = [
 ];
 
 const MANAGER_NAV_ITEMS = [{ to: "/products", label: "Products", icon: Package }];
-const ADMIN_NAV_ITEMS = [{ to: "/employees", label: "Employees", icon: UserCog }];
+const ADMIN_NAV_ITEMS = [
+  { to: "/employees", label: "Employees", icon: UserCog },
+  { to: "/team", label: "Team", icon: UsersRound },
+];
 
 const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager", viewer: "Viewer" };
 
