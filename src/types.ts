@@ -152,6 +152,14 @@ export interface TopProductPoint {
   count: number;
 }
 
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  createdAt: string;
+  details: Record<string, unknown> | null;
+  user: { name: string; email: string | null } | null;
+}
+
 export interface BusinessNumber {
   number: string;
   category: BusinessCategory;

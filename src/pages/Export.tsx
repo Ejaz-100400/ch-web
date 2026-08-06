@@ -6,15 +6,17 @@ import { api, ApiError, downloadBlob, type CallsQuery } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatDateTime } from "../lib/format";
-import type { Employee } from "../types";
+import type { AuditLogEntry, Employee } from "../types";
 
 type ExportFormat = "xlsx" | "pdf";
 
-interface DownloadRecord {
-  id: string;
-  format: ExportFormat;
-  filterSummary: string;
-  createdAt: string;
+function summarizeFilters(filters: Record<string, unknown> | undefined, employees: Employee[]): string {
+  if (!filters) return "All calls";
+  const parts: string[] = [];
+  if (filters.category) parts.push(filters.category === "car_glasses" ? "Car Glasses" : "Car Modifications");
+  if (filters.employeeId) parts.push(employees.find((e) => e.id === filters.employeeId)?.name ?? "employee");
+  if (filters.dateFrom || filters.dateTo) parts.push(`${filters.dateFrom ?? "…"} – ${filters.dateTo ?? "…"}`);
+  return parts.length ? parts.join(", ") : "All calls";
 }
 
 const CATEGORY_OPTIONS = [
@@ -38,11 +40,23 @@ export default function Export() {
   const [format, setFormat] = useState<ExportFormat>("xlsx");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [generating, setGenerating] = useState(false);
-  const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
+  const [history, setHistory] = useState<AuditLogEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function loadHistory() {
+    setHistoryLoading(true);
+    return api.export
+      .history()
+      .then(setHistory)
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  }
 
   if (!canManage(appUser?.role)) {
     return (
@@ -57,14 +71,6 @@ export default function Export() {
     );
   }
 
-  function filterSummary() {
-    const parts: string[] = [];
-    if (category) parts.push(category === "car_glasses" ? "Car Glasses" : "Car Modifications");
-    if (employeeId) parts.push(employees.find((e) => e.id === employeeId)?.name ?? "employee");
-    if (dateFrom || dateTo) parts.push(`${dateFrom || "…"} – ${dateTo || "…"}`);
-    return parts.length ? parts.join(", ") : "All calls";
-  }
-
   async function handleGenerate() {
     setGenerating(true);
     const query: CallsQuery = {
@@ -77,11 +83,8 @@ export default function Export() {
       const blob = await api.export.calls(format, query);
       const dateStamp = new Date().toISOString().slice(0, 10);
       downloadBlob(blob, `calls-export-${dateStamp}.${format}`);
-      setDownloads((prev) => [
-        { id: `${Date.now()}`, format, filterSummary: filterSummary(), createdAt: new Date().toISOString() },
-        ...prev,
-      ]);
       toast.show(`${format.toUpperCase()} export downloaded.`, "success");
+      await loadHistory();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Export failed", "error");
     } finally {
@@ -174,39 +177,44 @@ export default function Export() {
           </button>
         </div>
 
-        {/* Recent exports (this session) */}
+        {/* Recent exports -- who exported what, so it's traceable across the team */}
         <div style={cardStyle}>
-          <SectionLabel>Downloaded this session</SectionLabel>
-          {downloads.length === 0 ? (
-            <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
-              Nothing downloaded yet in this session — exports aren't tracked server-side, only shown here for reference while you work.
-            </p>
+          <SectionLabel>Recent exports</SectionLabel>
+          {historyLoading ? (
+            <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Loading…</p>
+          ) : history.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--text-faint)" }}>No exports yet.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {downloads.map((d) => (
-                <div
-                  key={d.id}
-                  className="fade-in-up"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "12px 14px",
-                    border: "1px solid var(--border-soft)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", flexShrink: 0 }}>
-                    {d.format === "xlsx" ? <FileSpreadsheet size={16} color="var(--brand-strong)" /> : <FileText size={16} color="var(--brand-strong)" />}
-                  </span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{d.filterSummary}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
-                      {d.format.toUpperCase()} · {formatDateTime(d.createdAt)}
+              {history.map((h) => {
+                const format = (h.details?.format as ExportFormat | undefined) ?? "xlsx";
+                return (
+                  <div
+                    key={h.id}
+                    className="fade-in-up"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      padding: "12px 14px",
+                      border: "1px solid var(--border-soft)",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", flexShrink: 0 }}>
+                      {format === "xlsx" ? <FileSpreadsheet size={16} color="var(--brand-strong)" /> : <FileText size={16} color="var(--brand-strong)" />}
+                    </span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                        {summarizeFilters(h.details?.filters as Record<string, unknown> | undefined, employees)}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
+                        {h.user?.name ?? "Unknown user"} · {format.toUpperCase()} · {formatDateTime(h.createdAt)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

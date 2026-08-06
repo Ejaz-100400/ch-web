@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import type {
   AppUser,
+  AuditLogEntry,
   BusinessNumber,
   Call,
   CallExtraction,
@@ -210,6 +211,7 @@ export const api = {
 
   export: {
     calls: (format: "xlsx" | "pdf", q: CallsQuery = {}) => requestBlob(`/export/calls.${format}${query(q)}`),
+    history: () => request<AuditLogEntry[]>("/export/history"),
   },
 
   import: {
@@ -219,6 +221,7 @@ export const api = {
       body.append("file", file);
       return request<ImportResult>("/import/calls", { method: "POST", body });
     },
+    history: () => request<AuditLogEntry[]>("/import/calls/history"),
   },
 };
 

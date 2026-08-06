@@ -1,8 +1,10 @@
-import { useRef, useState } from "react";
-import { Download, FileSpreadsheet, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, FileSpreadsheet, Upload, AlertTriangle, CheckCircle2, History } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { api, ApiError, downloadBlob, type ImportResult } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
+import { formatDateTime } from "../lib/format";
+import type { AuditLogEntry } from "../types";
 
 export default function Import() {
   const toast = useToast();
@@ -12,6 +14,21 @@ export default function Import() {
   const [uploading, setUploading] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [history, setHistory] = useState<AuditLogEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  function loadHistory() {
+    setHistoryLoading(true);
+    return api.import
+      .history()
+      .then(setHistory)
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  }
 
   async function handleDownloadTemplate() {
     setDownloadingTemplate(true);
@@ -43,6 +60,7 @@ export default function Import() {
       );
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      await loadHistory();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Import failed", "error");
     } finally {
@@ -149,6 +167,49 @@ export default function Import() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Who imported what, so it's traceable across the team */}
+      <div style={{ ...cardStyle, marginTop: 20 }}>
+        <SectionLabel>Recent imports</SectionLabel>
+        {historyLoading ? (
+          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Loading…</p>
+        ) : history.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>No imports yet.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {history.map((h) => {
+              const imported = (h.details?.imported as number | undefined) ?? 0;
+              const skipped = (h.details?.skipped as number | undefined) ?? 0;
+              return (
+                <div
+                  key={h.id}
+                  className="fade-in-up"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "12px 14px",
+                    border: "1px solid var(--border-soft)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", flexShrink: 0 }}>
+                    <History size={16} color="var(--brand-strong)" />
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                      {imported} imported{skipped > 0 ? `, ${skipped} skipped` : ""}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
+                      {h.user?.name ?? "Unknown user"} · {formatDateTime(h.createdAt)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
