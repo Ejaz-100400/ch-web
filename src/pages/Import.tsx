@@ -177,7 +177,7 @@ export default function Import() {
         ) : history.length === 0 ? (
           <p style={{ fontSize: 13, color: "var(--text-faint)" }}>No imports yet.</p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
             {history.map((h) => {
               const imported = (h.details?.imported as number | undefined) ?? 0;
               const skipped = (h.details?.skipped as number | undefined) ?? 0;

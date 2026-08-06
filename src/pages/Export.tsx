@@ -185,7 +185,7 @@ export default function Export() {
           ) : history.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--text-faint)" }}>No exports yet.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
               {history.map((h) => {
                 const format = (h.details?.format as ExportFormat | undefined) ?? "xlsx";
                 return (
