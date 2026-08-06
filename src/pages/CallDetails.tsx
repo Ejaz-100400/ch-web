@@ -14,7 +14,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { CallStatusBadge, SentimentBadge } from "../components/ui/StatusBadge";
+import { CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { Avatar } from "../components/ui/Avatar";
 import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError, type UpdateExtractionInput } from "../lib/api";
@@ -183,6 +183,7 @@ export default function CallDetails() {
   const canEdit = canManage(appUser?.role);
   const isAdmin = appUser?.role === "admin";
   const e = call.extraction;
+  const isImported = e?.extractedByModel === "manual_import";
 
   return (
     <div>
@@ -244,7 +245,10 @@ export default function CallDetails() {
           <div style={cardStyle}>
             <SectionLabel>Call summary</SectionLabel>
             <Row label="Status">
-              <CallStatusBadge status={call.status} />
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <CallStatusBadge status={call.status} />
+                {isImported && <ImportedBadge />}
+              </span>
             </Row>
             {call.status === "failed" && call.failureReason && (
               <div style={{ background: "var(--coral-soft)", color: "var(--coral)", fontSize: 12, padding: "8px 10px", borderRadius: "var(--radius-sm)", marginTop: 8 }}>
@@ -263,6 +267,10 @@ export default function CallDetails() {
             <SectionLabel>Recording</SectionLabel>
             {call.recordingStorageKey ? (
               <RecordingPlayer callId={call.id} />
+            ) : isImported ? (
+              <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>
+                No recording — this call was added from a historical data import, not the live call pipeline.
+              </p>
             ) : (
               <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>No recording stored for this call yet.</p>
             )}
@@ -503,7 +511,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 function FormRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--text-soft)", flex: 1 }}>
+    <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--text-soft)", flex: 1, minWidth: 0 }}>
       {label}
       {children}
     </label>

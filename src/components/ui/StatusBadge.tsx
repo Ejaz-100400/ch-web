@@ -1,3 +1,4 @@
+import { Upload } from "lucide-react";
 import type { BusinessCategory, CallStatus, FollowUpStatus, SentimentType } from "../../types";
 
 const CALL_STATUS_META: Record<CallStatus, { label: string; color: string; bg: string; live?: boolean }> = {
@@ -70,4 +71,33 @@ export function CategoryBadge({ category }: { category: BusinessCategory }) {
 
 export function FollowUpStatusBadge({ status }: { status: FollowUpStatus }) {
   return <Badge {...FOLLOWUP_STATUS_META[status]} />;
+}
+
+/**
+ * Marks a call that came from a bulk historical-data import rather than the
+ * live call pipeline -- these have no recording/transcript by nature, not
+ * because anything failed, so it's worth a quiet visual distinction rather
+ * than looking like a broken live call.
+ */
+export function ImportedBadge() {
+  return (
+    <span
+      title="Added from a historical data import -- no recording exists for this call"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "2px 7px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 600,
+        color: "var(--text-faint)",
+        background: "var(--border-soft)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <Upload size={10} />
+      Imported
+    </span>
+  );
 }

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { PhoneCall } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
-import { CategoryBadge, CallStatusBadge, SentimentBadge } from "../components/ui/StatusBadge";
+import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
@@ -198,10 +198,13 @@ export default function CallList() {
                 {formatDateTime(call.callDate)}
               </span>
               <CategoryBadge category={call.businessCategory} />
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {call.customer?.name ?? call.extraction?.customerName ?? (
-                  <span style={{ color: "var(--text-faint)" }}>{call.customer?.phoneNumber ?? "Unknown"}</span>
-                )}
+              <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {call.customer?.name ?? call.extraction?.customerName ?? (
+                    <span style={{ color: "var(--text-faint)" }}>{call.customer?.phoneNumber ?? "Unknown"}</span>
+                  )}
+                </span>
+                {call.extraction?.extractedByModel === "manual_import" && <ImportedBadge />}
               </span>
               <span style={{ color: "var(--text-soft)" }}>{call.employee?.name ?? "Unassigned"}</span>
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
