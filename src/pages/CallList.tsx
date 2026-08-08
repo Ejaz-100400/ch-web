@@ -5,11 +5,11 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
-import { api, ApiError, type UpdateCallInput } from "../lib/api";
+import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatDuration, formatDateTime } from "../lib/format";
-import type { BusinessCategory, Call, Employee } from "../types";
+import type { BusinessCategory, Call, Employee, SentimentType } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -17,6 +17,12 @@ const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
   { value: "unknown", label: "Unknown" },
+];
+
+const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
+  { value: "interested", label: "Interested" },
+  { value: "not_interested", label: "Not interested" },
+  { value: "needs_follow_up", label: "Needs follow-up" },
 ];
 
 export default function CallList() {
@@ -303,9 +309,21 @@ function CallEditForm({
   onSaved: (updated: Call) => void;
 }) {
   const toast = useToast();
+  const e = call.extraction;
   const [category, setCategory] = useState<BusinessCategory>(call.businessCategory);
   const [callDate, setCallDate] = useState(call.callDate.slice(0, 10));
   const [employeeId, setEmployeeId] = useState(call.employeeId ?? "");
+  const [customerName, setCustomerName] = useState(e?.customerName ?? "");
+  const [carMake, setCarMake] = useState(e?.carMake ?? "");
+  const [carModel, setCarModel] = useState(e?.carModel ?? "");
+  const [carVariant, setCarVariant] = useState(e?.carVariant ?? "");
+  const [location, setLocation] = useState(e?.location ?? "");
+  const [customerRequirements, setCustomerRequirements] = useState(e?.customerRequirements ?? "");
+  const [budget, setBudget] = useState(e?.budget != null ? String(e.budget) : "");
+  const [sentiment, setSentiment] = useState<SentimentType | "">(e?.sentiment ?? "");
+  const [followUpRequired, setFollowUpRequired] = useState(e?.followUpRequired ?? false);
+  const [followUpDate, setFollowUpDate] = useState(e?.followUpDate ? e.followUpDate.slice(0, 10) : "");
+  const [summary, setSummary] = useState(e?.summary ?? "");
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -316,10 +334,29 @@ function CallEditForm({
       const original = new Date(call.callDate);
       const [year, month, day] = callDate.split("-").map(Number);
       original.setFullYear(year, month - 1, day);
-      const dto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId };
-      const updated = await api.calls.update(call.id, dto);
+      const callDto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId };
+      const updatedCall = await api.calls.update(call.id, callDto);
+
+      let updatedExtraction = call.extraction;
+      if (e) {
+        const extractionDto: UpdateExtractionInput = {
+          customerName: customerName.trim() || undefined,
+          carMake: carMake.trim() || undefined,
+          carModel: carModel.trim() || undefined,
+          carVariant: carVariant.trim() || undefined,
+          location: location.trim() || undefined,
+          customerRequirements: customerRequirements.trim() || undefined,
+          budget: budget ? Number(budget) : undefined,
+          followUpRequired,
+          followUpDate: followUpDate || undefined,
+          summary: summary.trim() || undefined,
+          sentiment: sentiment || undefined,
+        };
+        updatedExtraction = await api.calls.updateExtraction(call.id, extractionDto);
+      }
+
       toast.show("Call updated.", "success");
-      onSaved(updated);
+      onSaved({ ...updatedCall, extraction: updatedExtraction });
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Failed to save changes", "error");
     } finally {
@@ -335,10 +372,10 @@ function CallEditForm({
           <X size={15} />
         </button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
         <label style={editFieldLabelStyle}>
           Category
-          <select style={editInputStyle} value={category} onChange={(e) => setCategory(e.target.value as BusinessCategory)}>
+          <select style={editInputStyle} value={category} onChange={(ev) => setCategory(ev.target.value as BusinessCategory)}>
             {CATEGORY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -346,11 +383,11 @@ function CallEditForm({
         </label>
         <label style={editFieldLabelStyle}>
           Call date
-          <input type="date" style={editInputStyle} value={callDate} onChange={(e) => setCallDate(e.target.value)} />
+          <input type="date" style={editInputStyle} value={callDate} onChange={(ev) => setCallDate(ev.target.value)} />
         </label>
         <label style={editFieldLabelStyle}>
           Employee
-          <select style={editInputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+          <select style={editInputStyle} value={employeeId} onChange={(ev) => setEmployeeId(ev.target.value)}>
             <option value="">Unassigned</option>
             {employees.map((emp) => (
               <option key={emp.id} value={emp.id}>{emp.name}</option>
@@ -358,6 +395,73 @@ function CallEditForm({
           </select>
         </label>
       </div>
+
+      {!e && (
+        <p style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 12 }}>
+          This call has no AI extraction yet -- only category, date, and employee can be edited until it does.
+        </p>
+      )}
+
+      {e && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <label style={editFieldLabelStyle}>
+              Customer name
+              <input style={editInputStyle} value={customerName} onChange={(ev) => setCustomerName(ev.target.value)} />
+            </label>
+            <label style={editFieldLabelStyle}>
+              Car make
+              <input style={editInputStyle} value={carMake} onChange={(ev) => setCarMake(ev.target.value)} />
+            </label>
+            <label style={editFieldLabelStyle}>
+              Car model
+              <input style={editInputStyle} value={carModel} onChange={(ev) => setCarModel(ev.target.value)} />
+            </label>
+            <label style={editFieldLabelStyle}>
+              Variant
+              <input style={editInputStyle} value={carVariant} onChange={(ev) => setCarVariant(ev.target.value)} />
+            </label>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <label style={editFieldLabelStyle}>
+              Location
+              <input style={editInputStyle} value={location} onChange={(ev) => setLocation(ev.target.value)} />
+            </label>
+            <label style={editFieldLabelStyle}>
+              Budget (₹)
+              <input type="number" style={editInputStyle} value={budget} onChange={(ev) => setBudget(ev.target.value)} />
+            </label>
+          </div>
+          <label style={{ ...editFieldLabelStyle, marginBottom: 12 }}>
+            Customer requirements
+            <textarea style={{ ...editInputStyle, minHeight: 50, resize: "vertical" }} value={customerRequirements} onChange={(ev) => setCustomerRequirements(ev.target.value)} />
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12, alignItems: "end" }}>
+            <label style={editFieldLabelStyle}>
+              Sentiment
+              <select style={editInputStyle} value={sentiment} onChange={(ev) => setSentiment(ev.target.value as SentimentType | "")}>
+                <option value="">—</option>
+                {SENTIMENT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-soft)", paddingBottom: 8 }}>
+              <input type="checkbox" checked={followUpRequired} onChange={(ev) => setFollowUpRequired(ev.target.checked)} style={{ accentColor: "var(--brand)" }} />
+              Follow-up required
+            </label>
+            <label style={editFieldLabelStyle}>
+              Follow-up date
+              <input type="date" style={editInputStyle} value={followUpDate} onChange={(ev) => setFollowUpDate(ev.target.value)} disabled={!followUpRequired} />
+            </label>
+          </div>
+          <label style={{ ...editFieldLabelStyle, marginBottom: 16 }}>
+            Summary
+            <textarea style={{ ...editInputStyle, minHeight: 60, resize: "vertical" }} value={summary} onChange={(ev) => setSummary(ev.target.value)} />
+          </label>
+        </>
+      )}
+
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={handleSave} disabled={saving} style={editPrimaryButtonStyle}>
           <Save size={14} /> {saving ? "Saving…" : "Save changes"}
