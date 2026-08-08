@@ -153,6 +153,31 @@ export interface TopProductPoint {
   count: number;
 }
 
+export interface ExtractedEntry {
+  customerName: string | null;
+  phoneNumber: string | null;
+  businessCategory: BusinessCategory | null;
+  callDate: string | null;
+  employeeName: string | null;
+  carMake: string | null;
+  carModel: string | null;
+  carVariant: string | null;
+  productsDiscussed: string[];
+  customerRequirements: string | null;
+  budget: number | null;
+  followUpRequired: boolean;
+  followUpDate: string | null;
+  summary: string | null;
+  sentiment: SentimentType | null;
+  rawNoteText: string;
+}
+
+export interface PhotoExtractResult {
+  sourceFile: string;
+  entries: ExtractedEntry[];
+  error?: string;
+}
+
 export interface AuditLogEntry {
   id: string;
   action: string;

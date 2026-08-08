@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import type {
   AppUser,
   AuditLogEntry,
+  BusinessCategory,
   BusinessNumber,
   Call,
   CallExtraction,
@@ -12,6 +13,7 @@ import type {
   FollowUpBreakdownPoint,
   FollowUpStatus,
   Paginated,
+  PhotoExtractResult,
   Product,
   ReportsSummary,
   SentimentType,
@@ -125,6 +127,24 @@ export interface InviteTeamMemberInput {
   redirectTo: string;
 }
 
+export interface CommitPhotoRowInput {
+  phoneNumber?: string;
+  businessCategory: BusinessCategory;
+  callDate: string;
+  customerName?: string;
+  employeeId?: string;
+  carMake?: string;
+  carModel?: string;
+  carVariant?: string;
+  productsDiscussed?: string[];
+  customerRequirements?: string;
+  budget?: number;
+  followUpRequired?: boolean;
+  followUpDate?: string;
+  summary?: string;
+  sentiment?: SentimentType;
+}
+
 export interface ImportResult {
   imported: number;
   skipped: number;
@@ -230,6 +250,13 @@ export const api = {
       return request<ImportResult>("/import/calls", { method: "POST", body });
     },
     history: () => request<AuditLogEntry[]>("/import/calls/history"),
+    extractPhotos: (files: File[]) => {
+      const body = new FormData();
+      files.forEach((f) => body.append("files", f));
+      return request<PhotoExtractResult[]>("/import/photos/extract", { method: "POST", body });
+    },
+    commitPhotoRows: (rows: CommitPhotoRowInput[]) =>
+      request<ImportResult>("/import/photos/commit", { method: "POST", body: JSON.stringify({ rows }) }),
   },
 
   team: {
