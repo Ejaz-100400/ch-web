@@ -13,7 +13,9 @@ type ExportFormat = "xlsx" | "pdf";
 function summarizeFilters(filters: Record<string, unknown> | undefined, employees: Employee[]): string {
   if (!filters) return "All calls";
   const parts: string[] = [];
-  if (filters.category) parts.push(filters.category === "car_glasses" ? "Car Glasses" : "Car Modifications");
+  if (filters.category) {
+    parts.push(filters.category === "car_glasses" ? "Car Glasses" : filters.category === "car_modifications" ? "Car Modifications" : "Unknown");
+  }
   if (filters.employeeId) parts.push(employees.find((e) => e.id === filters.employeeId)?.name ?? "employee");
   if (filters.dateFrom || filters.dateTo) parts.push(`${filters.dateFrom ?? "…"} – ${filters.dateTo ?? "…"}`);
   return parts.length ? parts.join(", ") : "All calls";
@@ -22,6 +24,7 @@ function summarizeFilters(filters: Record<string, unknown> | undefined, employee
 const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
+  { value: "unknown", label: "Unknown" },
 ];
 
 const FORMATS: { value: ExportFormat; label: string; icon: typeof FileText; description: string }[] = [

@@ -21,6 +21,8 @@ export default function CustomerList() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [phone, setPhone] = useState("");
+  const [debouncedPhone, setDebouncedPhone] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -35,16 +37,17 @@ export default function CustomerList() {
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(search);
+      setDebouncedPhone(phone);
       setPage(1);
     }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, phone]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     api.customers
-      .list({ search: debouncedSearch || undefined, page, pageSize: PAGE_SIZE })
+      .list({ search: debouncedSearch || undefined, phone: debouncedPhone || undefined, page, pageSize: PAGE_SIZE })
       .then((res) => {
         if (!active) return;
         setCustomers(res.items);
@@ -60,7 +63,7 @@ export default function CustomerList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, debouncedPhone, page]);
 
   async function toggleExpand(customer: Customer) {
     const isOpen = expanded === customer.id;
@@ -78,7 +81,7 @@ export default function CustomerList() {
     }
   }
 
-  const hasActiveFilters = Boolean(search);
+  const hasActiveFilters = Boolean(search || phone);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
@@ -114,8 +117,22 @@ export default function CustomerList() {
       {showDuplicates && canManage(appUser?.role) && <DuplicatesPanel onClose={() => setShowDuplicates(false)} onMerged={() => setPage(1)} />}
 
       <FilterBar>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name or phone" />
-        {hasActiveFilters && <ClearFiltersButton onClick={() => setSearch("")} />}
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by name" />
+        <input
+          type="text"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Phone number"
+          style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 150 }}
+        />
+        {hasActiveFilters && (
+          <ClearFiltersButton
+            onClick={() => {
+              setSearch("");
+              setPhone("");
+            }}
+          />
+        )}
       </FilterBar>
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>

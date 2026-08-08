@@ -17,6 +17,7 @@ const SENTIMENT_META: Record<SentimentType, { label: string; color: string; bg: 
 const CATEGORY_META: Record<BusinessCategory, { label: string; color: string; bg: string }> = {
   car_glasses: { label: "Car Glasses", color: "var(--brand-strong)", bg: "var(--brand-soft)" },
   car_modifications: { label: "Car Modifications", color: "var(--violet)", bg: "var(--violet-soft)" },
+  unknown: { label: "Unknown", color: "var(--text-faint)", bg: "var(--border-soft)" },
 };
 
 const FOLLOWUP_STATUS_META: Record<FollowUpStatus, { label: string; color: string; bg: string }> = {

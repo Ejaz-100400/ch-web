@@ -15,6 +15,7 @@ const PAGE_SIZE = 20;
 const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
+  { value: "unknown", label: "Unknown" },
 ];
 
 export default function CallList() {
@@ -23,6 +24,8 @@ export default function CallList() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [phone, setPhone] = useState("");
+  const [debouncedPhone, setDebouncedPhone] = useState("");
   const [carModel, setCarModel] = useState("");
   const [category, setCategory] = useState("");
   const [employeeId, setEmployeeId] = useState("");
@@ -42,10 +45,11 @@ export default function CallList() {
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(search);
+      setDebouncedPhone(phone);
       setPage(1);
     }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, phone]);
 
   useEffect(() => {
     setPage(1);
@@ -57,6 +61,7 @@ export default function CallList() {
     api.calls
       .list({
         search: debouncedSearch || undefined,
+        phone: debouncedPhone || undefined,
         carModel: carModel || undefined,
         category: category || undefined,
         employeeId: employeeId || undefined,
@@ -80,13 +85,14 @@ export default function CallList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, carModel, category, employeeId, dateFrom, dateTo, page]);
+  }, [debouncedSearch, debouncedPhone, carModel, category, employeeId, dateFrom, dateTo, page]);
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
-  const hasActiveFilters = Boolean(search || carModel || category || employeeId || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(search || phone || carModel || category || employeeId || dateFrom || dateTo);
 
   function clearFilters() {
     setSearch("");
+    setPhone("");
     setCarModel("");
     setCategory("");
     setEmployeeId("");
@@ -106,6 +112,13 @@ export default function CallList() {
 
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Search customer name or summary" />
+        <input
+          type="text"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Phone number"
+          style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 130 }}
+        />
         <FilterSelect label="Category" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
         <FilterSelect label="Employee" value={employeeId} onChange={setEmployeeId} options={employeeOptions} />
         <input

@@ -2,7 +2,7 @@
 // dashboard consumes. Keep field names/casing identical to the API's JSON
 // responses (camelCase) so no mapping layer is needed.
 
-export type BusinessCategory = "car_glasses" | "car_modifications";
+export type BusinessCategory = "car_glasses" | "car_modifications" | "unknown";
 
 export type CallStatus = "pending" | "processing" | "completed" | "failed";
 
@@ -46,7 +46,8 @@ export interface Customer {
 export interface Product {
   id: string;
   name: string;
-  category: BusinessCategory;
+  // Products always belong to a real business line -- unlike calls, "unknown" never applies here.
+  category: "car_glasses" | "car_modifications";
   active: boolean;
   createdAt: string;
 }

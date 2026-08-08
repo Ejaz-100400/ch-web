@@ -21,6 +21,7 @@ type Tab = "excel" | "photos";
 const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
+  { value: "unknown", label: "Unknown" },
 ];
 
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
@@ -383,20 +384,20 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
     setDrafts((prev) => prev.filter((d) => d.key !== key));
   }
 
-  const invalidCount = drafts.filter((d) => !d.businessCategory || !d.callDate).length;
+  const invalidCount = drafts.filter((d) => !d.phoneNumber.trim()).length;
 
   async function handleCommit() {
     if (drafts.length === 0) return;
     if (invalidCount > 0) {
-      toast.show(`${invalidCount} row${invalidCount === 1 ? "" : "s"} still need${invalidCount === 1 ? "s" : ""} a category and date before importing.`, "error");
+      toast.show(`${invalidCount} row${invalidCount === 1 ? "" : "s"} still need${invalidCount === 1 ? "s" : ""} a phone number before importing.`, "error");
       return;
     }
     setCommitting(true);
     try {
       const rows: CommitPhotoRowInput[] = drafts.map((d) => ({
-        phoneNumber: d.phoneNumber.trim() || undefined,
-        businessCategory: d.businessCategory as BusinessCategory,
-        callDate: d.callDate,
+        phoneNumber: d.phoneNumber.trim(),
+        businessCategory: d.businessCategory || undefined,
+        callDate: d.callDate || undefined,
         customerName: d.customerName.trim() || undefined,
         employeeId: d.employeeId || undefined,
         carMake: d.carMake.trim() || undefined,
@@ -481,7 +482,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
           </div>
           <p style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 16 }}>
             Compare each card's fields against the original note (the quoted text is Claude's raw reading) and fix anything wrong.
-            <strong> Category and date are required</strong> to import a row — everything else can stay blank/Unknown.
+            <strong> A phone number is required</strong> to import a row — everything else, including category and date, can stay Unknown.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -523,7 +524,7 @@ function DraftCard({
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove: () => void;
 }) {
-  const needsAttention = !draft.businessCategory || !draft.callDate;
+  const needsAttention = !draft.phoneNumber.trim();
   return (
     <div
       className="fade-in-up"
@@ -552,19 +553,19 @@ function DraftCard({
         <Field label="Customer name">
           <input style={inputStyle} value={draft.customerName} onChange={(e) => onChange({ customerName: e.target.value })} placeholder="Unknown" />
         </Field>
-        <Field label="Phone">
-          <input style={inputStyle} value={draft.phoneNumber} onChange={(e) => onChange({ phoneNumber: e.target.value })} placeholder="Unknown" />
+        <Field label="Phone *">
+          <input style={{ ...inputStyle, borderColor: !draft.phoneNumber.trim() ? "var(--amber)" : "var(--border)" }} value={draft.phoneNumber} onChange={(e) => onChange({ phoneNumber: e.target.value })} placeholder="Required" />
         </Field>
-        <Field label="Category *">
-          <select style={{ ...inputStyle, borderColor: !draft.businessCategory ? "var(--amber)" : "var(--border)" }} value={draft.businessCategory} onChange={(e) => onChange({ businessCategory: e.target.value as BusinessCategory })}>
-            <option value="">Select…</option>
+        <Field label="Category">
+          <select style={inputStyle} value={draft.businessCategory} onChange={(e) => onChange({ businessCategory: e.target.value as BusinessCategory })}>
+            <option value="">Unknown</option>
             {CATEGORY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </Field>
-        <Field label="Call date *">
-          <input type="date" style={{ ...inputStyle, borderColor: !draft.callDate ? "var(--amber)" : "var(--border)" }} value={draft.callDate} onChange={(e) => onChange({ callDate: e.target.value })} />
+        <Field label="Call date">
+          <input type="date" style={inputStyle} value={draft.callDate} onChange={(e) => onChange({ callDate: e.target.value })} placeholder="Unknown" />
         </Field>
         <Field label="Employee">
           <select style={inputStyle} value={draft.employeeId} onChange={(e) => onChange({ employeeId: e.target.value })}>

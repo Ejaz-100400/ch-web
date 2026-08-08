@@ -128,9 +128,9 @@ export interface InviteTeamMemberInput {
 }
 
 export interface CommitPhotoRowInput {
-  phoneNumber?: string;
-  businessCategory: BusinessCategory;
-  callDate: string;
+  phoneNumber: string;
+  businessCategory?: BusinessCategory;
+  callDate?: string;
   customerName?: string;
   employeeId?: string;
   carMake?: string;
