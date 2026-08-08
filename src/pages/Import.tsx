@@ -9,11 +9,13 @@ import {
   Camera,
   X,
   ScanLine,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { api, ApiError, downloadBlob, type CommitPhotoRowInput, type ImportResult } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
-import { formatDateTime } from "../lib/format";
+import { formatDate, formatDateTime } from "../lib/format";
 import type { AuditLogEntry, BusinessCategory, Employee, ExtractedEntry, SentimentType } from "../types";
 
 type Tab = "excel" | "photos";
@@ -23,6 +25,16 @@ const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
   { value: "car_modifications", label: "Car Modifications" },
   { value: "unknown", label: "Unknown" },
 ];
+
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
+
+interface ImportedRowDetail {
+  customerName?: string;
+  phoneNumber: string;
+  businessCategory: BusinessCategory;
+  callDate: string;
+  location?: string;
+}
 
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "interested", label: "Interested" },
@@ -35,6 +47,7 @@ export default function Import() {
   const [tab, setTab] = useState<Tab>("excel");
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
   useEffect(() => {
     loadHistory();
@@ -81,30 +94,68 @@ export default function Import() {
               const imported = (h.details?.imported as number | undefined) ?? 0;
               const skipped = (h.details?.skipped as number | undefined) ?? 0;
               const source = h.details?.source === "photo_ocr" ? "Photo scan" : "Spreadsheet";
+              const rows = (h.details?.rows as ImportedRowDetail[] | undefined) ?? [];
+              const isOpen = expandedHistoryId === h.id;
               return (
-                <div
-                  key={h.id}
-                  className="fade-in-up"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "12px 14px",
-                    border: "1px solid var(--border-soft)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", flexShrink: 0 }}>
-                    <History size={16} color="var(--brand-strong)" />
-                  </span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                      {imported} imported{skipped > 0 ? `, ${skipped} skipped` : ""}
+                <div key={h.id} className="fade-in-up" style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)" }}>
+                  <button
+                    onClick={() => setExpandedHistoryId(isOpen ? null : h.id)}
+                    disabled={rows.length === 0}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      padding: "12px 14px",
+                      background: "transparent",
+                      border: "none",
+                      textAlign: "left",
+                      cursor: rows.length === 0 ? "default" : "pointer",
+                    }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", flexShrink: 0 }}>
+                      <History size={16} color="var(--brand-strong)" />
+                    </span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                        {imported} imported{skipped > 0 ? `, ${skipped} skipped` : ""}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
+                        {source} · {h.user?.name ?? "Unknown user"} · {formatDateTime(h.createdAt)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
-                      {source} · {h.user?.name ?? "Unknown user"} · {formatDateTime(h.createdAt)}
+                    {rows.length > 0 && (
+                      <span style={{ color: "var(--text-faint)", flexShrink: 0, display: "flex" }}>
+                        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </span>
+                    )}
+                  </button>
+
+                  {isOpen && rows.length > 0 && (
+                    <div className="expand-row-anim" style={{ padding: "0 14px 12px 60px", display: "flex", flexDirection: "column", gap: 6 }}>
+                      {rows.map((r, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            fontSize: 12.5,
+                            padding: "8px 10px",
+                            border: "1px solid var(--border-soft)",
+                            borderRadius: "var(--radius-sm)",
+                            background: "var(--paper)",
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "4px 10px",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700 }}>{r.customerName || r.phoneNumber}</span>
+                          {r.customerName && <span style={{ color: "var(--text-faint)" }}>{r.phoneNumber}</span>}
+                          <span style={{ color: "var(--text-faint)" }}>· {CATEGORY_LABELS[r.businessCategory] ?? r.businessCategory}</span>
+                          <span style={{ color: "var(--text-faint)" }}>· {formatDate(r.callDate)}</span>
+                          {r.location && <span style={{ color: "var(--text-faint)" }}>· {r.location}</span>}
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
@@ -285,6 +336,7 @@ interface DraftRow {
   carMake: string;
   carModel: string;
   carVariant: string;
+  location: string;
   productsDiscussed: string;
   customerRequirements: string;
   budget: string;
@@ -317,6 +369,7 @@ function toDraftRow(sourceFile: string, entry: ExtractedEntry, employees: Employ
     carMake: entry.carMake ?? "",
     carModel: entry.carModel ?? "",
     carVariant: entry.carVariant ?? "",
+    location: entry.location ?? "",
     productsDiscussed: entry.productsDiscussed.join(", "),
     customerRequirements: entry.customerRequirements ?? "",
     budget: entry.budget != null ? String(entry.budget) : "",
@@ -403,6 +456,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         carMake: d.carMake.trim() || undefined,
         carModel: d.carModel.trim() || undefined,
         carVariant: d.carVariant.trim() || undefined,
+        location: d.location.trim() || undefined,
         productsDiscussed: d.productsDiscussed.split(",").map((p) => p.trim()).filter(Boolean),
         customerRequirements: d.customerRequirements.trim() || undefined,
         budget: d.budget ? Number(d.budget) : undefined,
@@ -583,6 +637,9 @@ function DraftCard({
         </Field>
         <Field label="Variant">
           <input style={inputStyle} value={draft.carVariant} onChange={(e) => onChange({ carVariant: e.target.value })} placeholder="Unknown" />
+        </Field>
+        <Field label="Location">
+          <input style={inputStyle} value={draft.location} onChange={(e) => onChange({ location: e.target.value })} placeholder="Unknown" />
         </Field>
         <Field label="Budget (₹)">
           <input type="number" style={inputStyle} value={draft.budget} onChange={(e) => onChange({ budget: e.target.value })} placeholder="Unknown" />

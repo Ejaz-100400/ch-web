@@ -136,6 +136,7 @@ export interface CommitPhotoRowInput {
   carMake?: string;
   carModel?: string;
   carVariant?: string;
+  location?: string;
   productsDiscussed?: string[];
   customerRequirements?: string;
   budget?: number;
@@ -156,6 +157,7 @@ export interface UpdateExtractionInput {
   carMake?: string;
   carModel?: string;
   carVariant?: string;
+  location?: string;
   customerRequirements?: string;
   budget?: number;
   followUpRequired?: boolean;

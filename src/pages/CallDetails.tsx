@@ -12,6 +12,7 @@ import {
   Car,
   Wallet,
   CalendarClock,
+  MapPin,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
@@ -83,6 +84,7 @@ export default function CallDetails() {
       carMake: e.carMake ?? undefined,
       carModel: e.carModel ?? undefined,
       carVariant: e.carVariant ?? undefined,
+      location: e.location ?? undefined,
       customerRequirements: e.customerRequirements ?? undefined,
       budget: e.budget ?? undefined,
       followUpRequired: e.followUpRequired,
@@ -323,6 +325,7 @@ export default function CallDetails() {
                   {(e.carMake || e.carModel || e.carVariant) && (
                     <InfoPill icon={Car} text={[e.carMake, e.carModel, e.carVariant].filter(Boolean).join(" ")} />
                   )}
+                  {e.location && <InfoPill icon={MapPin} text={e.location} />}
                   {e.budget != null && <InfoPill icon={Wallet} text={formatCurrency(e.budget)} />}
                   {e.followUpRequired && (
                     <InfoPill icon={CalendarClock} text={e.followUpDate ? `Follow up by ${e.followUpDate.slice(0, 10)}` : "Follow-up required"} />
@@ -376,6 +379,9 @@ export default function CallDetails() {
                   </FormRow>
                   <FormRow label="Variant">
                     <input style={inputStyle} value={form.carVariant ?? ""} onChange={(ev) => setForm((f) => ({ ...f, carVariant: ev.target.value }))} />
+                  </FormRow>
+                  <FormRow label="Location">
+                    <input style={inputStyle} value={form.location ?? ""} onChange={(ev) => setForm((f) => ({ ...f, location: ev.target.value }))} />
                   </FormRow>
                 </div>
                 <FormRow label="Customer requirements">

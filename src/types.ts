@@ -70,6 +70,7 @@ export interface CallExtraction {
   carMake: string | null;
   carModel: string | null;
   carVariant: string | null;
+  location: string | null;
   productsDiscussed: string[];
   customerRequirements: string | null;
   budget: number | null;
@@ -163,6 +164,7 @@ export interface ExtractedEntry {
   carMake: string | null;
   carModel: string | null;
   carVariant: string | null;
+  location: string | null;
   productsDiscussed: string[];
   customerRequirements: string | null;
   budget: number | null;
