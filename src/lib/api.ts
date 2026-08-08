@@ -152,6 +152,12 @@ export interface ImportResult {
   errors: { row: number; reason: string }[];
 }
 
+export interface UpdateCallInput {
+  businessCategory?: BusinessCategory;
+  callDate?: string;
+  employeeId?: string;
+}
+
 export interface UpdateExtractionInput {
   customerName?: string;
   carMake?: string;
@@ -175,6 +181,7 @@ export const api = {
     list: (q: CallsQuery = {}) => request<Paginated<Call>>(`/calls${query(q)}`),
     get: (id: string) => request<Call>(`/calls/${id}`),
     recording: (id: string) => request<{ url: string; expiresAt: string }>(`/calls/${id}/recording`),
+    update: (id: string, dto: UpdateCallInput) => request<Call>(`/calls/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
     updateExtraction: (id: string, dto: UpdateExtractionInput) =>
       request<CallExtraction>(`/calls/${id}/extraction`, { method: "PATCH", body: JSON.stringify(dto) }),
     remove: (id: string) => request<{ deleted: true }>(`/calls/${id}`, { method: "DELETE" }),

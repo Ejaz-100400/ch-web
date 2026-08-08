@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PhoneCall } from "lucide-react";
+import { PhoneCall, Pencil, Save, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
-import { api, ApiError } from "../lib/api";
+import { api, ApiError, type UpdateCallInput } from "../lib/api";
+import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatDuration, formatDateTime } from "../lib/format";
-import type { Call, Employee } from "../types";
+import type { BusinessCategory, Call, Employee } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -21,6 +22,9 @@ const CATEGORY_OPTIONS = [
 export default function CallList() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === "admin";
+  const [editingCall, setEditingCall] = useState<Call | null>(null);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -101,6 +105,11 @@ export default function CallList() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const gridCols = isAdmin ? "130px 1fr 1.4fr 1fr 90px 1fr 1.2fr 40px" : "130px 1fr 1.4fr 1fr 90px 1fr 1.2fr";
+
+  function refreshCall(updated: Call) {
+    setCalls((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+  }
 
   return (
     <div>
@@ -145,6 +154,15 @@ export default function CallList() {
         {hasActiveFilters && <ClearFiltersButton onClick={clearFilters} />}
       </FilterBar>
 
+      {editingCall && (
+        <CallEditForm
+          call={editingCall}
+          employees={employees}
+          onClose={() => setEditingCall(null)}
+          onSaved={(c) => { refreshCall(c); setEditingCall(null); }}
+        />
+      )}
+
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
         {loading ? "Loading…" : `${total} call${total === 1 ? "" : "s"}`}
       </div>
@@ -164,7 +182,7 @@ export default function CallList() {
           className="mono"
           style={{
             display: "grid",
-            gridTemplateColumns: "130px 1fr 1.4fr 1fr 90px 1fr 1.2fr",
+            gridTemplateColumns: gridCols,
             padding: "10px 18px",
             fontSize: 11,
             fontFamily: "var(--font-body)",
@@ -182,19 +200,23 @@ export default function CallList() {
           <span>Duration</span>
           <span>Status</span>
           <span>Sentiment</span>
+          {isAdmin && <span />}
         </div>
 
         {loading && <SkeletonRows rows={8} />}
 
         {!loading &&
           calls.map((call) => (
-            <button
+            <div
               key={call.id}
+              role="button"
+              tabIndex={0}
               onClick={() => navigate(`/calls/${call.id}`)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate(`/calls/${call.id}`); }}
               style={{
                 width: "100%",
                 display: "grid",
-                gridTemplateColumns: "130px 1fr 1.4fr 1fr 90px 1fr 1.2fr",
+                gridTemplateColumns: gridCols,
                 alignItems: "center",
                 padding: "12px 18px",
                 background: "transparent",
@@ -202,6 +224,7 @@ export default function CallList() {
                 borderBottom: "1px solid var(--border-soft)",
                 textAlign: "left",
                 fontSize: 13,
+                cursor: "pointer",
                 transition: "background 120ms ease",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--paper)")}
@@ -227,7 +250,17 @@ export default function CallList() {
               </span>
               <CallStatusBadge status={call.status} />
               {call.extraction?.sentiment ? <SentimentBadge sentiment={call.extraction.sentiment} /> : <span style={{ color: "var(--text-faint)" }}>—</span>}
-            </button>
+              {isAdmin && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditingCall(call); }}
+                  aria-label="Edit call"
+                  title="Edit"
+                  style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex", padding: 6, justifySelf: "start" }}
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -257,6 +290,135 @@ export default function CallList() {
     </div>
   );
 }
+
+function CallEditForm({
+  call,
+  employees,
+  onClose,
+  onSaved,
+}: {
+  call: Call;
+  employees: Employee[];
+  onClose: () => void;
+  onSaved: (updated: Call) => void;
+}) {
+  const toast = useToast();
+  const [category, setCategory] = useState<BusinessCategory>(call.businessCategory);
+  const [callDate, setCallDate] = useState(call.callDate.slice(0, 10));
+  const [employeeId, setEmployeeId] = useState(call.employeeId ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      // The date input only edits the day -- keep the original time-of-day rather
+      // than silently collapsing it to midnight when the date itself is unchanged.
+      const original = new Date(call.callDate);
+      const [year, month, day] = callDate.split("-").map(Number);
+      original.setFullYear(year, month - 1, day);
+      const dto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId };
+      const updated = await api.calls.update(call.id, dto);
+      toast.show("Call updated.", "success");
+      onSaved(updated);
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to save changes", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fade-in-up" style={{ ...editCardStyle, marginBottom: 18, padding: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Edit call</div>
+        <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
+          <X size={15} />
+        </button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <label style={editFieldLabelStyle}>
+          Category
+          <select style={editInputStyle} value={category} onChange={(e) => setCategory(e.target.value as BusinessCategory)}>
+            {CATEGORY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+        <label style={editFieldLabelStyle}>
+          Call date
+          <input type="date" style={editInputStyle} value={callDate} onChange={(e) => setCallDate(e.target.value)} />
+        </label>
+        <label style={editFieldLabelStyle}>
+          Employee
+          <select style={editInputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+            <option value="">Unassigned</option>
+            {employees.map((emp) => (
+              <option key={emp.id} value={emp.id}>{emp.name}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={handleSave} disabled={saving} style={editPrimaryButtonStyle}>
+          <Save size={14} /> {saving ? "Saving…" : "Save changes"}
+        </button>
+        <button onClick={onClose} style={editSecondaryButtonStyle}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const editCardStyle = {
+  background: "var(--paper-raised)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-md)",
+  boxShadow: "var(--shadow-card)",
+} as const;
+
+const editFieldLabelStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 5,
+  fontSize: 12,
+  fontWeight: 600,
+  color: "var(--text-soft)",
+  minWidth: 0,
+} as const;
+
+const editInputStyle = {
+  width: "100%",
+  padding: "8px 10px",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  background: "var(--paper)",
+  fontSize: 13,
+  fontWeight: 400,
+} as const;
+
+const editPrimaryButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "9px 15px",
+  background: "var(--brand)",
+  color: "var(--on-brand)",
+  border: "none",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13.5,
+  fontWeight: 700,
+} as const;
+
+const editSecondaryButtonStyle = {
+  padding: "9px 15px",
+  background: "var(--paper)",
+  color: "var(--text)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13.5,
+  fontWeight: 600,
+} as const;
 
 function pagerButtonStyle(disabled: boolean) {
   return {

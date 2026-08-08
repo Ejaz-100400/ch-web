@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronRight, Copy, Merge, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Merge, Pencil, Save, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge } from "../components/ui/StatusBadge";
@@ -33,6 +33,12 @@ export default function CustomerList() {
   const [callsLoading, setCallsLoading] = useState<string | null>(null);
 
   const [showDuplicates, setShowDuplicates] = useState(false);
+  const isAdmin = appUser?.role === "admin";
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+
+  function refreshCustomer(updated: Customer) {
+    setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  }
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -83,6 +89,7 @@ export default function CustomerList() {
 
   const hasActiveFilters = Boolean(search || phone);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const gridCols = isAdmin ? "28px 2.1fr 1.3fr 1.6fr 1fr 40px" : "28px 2.1fr 1.3fr 1.6fr 1fr";
 
   return (
     <div>
@@ -115,6 +122,10 @@ export default function CustomerList() {
       />
 
       {showDuplicates && canManage(appUser?.role) && <DuplicatesPanel onClose={() => setShowDuplicates(false)} onMerged={() => setPage(1)} />}
+
+      {editingCustomer && (
+        <CustomerEditForm customer={editingCustomer} onClose={() => setEditingCustomer(null)} onSaved={(c) => { refreshCustomer(c); setEditingCustomer(null); }} />
+      )}
 
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name" />
@@ -154,7 +165,7 @@ export default function CustomerList() {
           className="mono"
           style={{
             display: "grid",
-            gridTemplateColumns: "28px 2.1fr 1.3fr 1.6fr 1fr",
+            gridTemplateColumns: gridCols,
             padding: "10px 18px",
             fontSize: 11,
             fontFamily: "var(--font-body)",
@@ -170,6 +181,7 @@ export default function CustomerList() {
           <span>Phone</span>
           <span>Notes</span>
           <span>Since</span>
+          {isAdmin && <span />}
         </div>
 
         {loading && <SkeletonRows rows={6} />}
@@ -181,18 +193,22 @@ export default function CustomerList() {
 
             return (
               <div key={c.id} style={{ borderBottom: "1px solid var(--border-soft)" }}>
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => toggleExpand(c)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleExpand(c); }}
                   style={{
                     width: "100%",
                     display: "grid",
-                    gridTemplateColumns: "28px 2.1fr 1.3fr 1.6fr 1fr",
+                    gridTemplateColumns: gridCols,
                     alignItems: "center",
                     padding: "12px 18px",
                     background: isOpen ? "var(--paper)" : "transparent",
                     border: "none",
                     textAlign: "left",
                     fontSize: 13.5,
+                    cursor: "pointer",
                   }}
                 >
                   <span style={{ color: "var(--text-faint)", display: "flex" }}>
@@ -211,7 +227,17 @@ export default function CustomerList() {
                     {c.notes ?? "—"}
                   </span>
                   <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{relativeDay(c.createdAt)}</span>
-                </button>
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingCustomer(c); }}
+                      aria-label="Edit customer"
+                      title="Edit"
+                      style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex", padding: 6, justifySelf: "start" }}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                </div>
 
                 {isOpen && (
                   <div className="expand-row-anim" style={{ background: "var(--paper)", padding: "6px 18px 16px 56px" }}>
@@ -289,6 +315,113 @@ export default function CustomerList() {
     </div>
   );
 }
+
+function CustomerEditForm({
+  customer,
+  onClose,
+  onSaved,
+}: {
+  customer: Customer;
+  onClose: () => void;
+  onSaved: (updated: Customer) => void;
+}) {
+  const toast = useToast();
+  const [name, setName] = useState(customer.name ?? "");
+  const [notes, setNotes] = useState(customer.notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const updated = await api.customers.update(customer.id, { name: name.trim() || undefined, notes: notes.trim() || undefined });
+      toast.show("Customer updated.", "success");
+      onSaved(updated);
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to save changes", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fade-in-up" style={{ ...editCardStyle, marginBottom: 18, padding: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Edit customer</div>
+        <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
+          <X size={15} />
+        </button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <label style={editFieldLabelStyle}>
+          Name
+          <input style={editInputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder={customer.phoneNumber} />
+        </label>
+        <label style={editFieldLabelStyle}>
+          Notes
+          <input style={editInputStyle} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={handleSave} disabled={saving} style={editPrimaryButtonStyle}>
+          <Save size={14} /> {saving ? "Saving…" : "Save changes"}
+        </button>
+        <button onClick={onClose} style={editSecondaryButtonStyle}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const editCardStyle = {
+  background: "var(--paper-raised)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-md)",
+  boxShadow: "var(--shadow-card)",
+} as const;
+
+const editFieldLabelStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 5,
+  fontSize: 12,
+  fontWeight: 600,
+  color: "var(--text-soft)",
+  minWidth: 0,
+} as const;
+
+const editInputStyle = {
+  width: "100%",
+  padding: "8px 10px",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  background: "var(--paper)",
+  fontSize: 13,
+  fontWeight: 400,
+} as const;
+
+const editPrimaryButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "9px 15px",
+  background: "var(--brand)",
+  color: "var(--on-brand)",
+  border: "none",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13.5,
+  fontWeight: 700,
+} as const;
+
+const editSecondaryButtonStyle = {
+  padding: "9px 15px",
+  background: "var(--paper)",
+  color: "var(--text)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13.5,
+  fontWeight: 600,
+} as const;
 
 function pagerButtonStyle(disabled: boolean) {
   return {
