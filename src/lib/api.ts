@@ -133,6 +133,7 @@ export interface CommitPhotoRowInput {
   callDate?: string;
   customerName?: string;
   employeeId?: string;
+  durationSeconds?: number;
   carMake?: string;
   carModel?: string;
   carVariant?: string;
@@ -150,6 +151,52 @@ export interface ImportResult {
   imported: number;
   skipped: number;
   errors: { row: number; reason: string }[];
+}
+
+export interface ImportedRowSummary {
+  customerName?: string;
+  phoneNumber: string;
+  businessCategory: BusinessCategory;
+  callDate: string;
+  location?: string;
+}
+
+export interface CommitRowsResult extends ImportResult {
+  importedRows: ImportedRowSummary[];
+}
+
+export interface ParsedExcelRow {
+  sourceRow: number;
+  phoneNumber: string;
+  businessCategory?: BusinessCategory;
+  callDate?: string;
+  customerName?: string;
+  employeeId?: string;
+  durationSeconds?: number;
+  carMake?: string;
+  carModel?: string;
+  carVariant?: string;
+  location?: string;
+  productsDiscussed?: string[];
+  customerRequirements?: string;
+  budget?: number;
+  followUpRequired?: boolean;
+  followUpDate?: string;
+  summary?: string;
+  sentiment?: SentimentType;
+}
+
+export interface ParseExcelResult {
+  rows: ParsedExcelRow[];
+  errors: { row: number; reason: string }[];
+}
+
+export interface RecordImportHistoryInput {
+  source: "excel" | "photo_ocr";
+  imported: number;
+  skipped: number;
+  errors: { row: number; reason: string }[];
+  rows: ImportedRowSummary[];
 }
 
 export interface UpdateCallInput {
@@ -253,10 +300,10 @@ export const api = {
 
   import: {
     template: () => requestBlob("/import/calls/template"),
-    calls: (file: File) => {
+    parseExcel: (file: File) => {
       const body = new FormData();
       body.append("file", file);
-      return request<ImportResult>("/import/calls", { method: "POST", body });
+      return request<ParseExcelResult>("/import/calls", { method: "POST", body });
     },
     history: () => request<AuditLogEntry[]>("/import/calls/history"),
     extractPhotos: (files: File[]) => {
@@ -265,7 +312,9 @@ export const api = {
       return request<PhotoExtractResult[]>("/import/photos/extract", { method: "POST", body });
     },
     commitPhotoRows: (rows: CommitPhotoRowInput[]) =>
-      request<ImportResult>("/import/photos/commit", { method: "POST", body: JSON.stringify({ rows }) }),
+      request<CommitRowsResult>("/import/photos/commit", { method: "POST", body: JSON.stringify({ rows }) }),
+    recordHistory: (dto: RecordImportHistoryInput) =>
+      request<{ recorded: true }>("/import/history", { method: "POST", body: JSON.stringify(dto) }),
   },
 
   team: {

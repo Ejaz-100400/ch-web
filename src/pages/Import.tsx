@@ -13,7 +13,15 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { api, ApiError, downloadBlob, type CommitPhotoRowInput, type ImportResult } from "../lib/api";
+import {
+  api,
+  ApiError,
+  downloadBlob,
+  type CommitPhotoRowInput,
+  type ImportedRowSummary,
+  type ImportResult,
+  type ParsedExcelRow,
+} from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { formatDate, formatDateTime } from "../lib/format";
 import type { AuditLogEntry, BusinessCategory, Employee, ExtractedEntry, SentimentType } from "../types";
@@ -28,12 +36,78 @@ const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
 
 const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
 
-interface ImportedRowDetail {
-  customerName?: string;
-  phoneNumber: string;
-  businessCategory: BusinessCategory;
-  callDate: string;
-  location?: string;
+// Rows are committed in small batches (rather than all at once) purely so the
+// UI can show real progress -- each batch is a real round-trip, not a fake timer.
+const BATCH_SIZE = 15;
+
+async function commitRowsInBatches(
+  rows: CommitPhotoRowInput[],
+  rowNumbers: number[],
+  source: "excel" | "photo_ocr",
+  onProgress: (done: number, total: number) => void,
+): Promise<ImportResult> {
+  const total = rows.length;
+  let imported = 0;
+  let skipped = 0;
+  const errors: { row: number; reason: string }[] = [];
+  const importedRows: ImportedRowSummary[] = [];
+
+  for (let i = 0; i < total; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const res = await api.import.commitPhotoRows(batch);
+    imported += res.imported;
+    skipped += res.skipped;
+    for (const e of res.errors) {
+      const globalIndex = i + (e.row - 1);
+      errors.push({ row: rowNumbers[globalIndex] ?? e.row, reason: e.reason });
+    }
+    importedRows.push(...res.importedRows);
+    onProgress(Math.min(i + BATCH_SIZE, total), total);
+  }
+
+  if (imported > 0 || skipped > 0) {
+    // Non-critical -- the rows are already safely persisted either way.
+    await api.import.recordHistory({ source, imported, skipped, errors, rows: importedRows }).catch(() => {});
+  }
+
+  return { imported, skipped, errors };
+}
+
+function excelRowToCommitInput(r: ParsedExcelRow): CommitPhotoRowInput {
+  return {
+    phoneNumber: r.phoneNumber,
+    businessCategory: r.businessCategory,
+    callDate: r.callDate,
+    customerName: r.customerName,
+    employeeId: r.employeeId,
+    durationSeconds: r.durationSeconds,
+    carMake: r.carMake,
+    carModel: r.carModel,
+    carVariant: r.carVariant,
+    location: r.location,
+    productsDiscussed: r.productsDiscussed,
+    customerRequirements: r.customerRequirements,
+    budget: r.budget,
+    followUpRequired: r.followUpRequired,
+    followUpDate: r.followUpDate,
+    summary: r.summary,
+    sentiment: r.sentiment,
+  };
+}
+
+function ProgressBar({ done, total }: { done: number; total: number }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-soft)", marginBottom: 6 }}>
+        <span>{done} / {total} rows imported</span>
+        <span style={{ fontWeight: 700 }}>{pct}%</span>
+      </div>
+      <div style={{ height: 8, background: "var(--border-soft)", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: "var(--brand)", borderRadius: 999, transition: "width 200ms ease" }} />
+      </div>
+    </div>
+  );
 }
 
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
@@ -94,7 +168,7 @@ export default function Import() {
               const imported = (h.details?.imported as number | undefined) ?? 0;
               const skipped = (h.details?.skipped as number | undefined) ?? 0;
               const source = h.details?.source === "photo_ocr" ? "Photo scan" : "Spreadsheet";
-              const rows = (h.details?.rows as ImportedRowDetail[] | undefined) ?? [];
+              const rows = (h.details?.rows as ImportedRowSummary[] | undefined) ?? [];
               const isOpen = expandedHistoryId === h.id;
               return (
                 <div key={h.id} className="fade-in-up" style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)" }}>
@@ -195,6 +269,7 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
@@ -219,12 +294,31 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
     if (!file) return;
     setUploading(true);
     setResult(null);
+    setProgress(null);
     try {
-      const res = await api.import.calls(file);
-      setResult(res);
+      const parsed = await api.import.parseExcel(file);
+      if (parsed.rows.length === 0) {
+        setResult({ imported: 0, skipped: 0, errors: parsed.errors });
+        toast.show("No rows were imported — check the errors below.", "error");
+        return;
+      }
+
+      setProgress({ done: 0, total: parsed.rows.length });
+      const commitRes = await commitRowsInBatches(
+        parsed.rows.map(excelRowToCommitInput),
+        parsed.rows.map((r) => r.sourceRow),
+        "excel",
+        (done, total) => setProgress({ done, total }),
+      );
+      const combined: ImportResult = {
+        imported: commitRes.imported,
+        skipped: commitRes.skipped + parsed.errors.length,
+        errors: [...parsed.errors, ...commitRes.errors],
+      };
+      setResult(combined);
       toast.show(
-        res.imported > 0 ? `Imported ${res.imported} call${res.imported === 1 ? "" : "s"}.` : "No rows were imported — check the errors below.",
-        res.imported > 0 ? "success" : "error",
+        combined.imported > 0 ? `Imported ${combined.imported} call${combined.imported === 1 ? "" : "s"}.` : "No rows were imported — check the errors below.",
+        combined.imported > 0 ? "success" : "error",
       );
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -233,6 +327,7 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
       toast.show(err instanceof ApiError ? err.message : "Import failed", "error");
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   }
 
@@ -278,8 +373,9 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
           style={{ ...primaryButtonStyle, marginTop: 14, opacity: !file || uploading ? 0.6 : 1 }}
         >
           <Upload size={16} className={uploading ? "spin" : undefined} />
-          {uploading ? "Importing…" : "Upload & import"}
+          {progress ? `Importing… (${progress.done}/${progress.total})` : uploading ? "Reading file…" : "Upload & import"}
         </button>
+        {progress && <ProgressBar done={progress.done} total={progress.total} />}
       </div>
 
       <div style={cardStyle}>
@@ -388,6 +484,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [committing, setCommitting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
 
   useEffect(() => {
@@ -446,6 +543,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
       return;
     }
     setCommitting(true);
+    setProgress({ done: 0, total: drafts.length });
     try {
       const rows: CommitPhotoRowInput[] = drafts.map((d) => ({
         phoneNumber: d.phoneNumber.trim(),
@@ -465,7 +563,12 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         summary: d.summary.trim() || undefined,
         sentiment: d.sentiment || undefined,
       }));
-      const res = await api.import.commitPhotoRows(rows);
+      const res = await commitRowsInBatches(
+        rows,
+        rows.map((_, i) => i + 1),
+        "photo_ocr",
+        (done, total) => setProgress({ done, total }),
+      );
       setResult(res);
       toast.show(res.imported > 0 ? `Imported ${res.imported} call${res.imported === 1 ? "" : "s"}.` : "Nothing was imported — check the errors below.", res.imported > 0 ? "success" : "error");
       setDrafts([]);
@@ -476,6 +579,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
       toast.show(err instanceof ApiError ? err.message : "Import failed", "error");
     } finally {
       setCommitting(false);
+      setProgress(null);
     }
   }
 
@@ -551,9 +655,10 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
             style={{ ...primaryButtonStyle, marginTop: 18, opacity: committing ? 0.7 : 1 }}
           >
             <Upload size={16} className={committing ? "spin" : undefined} />
-            {committing ? "Importing…" : `Import ${drafts.length} row${drafts.length === 1 ? "" : "s"}`}
+            {progress ? `Importing… (${progress.done}/${progress.total})` : `Import ${drafts.length} row${drafts.length === 1 ? "" : "s"}`}
             {invalidCount > 0 && !committing ? ` (${invalidCount} need attention)` : ""}
           </button>
+          {progress && <ProgressBar done={progress.done} total={progress.total} />}
         </div>
       )}
 
