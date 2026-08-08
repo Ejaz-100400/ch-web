@@ -18,16 +18,22 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { Avatar } from "../components/ui/Avatar";
 import { Skeleton } from "../components/ui/Skeleton";
-import { api, ApiError, type UpdateExtractionInput } from "../lib/api";
+import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatCurrency, formatDateTime, formatDuration } from "../lib/format";
-import type { Call, SentimentType } from "../types";
+import type { BusinessCategory, Call, Employee, SentimentType } from "../types";
 
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "interested", label: "Interested" },
   { value: "not_interested", label: "Not interested" },
   { value: "needs_follow_up", label: "Needs follow-up" },
+];
+
+const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
+  { value: "car_glasses", label: "Car Glasses" },
+  { value: "car_modifications", label: "Car Modifications" },
+  { value: "unknown", label: "Unknown" },
 ];
 
 export default function CallDetails() {
@@ -41,9 +47,17 @@ export default function CallDetails() {
   const [notFound, setNotFound] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<UpdateExtractionInput>({});
+  const [category, setCategory] = useState<BusinessCategory>("unknown");
+  const [callDate, setCallDate] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [saving, setSaving] = useState(false);
   const [actionPending, setActionPending] = useState<"reprocess" | "summary" | "delete" | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+  }, []);
 
   async function load(silent = false) {
     if (!id) return;
@@ -92,15 +106,27 @@ export default function CallDetails() {
       summary: e.summary ?? undefined,
       sentiment: e.sentiment ?? undefined,
     });
+    setCategory(call.businessCategory);
+    setCallDate(call.callDate.slice(0, 10));
+    setEmployeeId(call.employeeId ?? "");
     setEditing(true);
   }
 
   async function saveEdit() {
-    if (!id) return;
+    if (!id || !call) return;
     setSaving(true);
     try {
+      if (isAdmin) {
+        // The date input only edits the day -- keep the original time-of-day
+        // rather than silently collapsing it to midnight.
+        const original = new Date(call.callDate);
+        const [year, month, day] = callDate.split("-").map(Number);
+        original.setFullYear(year, month - 1, day);
+        const callDto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId };
+        await api.calls.update(id, callDto);
+      }
       await api.calls.updateExtraction(id, form);
-      toast.show("Extraction updated.", "success");
+      toast.show("Call updated.", "success");
       setEditing(false);
       await load(true);
     } catch (err) {
@@ -367,6 +393,28 @@ export default function CallDetails() {
 
             {e && editing && (
               <div className="fade-in-up" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {isAdmin && (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <FormRow label="Category">
+                      <select style={inputStyle} value={category} onChange={(ev) => setCategory(ev.target.value as BusinessCategory)}>
+                        {CATEGORY_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </FormRow>
+                    <FormRow label="Call date">
+                      <input type="date" style={inputStyle} value={callDate} onChange={(ev) => setCallDate(ev.target.value)} />
+                    </FormRow>
+                    <FormRow label="Employee">
+                      <select style={inputStyle} value={employeeId} onChange={(ev) => setEmployeeId(ev.target.value)}>
+                        <option value="">Unassigned</option>
+                        {employees.map((emp) => (
+                          <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                      </select>
+                    </FormRow>
+                  </div>
+                )}
                 <FormRow label="Customer name">
                   <input style={inputStyle} value={form.customerName ?? ""} onChange={(ev) => setForm((f) => ({ ...f, customerName: ev.target.value }))} />
                 </FormRow>
