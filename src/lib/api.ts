@@ -112,6 +112,7 @@ export interface ReportsQuery {
   carMake?: string;
   carModel?: string;
   sentiment?: SentimentType;
+  productId?: string;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -252,6 +253,8 @@ export const api = {
     remove: (id: string) => request<{ deleted: true }>(`/calls/${id}`, { method: "DELETE" }),
     removeMany: (ids: string[]) =>
       request<{ deleted: number }>("/calls/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
+    carMakes: () => request<string[]>("/calls/car-makes"),
+    carModels: (carMake?: string) => request<string[]>(`/calls/car-models${query({ carMake })}`),
     reprocess: (id: string) => request<{ enqueued: true; callId: string }>(`/calls/${id}/reprocess`, { method: "POST" }),
     processingStatus: (id: string) =>
       request<{ id: string; status: Call["status"]; failureReason: string | null; updatedAt: string }>(

@@ -23,6 +23,7 @@ import type {
   CallsByPeriodPoint,
   Employee,
   FollowUpBreakdownPoint,
+  Product,
   ReportsSummary,
   SentimentBreakdownPoint,
   SentimentType,
@@ -69,10 +70,14 @@ export default function Reports() {
   const [carMake, setCarMake] = useState("");
   const [carModel, setCarModel] = useState("");
   const [sentiment, setSentiment] = useState("");
+  const [productId, setProductId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [carMakeOptions, setCarMakeOptions] = useState<string[]>([]);
+  const [carModelOptions, setCarModelOptions] = useState<string[]>([]);
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [callsByPeriod, setCallsByPeriod] = useState<CallsByPeriodPoint[]>([]);
   const [followUpBreakdown, setFollowUpBreakdown] = useState<FollowUpBreakdownPoint[]>([]);
@@ -84,7 +89,27 @@ export default function Reports() {
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.products.list().then(setProducts).catch(() => setProducts([]));
+    api.calls.carMakes().then(setCarMakeOptions).catch(() => setCarMakeOptions([]));
   }, []);
+
+  // Scope the Car Model dropdown to the selected make, if any -- otherwise
+  // every model on record. A previously-picked model that doesn't belong to
+  // the newly-selected make can't stay selected, so clear it.
+  useEffect(() => {
+    let active = true;
+    api.calls
+      .carModels(carMake || undefined)
+      .then((models) => {
+        if (!active) return;
+        setCarModelOptions(models);
+        setCarModel((prev) => (prev && !models.includes(prev) ? "" : prev));
+      })
+      .catch(() => active && setCarModelOptions([]));
+    return () => {
+      active = false;
+    };
+  }, [carMake]);
 
   useEffect(() => {
     let active = true;
@@ -95,6 +120,7 @@ export default function Reports() {
       carMake: carMake || undefined,
       carModel: carModel || undefined,
       sentiment: (sentiment as SentimentType) || undefined,
+      productId: productId || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     };
@@ -125,7 +151,7 @@ export default function Reports() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [granularity, category, employeeId, carMake, carModel, sentiment, dateFrom, dateTo]);
+  }, [granularity, category, employeeId, carMake, carModel, sentiment, productId, dateFrom, dateTo]);
 
   const volumeData = [...callsByPeriod].reverse().map((p) => ({ period: formatDate(p.period), calls: p.count }));
   const followUpData = followUpBreakdown.map((f) => ({ name: f.status, value: f.count }));
@@ -136,13 +162,14 @@ export default function Reports() {
   const carModelData = topCarModels.map((c) => ({ name: c.car_model, count: c.count }));
   const employeeData = topEmployees.map((e) => ({ name: e.name, count: e.count }));
 
-  const hasActiveFilters = Boolean(category || employeeId || carMake || carModel || sentiment || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(category || employeeId || carMake || carModel || sentiment || productId || dateFrom || dateTo);
   function clearFilters() {
     setCategory("");
     setEmployeeId("");
     setCarMake("");
     setCarModel("");
     setSentiment("");
+    setProductId("");
     setDateFrom("");
     setDateTo("");
   }
@@ -369,23 +396,21 @@ export default function Reports() {
           </FilterField>
 
           <FilterField label="Car make">
-            <input
-              type="text"
-              value={carMake}
-              onChange={(e) => setCarMake(e.target.value)}
-              placeholder="e.g. Maruti"
-              style={filterInputStyle}
-            />
+            <select style={filterInputStyle} value={carMake} onChange={(e) => setCarMake(e.target.value)}>
+              <option value="">All makes</option>
+              {carMakeOptions.map((make) => (
+                <option key={make} value={make}>{make}</option>
+              ))}
+            </select>
           </FilterField>
 
           <FilterField label="Car model">
-            <input
-              type="text"
-              value={carModel}
-              onChange={(e) => setCarModel(e.target.value)}
-              placeholder="e.g. Swift"
-              style={filterInputStyle}
-            />
+            <select style={filterInputStyle} value={carModel} onChange={(e) => setCarModel(e.target.value)}>
+              <option value="">All models</option>
+              {carModelOptions.map((model) => (
+                <option key={model} value={model}>{model}</option>
+              ))}
+            </select>
           </FilterField>
 
           <FilterField label="Sentiment">
@@ -393,6 +418,15 @@ export default function Reports() {
               <option value="">All sentiments</option>
               {SENTIMENT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </FilterField>
+
+          <FilterField label="Product">
+            <select style={filterInputStyle} value={productId} onChange={(e) => setProductId(e.target.value)}>
+              <option value="">All products</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </FilterField>
