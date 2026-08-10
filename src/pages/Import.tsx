@@ -630,7 +630,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
             <strong> A phone number is required</strong> to import a row — everything else, including category and date, can stay Unknown.
           </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: 620, overflowY: "auto", paddingRight: 6 }}>
             {drafts.map((d) => (
               <DraftCard key={d.key} draft={d} employees={employees} onChange={(patch) => updateDraft(d.key, patch)} onRemove={() => removeDraft(d.key)} />
             ))}
