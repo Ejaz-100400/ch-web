@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Search, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 
 export function FilterBar({ children }: { children: ReactNode }) {
   return (
@@ -112,6 +112,58 @@ export function FilterSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+export function AdvancedFiltersToggle({
+  open,
+  count,
+  onClick,
+}: {
+  open: boolean;
+  count: number;
+  onClick: () => void;
+}) {
+  const isActive = open || count > 0;
+  return (
+    <button
+      onClick={onClick}
+      aria-expanded={open}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "9px 14px",
+        border: `1px solid ${isActive ? "var(--brand)" : "var(--border)"}`,
+        borderRadius: "var(--radius-sm)",
+        background: isActive ? "var(--brand-soft)" : "var(--paper)",
+        color: isActive ? "var(--brand-strong)" : "var(--text)",
+        fontSize: 13.5,
+        fontWeight: isActive ? 700 : 600,
+      }}
+    >
+      <SlidersHorizontal size={14} />
+      Advanced filters
+      {count > 0 && (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 17,
+            height: 17,
+            padding: "0 4px",
+            borderRadius: 999,
+            background: "var(--brand)",
+            color: "var(--on-brand)",
+            fontSize: 10.5,
+            fontWeight: 800,
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 

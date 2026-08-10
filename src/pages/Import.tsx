@@ -11,6 +11,7 @@ import {
   ScanLine,
   ChevronDown,
   ChevronRight,
+  UserPlus,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import {
@@ -28,7 +29,7 @@ import { ProgressOverlay } from "../components/ui/ProgressOverlay";
 import { formatDate, formatDateTime } from "../lib/format";
 import type { AuditLogEntry, BusinessCategory, Employee, ExtractedEntry, SentimentType } from "../types";
 
-type Tab = "excel" | "photos";
+type Tab = "excel" | "photos" | "manual";
 
 const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
   { value: "car_glasses", label: "Car Glasses" },
@@ -134,13 +135,12 @@ export default function Import() {
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
         <TabButton active={tab === "excel"} onClick={() => setTab("excel")} icon={FileSpreadsheet} label="Spreadsheet" />
         <TabButton active={tab === "photos"} onClick={() => setTab("photos")} icon={Camera} label="Photo scan" />
+        <TabButton active={tab === "manual"} onClick={() => setTab("manual")} icon={UserPlus} label="Manual entry" />
       </div>
 
-      {tab === "excel" ? (
-        <ExcelImportPanel toast={toast} onImported={loadHistory} />
-      ) : (
-        <PhotoImportPanel toast={toast} onImported={loadHistory} />
-      )}
+      {tab === "excel" && <ExcelImportPanel toast={toast} onImported={loadHistory} />}
+      {tab === "photos" && <PhotoImportPanel toast={toast} onImported={loadHistory} />}
+      {tab === "manual" && <ManualEntryPanel toast={toast} onImported={loadHistory} />}
 
       {/* Who imported what, so it's traceable across the team */}
       <div style={{ ...cardStyle, marginTop: 20 }}>
@@ -154,7 +154,8 @@ export default function Import() {
             {history.map((h) => {
               const imported = (h.details?.imported as number | undefined) ?? 0;
               const skipped = (h.details?.skipped as number | undefined) ?? 0;
-              const source = h.details?.source === "photo_ocr" ? "Photo scan" : "Spreadsheet";
+              const source =
+                h.details?.source === "photo_ocr" ? "Photo scan" : h.details?.source === "manual" ? "Manual entry" : "Spreadsheet";
               const rows = (h.details?.rows as ImportedRowSummary[] | undefined) ?? [];
               const isOpen = expandedHistoryId === h.id;
               return (
@@ -532,24 +533,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
     setCommitting(true);
     setProgress({ done: 0, total: drafts.length });
     try {
-      const rows: CommitPhotoRowInput[] = drafts.map((d) => ({
-        phoneNumber: d.phoneNumber.trim(),
-        businessCategory: d.businessCategory || undefined,
-        callDate: d.callDate || undefined,
-        customerName: d.customerName.trim() || undefined,
-        employeeId: d.employeeId || undefined,
-        carMake: d.carMake.trim() || undefined,
-        carModel: d.carModel.trim() || undefined,
-        carVariant: d.carVariant.trim() || undefined,
-        location: d.location.trim() || undefined,
-        productsDiscussed: d.productsDiscussed.split(",").map((p) => p.trim()).filter(Boolean),
-        customerRequirements: d.customerRequirements.trim() || undefined,
-        budget: d.budget ? Number(d.budget) : undefined,
-        followUpRequired: d.followUpRequired,
-        followUpDate: d.followUpDate || undefined,
-        summary: d.summary.trim() || undefined,
-        sentiment: d.sentiment || undefined,
-      }));
+      const rows: CommitPhotoRowInput[] = drafts.map(draftToCommitInput);
       const res = await commitRowsInBatches(
         rows,
         rows.map((_, i) => i + 1),
@@ -659,6 +643,101 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   );
 }
 
+function emptyDraftRow(sourceFile = ""): DraftRow {
+  return {
+    key: `draft-${draftKeySeq++}`,
+    sourceFile,
+    rawNoteText: "",
+    customerName: "",
+    phoneNumber: "",
+    businessCategory: "",
+    callDate: new Date().toISOString().slice(0, 10),
+    employeeId: "",
+    carMake: "",
+    carModel: "",
+    carVariant: "",
+    location: "",
+    productsDiscussed: "",
+    customerRequirements: "",
+    budget: "",
+    followUpRequired: false,
+    followUpDate: "",
+    summary: "",
+    sentiment: "",
+  };
+}
+
+function draftToCommitInput(d: DraftRow): CommitPhotoRowInput {
+  return {
+    phoneNumber: d.phoneNumber.trim(),
+    businessCategory: d.businessCategory || undefined,
+    callDate: d.callDate || undefined,
+    customerName: d.customerName.trim() || undefined,
+    employeeId: d.employeeId || undefined,
+    carMake: d.carMake.trim() || undefined,
+    carModel: d.carModel.trim() || undefined,
+    carVariant: d.carVariant.trim() || undefined,
+    location: d.location.trim() || undefined,
+    productsDiscussed: d.productsDiscussed.split(",").map((p) => p.trim()).filter(Boolean),
+    customerRequirements: d.customerRequirements.trim() || undefined,
+    budget: d.budget ? Number(d.budget) : undefined,
+    followUpRequired: d.followUpRequired,
+    followUpDate: d.followUpDate || undefined,
+    summary: d.summary.trim() || undefined,
+    sentiment: d.sentiment || undefined,
+  };
+}
+
+function ManualEntryPanel({ toast, onImported }: { toast: Toast; onImported: () => void }) {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [draft, setDraft] = useState<DraftRow>(emptyDraftRow);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+  }, []);
+
+  async function handleSave() {
+    if (!draft.phoneNumber.trim()) {
+      toast.show("A phone number is required to save this customer.", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api.import.commitPhotoRows([draftToCommitInput(draft)]);
+      if (res.imported > 0) {
+        await api.import
+          .recordHistory({ source: "manual", imported: res.imported, skipped: res.skipped, errors: res.errors, rows: res.importedRows })
+          .catch(() => {});
+        toast.show("Customer added.", "success");
+        setDraft(emptyDraftRow());
+        onImported();
+      } else {
+        toast.show(res.errors[0]?.reason ?? "Could not save this entry.", "error");
+      }
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to save", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={cardStyle}>
+      <SectionLabel>Enter customer &amp; call details</SectionLabel>
+      <p style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 16 }}>
+        For walk-ins or calls that weren't captured automatically -- everything shows up in Calls, Reports, and Follow-ups
+        just like a normal call. <strong>A phone number is required</strong>; everything else can stay Unknown.
+      </p>
+      <DraftCard draft={draft} employees={employees} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
+      <button onClick={handleSave} disabled={saving} style={{ ...primaryButtonStyle, marginTop: 14, opacity: saving ? 0.7 : 1 }}>
+        {saving ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <UserPlus size={16} />}
+        {saving ? "Saving…" : "Save customer"}
+      </button>
+    </div>
+  );
+}
+
 function DraftCard({
   draft,
   employees,
@@ -668,7 +747,7 @@ function DraftCard({
   draft: DraftRow;
   employees: Employee[];
   onChange: (patch: Partial<DraftRow>) => void;
-  onRemove: () => void;
+  onRemove?: () => void;
 }) {
   const needsAttention = !draft.phoneNumber.trim();
   return (
@@ -683,16 +762,18 @@ function DraftCard({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, gap: 10 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginBottom: 2 }}>{draft.sourceFile}</div>
+          {draft.sourceFile && <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginBottom: 2 }}>{draft.sourceFile}</div>}
           {draft.rawNoteText && (
             <div style={{ fontSize: 12, color: "var(--text-soft)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
               "{draft.rawNoteText}"
             </div>
           )}
         </div>
-        <button onClick={onRemove} aria-label="Remove this entry" style={{ background: "none", border: "none", color: "var(--text-faint)", flexShrink: 0, padding: 4 }}>
-          <X size={15} />
-        </button>
+        {onRemove && (
+          <button onClick={onRemove} aria-label="Remove this entry" style={{ background: "none", border: "none", color: "var(--text-faint)", flexShrink: 0, padding: 4 }}>
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>

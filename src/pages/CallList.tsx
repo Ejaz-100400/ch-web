@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PhoneCall, Pencil, Save, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { FilterBar, SearchInput, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
+import { FilterBar, SearchInput, FilterSelect, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
@@ -26,6 +26,11 @@ const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "needs_follow_up", label: "Needs follow-up" },
 ];
 
+const FOLLOW_UP_OPTIONS = [
+  { value: "true", label: "Follow-up needed" },
+  { value: "false", label: "No follow-up" },
+];
+
 export default function CallList() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -37,11 +42,15 @@ export default function CallList() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [phone, setPhone] = useState("");
   const [debouncedPhone, setDebouncedPhone] = useState("");
+  const [carMake, setCarMake] = useState("");
   const [carModel, setCarModel] = useState("");
+  const [sentiment, setSentiment] = useState("");
+  const [followUpRequired, setFollowUpRequired] = useState("");
   const [category, setCategory] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [page, setPage] = useState(1);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -64,7 +73,7 @@ export default function CallList() {
 
   useEffect(() => {
     setPage(1);
-  }, [carModel, category, employeeId, dateFrom, dateTo]);
+  }, [carMake, carModel, sentiment, followUpRequired, category, employeeId, dateFrom, dateTo]);
 
   useEffect(() => {
     let active = true;
@@ -73,7 +82,10 @@ export default function CallList() {
       .list({
         search: debouncedSearch || undefined,
         phone: debouncedPhone || undefined,
+        carMake: carMake || undefined,
         carModel: carModel || undefined,
+        sentiment: (sentiment as SentimentType) || undefined,
+        followUpRequired: followUpRequired ? followUpRequired === "true" : undefined,
         category: category || undefined,
         employeeId: employeeId || undefined,
         dateFrom: dateFrom || undefined,
@@ -96,15 +108,21 @@ export default function CallList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carModel, category, employeeId, dateFrom, dateTo, page]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, employeeId, dateFrom, dateTo, page]);
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
-  const hasActiveFilters = Boolean(search || phone || carModel || category || employeeId || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(
+    search || phone || carMake || carModel || sentiment || followUpRequired || category || employeeId || dateFrom || dateTo,
+  );
+  const advancedFilterCount = [carMake, carModel, sentiment, followUpRequired].filter(Boolean).length;
 
   function clearFilters() {
     setSearch("");
     setPhone("");
+    setCarMake("");
     setCarModel("");
+    setSentiment("");
+    setFollowUpRequired("");
     setCategory("");
     setEmployeeId("");
     setDateFrom("");
@@ -112,7 +130,9 @@ export default function CallList() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const gridCols = isAdmin ? "130px 1fr 1.4fr 1fr 90px 1fr 1.2fr 40px" : "130px 1fr 1.4fr 1fr 90px 1fr 1.2fr";
+  const gridCols = isAdmin
+    ? "120px 90px 1fr 1.3fr 1fr 80px 90px 1fr 36px"
+    : "120px 90px 1fr 1.3fr 1fr 80px 90px 1fr";
 
   function refreshCall(updated: Call) {
     setCalls((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
@@ -138,13 +158,6 @@ export default function CallList() {
         <FilterSelect label="Category" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
         <FilterSelect label="Employee" value={employeeId} onChange={setEmployeeId} options={employeeOptions} />
         <input
-          type="text"
-          value={carModel}
-          onChange={(e) => setCarModel(e.target.value)}
-          placeholder="Car model"
-          style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 130 }}
-        />
-        <input
           type="date"
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
@@ -158,8 +171,30 @@ export default function CallList() {
           aria-label="To date"
           style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
         />
+        <AdvancedFiltersToggle open={showAdvanced} count={advancedFilterCount} onClick={() => setShowAdvanced((v) => !v)} />
         {hasActiveFilters && <ClearFiltersButton onClick={clearFilters} />}
       </FilterBar>
+
+      {showAdvanced && (
+        <FilterBar>
+          <input
+            type="text"
+            value={carMake}
+            onChange={(e) => setCarMake(e.target.value)}
+            placeholder="Car make (e.g. Maruti)"
+            style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 160 }}
+          />
+          <input
+            type="text"
+            value={carModel}
+            onChange={(e) => setCarModel(e.target.value)}
+            placeholder="Car model (e.g. Swift)"
+            style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 160 }}
+          />
+          <FilterSelect label="Sentiment" value={sentiment} onChange={setSentiment} options={SENTIMENT_OPTIONS} />
+          <FilterSelect label="Follow-up" value={followUpRequired} onChange={setFollowUpRequired} options={FOLLOW_UP_OPTIONS} />
+        </FilterBar>
+      )}
 
       {editingCall && (
         <CallEditForm
@@ -184,7 +219,7 @@ export default function CallList() {
         }}
       >
       <div className="table-scroll">
-        <div style={{ minWidth: 820 }}>
+        <div style={{ minWidth: 940 }}>
         <div
           className="mono"
           style={{
@@ -202,6 +237,7 @@ export default function CallList() {
         >
           <span>Date</span>
           <span>Category</span>
+          <span>Vehicle</span>
           <span>Customer</span>
           <span>Employee</span>
           <span>Duration</span>
@@ -241,6 +277,11 @@ export default function CallList() {
                 {formatDateTime(call.callDate)}
               </span>
               <CategoryBadge category={call.businessCategory} />
+              <span style={{ color: "var(--text-soft)", fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {call.extraction?.carMake || call.extraction?.carModel
+                  ? [call.extraction?.carMake, call.extraction?.carModel].filter(Boolean).join(" ")
+                  : <span style={{ color: "var(--text-faint)" }}>—</span>}
+              </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {call.customer?.name ?? call.extraction?.customerName ?? (

@@ -41,6 +41,11 @@ export interface Customer {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  // Only present on list responses -- the vehicle from this customer's most
+  // recent call, since a customer can have several cars over time.
+  latestCarMake?: string | null;
+  latestCarModel?: string | null;
+  latestCarVariant?: string | null;
 }
 
 export interface Product {

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronRight, Copy, Merge, Pencil, Save, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { FilterBar, SearchInput, ClearFiltersButton } from "../components/ui/FilterBar";
+import { FilterBar, SearchInput, FilterSelect, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge } from "../components/ui/StatusBadge";
 import { Avatar } from "../components/ui/Avatar";
 import { SkeletonRows } from "../components/ui/Skeleton";
@@ -15,6 +15,12 @@ import type { Call, Customer } from "../types";
 
 const PAGE_SIZE = 20;
 
+const CATEGORY_OPTIONS = [
+  { value: "car_glasses", label: "Car Glasses" },
+  { value: "car_modifications", label: "Car Modifications" },
+  { value: "unknown", label: "Unknown" },
+];
+
 export default function CustomerList() {
   const navigate = useNavigate();
   const { appUser } = useAuth();
@@ -24,6 +30,10 @@ export default function CustomerList() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [phone, setPhone] = useState("");
   const [debouncedPhone, setDebouncedPhone] = useState("");
+  const [carMake, setCarMake] = useState("");
+  const [carModel, setCarModel] = useState("");
+  const [category, setCategory] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -51,10 +61,22 @@ export default function CustomerList() {
   }, [search, phone]);
 
   useEffect(() => {
+    setPage(1);
+  }, [carMake, carModel, category]);
+
+  useEffect(() => {
     let active = true;
     setLoading(true);
     api.customers
-      .list({ search: debouncedSearch || undefined, phone: debouncedPhone || undefined, page, pageSize: PAGE_SIZE })
+      .list({
+        search: debouncedSearch || undefined,
+        phone: debouncedPhone || undefined,
+        carMake: carMake || undefined,
+        carModel: carModel || undefined,
+        category: category || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      })
       .then((res) => {
         if (!active) return;
         setCustomers(res.items);
@@ -70,7 +92,7 @@ export default function CustomerList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, page]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, category, page]);
 
   async function toggleExpand(customer: Customer) {
     const isOpen = expanded === customer.id;
@@ -88,9 +110,10 @@ export default function CustomerList() {
     }
   }
 
-  const hasActiveFilters = Boolean(search || phone);
+  const hasActiveFilters = Boolean(search || phone || carMake || carModel || category);
+  const advancedFilterCount = [carMake, carModel, category].filter(Boolean).length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const gridCols = isAdmin ? "28px 2.1fr 1.3fr 1.6fr 1fr 40px" : "28px 2.1fr 1.3fr 1.6fr 1fr";
+  const gridCols = isAdmin ? "28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr 40px" : "28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr";
 
   return (
     <div>
@@ -137,15 +160,39 @@ export default function CustomerList() {
           placeholder="Phone number"
           style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 150 }}
         />
+        <AdvancedFiltersToggle open={showAdvanced} count={advancedFilterCount} onClick={() => setShowAdvanced((v) => !v)} />
         {hasActiveFilters && (
           <ClearFiltersButton
             onClick={() => {
               setSearch("");
               setPhone("");
+              setCarMake("");
+              setCarModel("");
+              setCategory("");
             }}
           />
         )}
       </FilterBar>
+
+      {showAdvanced && (
+        <FilterBar>
+          <input
+            type="text"
+            value={carMake}
+            onChange={(e) => setCarMake(e.target.value)}
+            placeholder="Car make (e.g. Maruti)"
+            style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 160 }}
+          />
+          <input
+            type="text"
+            value={carModel}
+            onChange={(e) => setCarModel(e.target.value)}
+            placeholder="Car model (e.g. Swift)"
+            style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 160 }}
+          />
+          <FilterSelect label="Category" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+        </FilterBar>
+      )}
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
         {loading ? <LoadingText /> : `${total} customer${total === 1 ? "" : "s"}`}
@@ -161,7 +208,7 @@ export default function CustomerList() {
         }}
       >
       <div className="table-scroll">
-        <div style={{ minWidth: 640 }}>
+        <div style={{ minWidth: 760 }}>
         <div
           className="mono"
           style={{
@@ -180,6 +227,7 @@ export default function CustomerList() {
           <span />
           <span>Customer</span>
           <span>Phone</span>
+          <span>Vehicle</span>
           <span>Notes</span>
           <span>Since</span>
           {isAdmin && <span />}
@@ -223,6 +271,11 @@ export default function CustomerList() {
                   </span>
                   <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
                     {c.phoneNumber}
+                  </span>
+                  <span style={{ color: "var(--text-soft)", fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {c.latestCarMake || c.latestCarModel
+                      ? [c.latestCarMake, c.latestCarModel].filter(Boolean).join(" ")
+                      : <span style={{ color: "var(--text-faint)" }}>—</span>}
                   </span>
                   <span style={{ color: "var(--text-soft)", fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {c.notes ?? "—"}

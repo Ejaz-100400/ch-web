@@ -82,7 +82,10 @@ function query(params: object): string {
 export interface CallsQuery {
   search?: string;
   phone?: string;
+  carMake?: string;
   carModel?: string;
+  sentiment?: SentimentType;
+  followUpRequired?: boolean;
   category?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -94,6 +97,9 @@ export interface CallsQuery {
 export interface CustomersQuery {
   search?: string;
   phone?: string;
+  carMake?: string;
+  carModel?: string;
+  category?: string;
   page?: number;
   pageSize?: number;
 }
@@ -192,7 +198,7 @@ export interface ParseExcelResult {
 }
 
 export interface RecordImportHistoryInput {
-  source: "excel" | "photo_ocr";
+  source: "excel" | "photo_ocr" | "manual";
   imported: number;
   skipped: number;
   errors: { row: number; reason: string }[];
