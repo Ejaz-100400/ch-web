@@ -25,6 +25,7 @@ import type {
   FollowUpBreakdownPoint,
   ReportsSummary,
   SentimentBreakdownPoint,
+  SentimentType,
   TopCarModelPoint,
   TopEmployeePoint,
   TopProductPoint,
@@ -40,6 +41,12 @@ const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
   { value: "unknown", label: "Unknown" },
+];
+
+const SENTIMENT_OPTIONS = [
+  { value: "interested", label: "Interested" },
+  { value: "not_interested", label: "Not interested" },
+  { value: "needs_follow_up", label: "Needs follow-up" },
 ];
 
 const FOLLOWUP_COLORS: Record<string, string> = {
@@ -59,6 +66,9 @@ export default function Reports() {
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
   const [category, setCategory] = useState("");
   const [employeeId, setEmployeeId] = useState("");
+  const [carMake, setCarMake] = useState("");
+  const [carModel, setCarModel] = useState("");
+  const [sentiment, setSentiment] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -82,6 +92,9 @@ export default function Reports() {
     const filters = {
       category: category || undefined,
       employeeId: employeeId || undefined,
+      carMake: carMake || undefined,
+      carModel: carModel || undefined,
+      sentiment: (sentiment as SentimentType) || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     };
@@ -112,19 +125,24 @@ export default function Reports() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [granularity, category, employeeId, dateFrom, dateTo]);
+  }, [granularity, category, employeeId, carMake, carModel, sentiment, dateFrom, dateTo]);
 
   const volumeData = [...callsByPeriod].reverse().map((p) => ({ period: formatDate(p.period), calls: p.count }));
   const followUpData = followUpBreakdown.map((f) => ({ name: f.status, value: f.count }));
   const sentimentData = sentimentBreakdown.map((s) => ({ name: s.sentiment, value: s.count }));
-  const productData = [...topProducts].reverse().map((p) => ({ name: p.name, count: p.count }));
-  const carModelData = [...topCarModels].reverse().map((c) => ({ name: c.car_model, count: c.count }));
-  const employeeData = [...topEmployees].reverse().map((e) => ({ name: e.name, count: e.count }));
+  // Backend already returns these highest-first -- don't reverse, or the
+  // tallest bar ends up at the bottom instead of the top.
+  const productData = topProducts.map((p) => ({ name: p.name, count: p.count }));
+  const carModelData = topCarModels.map((c) => ({ name: c.car_model, count: c.count }));
+  const employeeData = topEmployees.map((e) => ({ name: e.name, count: e.count }));
 
-  const hasActiveFilters = Boolean(category || employeeId || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(category || employeeId || carMake || carModel || sentiment || dateFrom || dateTo);
   function clearFilters() {
     setCategory("");
     setEmployeeId("");
+    setCarMake("");
+    setCarModel("");
+    setSentiment("");
     setDateFrom("");
     setDateTo("");
   }
@@ -164,8 +182,8 @@ export default function Reports() {
             />
             <KpiCard
               icon={Wallet}
-              label="Budget potential"
-              value={summary ? formatCurrency(summary.totalBudgetPotential) : undefined}
+              label="Budget potential / customer"
+              value={summary ? formatCurrency(summary.budgetPotentialPerCustomer) : undefined}
               tint="var(--brand)"
               loading={loading}
             />
@@ -346,6 +364,35 @@ export default function Reports() {
               <option value="">All employees</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>{emp.name}</option>
+              ))}
+            </select>
+          </FilterField>
+
+          <FilterField label="Car make">
+            <input
+              type="text"
+              value={carMake}
+              onChange={(e) => setCarMake(e.target.value)}
+              placeholder="e.g. Maruti"
+              style={filterInputStyle}
+            />
+          </FilterField>
+
+          <FilterField label="Car model">
+            <input
+              type="text"
+              value={carModel}
+              onChange={(e) => setCarModel(e.target.value)}
+              placeholder="e.g. Swift"
+              style={filterInputStyle}
+            />
+          </FilterField>
+
+          <FilterField label="Sentiment">
+            <select style={filterInputStyle} value={sentiment} onChange={(e) => setSentiment(e.target.value)}>
+              <option value="">All sentiments</option>
+              {SENTIMENT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
           </FilterField>

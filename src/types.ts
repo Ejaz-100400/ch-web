@@ -139,7 +139,7 @@ export interface ReportsSummary {
   followUpsPending: number;
   followUpsOverdue: number;
   avgCallDurationSeconds: number | null;
-  totalBudgetPotential: number;
+  budgetPotentialPerCustomer: number;
   interestedRate: number | null;
 }
 

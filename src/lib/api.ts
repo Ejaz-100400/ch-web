@@ -109,6 +109,9 @@ export interface CustomersQuery {
 export interface ReportsQuery {
   category?: string;
   employeeId?: string;
+  carMake?: string;
+  carModel?: string;
+  sentiment?: SentimentType;
   dateFrom?: string;
   dateTo?: string;
 }
