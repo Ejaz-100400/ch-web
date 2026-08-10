@@ -101,7 +101,11 @@ export default function CallDetails() {
       carVariant: e.carVariant ?? undefined,
       location: e.location ?? undefined,
       customerRequirements: e.customerRequirements ?? undefined,
-      budget: e.budget ?? undefined,
+      // budget is a Postgres Decimal -- Prisma serializes those as a JSON
+      // string (e.g. "13.00"), not a number, so this has to convert it
+      // explicitly or an untouched budget gets sent back as a string and
+      // fails the backend's @IsNumber() validation.
+      budget: e.budget != null ? Number(e.budget) : undefined,
       followUpRequired: e.followUpRequired,
       followUpDate: e.followUpDate ? e.followUpDate.slice(0, 10) : undefined,
       summary: e.summary ?? undefined,
