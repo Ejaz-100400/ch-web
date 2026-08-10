@@ -23,6 +23,8 @@ import {
   type ParsedExcelRow,
 } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
+import { Spinner, LoadingText } from "../components/ui/Spinner";
+import { ProgressOverlay } from "../components/ui/ProgressOverlay";
 import { formatDate, formatDateTime } from "../lib/format";
 import type { AuditLogEntry, BusinessCategory, Employee, ExtractedEntry, SentimentType } from "../types";
 
@@ -95,21 +97,6 @@ function excelRowToCommitInput(r: ParsedExcelRow): CommitPhotoRowInput {
   };
 }
 
-function ProgressBar({ done, total }: { done: number; total: number }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-soft)", marginBottom: 6 }}>
-        <span>{done} / {total} rows imported</span>
-        <span style={{ fontWeight: 700 }}>{pct}%</span>
-      </div>
-      <div style={{ height: 8, background: "var(--border-soft)", borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: "var(--brand)", borderRadius: 999, transition: "width 200ms ease" }} />
-      </div>
-    </div>
-  );
-}
-
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "interested", label: "Interested" },
   { value: "not_interested", label: "Not interested" },
@@ -159,7 +146,7 @@ export default function Import() {
       <div style={{ ...cardStyle, marginTop: 20 }}>
         <SectionLabel>Recent imports</SectionLabel>
         {historyLoading ? (
-          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Loading…</p>
+          <p style={{ fontSize: 13, color: "var(--text-faint)" }}><LoadingText /></p>
         ) : history.length === 0 ? (
           <p style={{ fontSize: 13, color: "var(--text-faint)" }}>No imports yet.</p>
         ) : (
@@ -340,7 +327,7 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
           match the template (e.g. any header containing "phone" is read as the phone number) — order doesn't matter.
         </p>
         <button onClick={handleDownloadTemplate} disabled={downloadingTemplate} style={secondaryButtonStyle}>
-          <Download size={15} className={downloadingTemplate ? "spin" : undefined} />
+          {downloadingTemplate ? <Spinner size={15} /> : <Download size={15} />}
           {downloadingTemplate ? "Preparing…" : "Download template (.xlsx)"}
         </button>
 
@@ -372,11 +359,11 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
           disabled={!file || uploading}
           style={{ ...primaryButtonStyle, marginTop: 14, opacity: !file || uploading ? 0.6 : 1 }}
         >
-          <Upload size={16} className={uploading ? "spin" : undefined} />
+          {uploading ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <Upload size={16} />}
           {progress ? `Importing… (${progress.done}/${progress.total})` : uploading ? "Reading file…" : "Upload & import"}
         </button>
-        {progress && <ProgressBar done={progress.done} total={progress.total} />}
       </div>
+      <ProgressOverlay open={progress !== null} title="Importing calls…" done={progress?.done ?? 0} total={progress?.total ?? 0} />
 
       <div style={cardStyle}>
         <SectionLabel>Result</SectionLabel>
@@ -615,7 +602,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         </label>
 
         <button onClick={handleScan} disabled={files.length === 0 || scanning} style={{ ...primaryButtonStyle, marginTop: 14, opacity: files.length === 0 || scanning ? 0.6 : 1 }}>
-          <ScanLine size={16} className={scanning ? "spin" : undefined} />
+          {scanning ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <ScanLine size={16} />}
           {scanning ? `Scanning ${files.length} photo${files.length === 1 ? "" : "s"}… this can take a minute` : "Scan photos"}
         </button>
       </div>
@@ -654,13 +641,13 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
             disabled={committing}
             style={{ ...primaryButtonStyle, marginTop: 18, opacity: committing ? 0.7 : 1 }}
           >
-            <Upload size={16} className={committing ? "spin" : undefined} />
+            {committing ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <Upload size={16} />}
             {progress ? `Importing… (${progress.done}/${progress.total})` : `Import ${drafts.length} row${drafts.length === 1 ? "" : "s"}`}
             {invalidCount > 0 && !committing ? ` (${invalidCount} need attention)` : ""}
           </button>
-          {progress && <ProgressBar done={progress.done} total={progress.total} />}
         </div>
       )}
+      <ProgressOverlay open={progress !== null} title="Importing calls…" done={progress?.done ?? 0} total={progress?.total ?? 0} />
 
       {result && (
         <div style={cardStyle}>

@@ -9,6 +9,7 @@ import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
+import { LoadingText } from "../components/ui/Spinner";
 import { formatDuration, relativeDay, formatDateTime } from "../lib/format";
 import type { Call, Customer } from "../types";
 
@@ -147,7 +148,7 @@ export default function CustomerList() {
       </FilterBar>
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? "Loading…" : `${total} customer${total === 1 ? "" : "s"}`}
+        {loading ? <LoadingText /> : `${total} customer${total === 1 ? "" : "s"}`}
       </div>
 
       <div

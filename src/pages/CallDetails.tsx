@@ -18,6 +18,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { Avatar } from "../components/ui/Avatar";
 import { Skeleton } from "../components/ui/Skeleton";
+import { Spinner } from "../components/ui/Spinner";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -227,7 +228,7 @@ export default function CallDetails() {
           <div style={{ display: "flex", gap: 8 }}>
             {canEdit && (
               <button onClick={handleReprocess} disabled={actionPending !== null} style={secondaryButtonStyle}>
-                <RefreshCw size={14} className={actionPending === "reprocess" ? "spin" : undefined} /> Reprocess
+                {actionPending === "reprocess" ? <Spinner size={14} /> : <RefreshCw size={14} />} Reprocess
               </button>
             )}
             {canEdit && call.transcript && (

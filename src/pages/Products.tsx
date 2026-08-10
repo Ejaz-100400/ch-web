@@ -7,6 +7,7 @@ import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError, type ProductInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
+import { LoadingText } from "../components/ui/Spinner";
 import type { Product } from "../types";
 
 const CATEGORY_OPTIONS = [
@@ -147,7 +148,7 @@ export default function Products() {
       </FilterBar>
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? "Loading…" : `${filtered.length} product${filtered.length === 1 ? "" : "s"}`}
+        {loading ? <LoadingText /> : `${filtered.length} product${filtered.length === 1 ? "" : "s"}`}
       </div>
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>

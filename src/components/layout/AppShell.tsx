@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { FadeIn } from "../ui/FadeIn";
 import { ThemeToggle } from "../ui/ThemeToggle";
+import { Spinner } from "../ui/Spinner";
 import { useAuth } from "../../lib/auth-context";
 
 export function AppShell() {
@@ -21,7 +22,8 @@ export function AppShell() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", color: "var(--text-faint)", fontSize: 13.5 }}>
+      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "var(--text-faint)", fontSize: 13.5 }}>
+        <Spinner size={28} thickness={3} />
         Loading…
       </div>
     );

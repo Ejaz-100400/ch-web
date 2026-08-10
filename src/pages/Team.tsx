@@ -5,6 +5,7 @@ import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
+import { LoadingText } from "../components/ui/Spinner";
 import type { AppUser, UserRole } from "../types";
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
@@ -157,7 +158,7 @@ export default function Team() {
       )}
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? "Loading…" : `${members.length} team member${members.length === 1 ? "" : "s"}`}
+        {loading ? <LoadingText /> : `${members.length} team member${members.length === 1 ? "" : "s"}`}
       </div>
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>

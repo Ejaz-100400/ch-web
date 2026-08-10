@@ -5,6 +5,7 @@ import { FilterSelect } from "../components/ui/FilterBar";
 import { api, ApiError, downloadBlob, type CallsQuery } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
+import { Spinner, LoadingText } from "../components/ui/Spinner";
 import { formatDateTime } from "../lib/format";
 import type { AuditLogEntry, Employee } from "../types";
 
@@ -175,7 +176,7 @@ export default function Export() {
               opacity: generating ? 0.7 : 1,
             }}
           >
-            <Download size={16} className={generating ? "spin" : undefined} />
+            {generating ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <Download size={16} />}
             {generating ? "Generating…" : "Generate & download"}
           </button>
         </div>
@@ -184,7 +185,7 @@ export default function Export() {
         <div style={cardStyle}>
           <SectionLabel>Recent exports</SectionLabel>
           {historyLoading ? (
-            <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Loading…</p>
+            <p style={{ fontSize: 13, color: "var(--text-faint)" }}><LoadingText /></p>
           ) : history.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--text-faint)" }}>No exports yet.</p>
           ) : (

@@ -8,6 +8,7 @@ import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
+import { LoadingText } from "../components/ui/Spinner";
 import { formatDuration, formatDateTime } from "../lib/format";
 import type { BusinessCategory, Call, Employee, SentimentType } from "../types";
 
@@ -170,7 +171,7 @@ export default function CallList() {
       )}
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? "Loading…" : `${total} call${total === 1 ? "" : "s"}`}
+        {loading ? <LoadingText /> : `${total} call${total === 1 ? "" : "s"}`}
       </div>
 
       <div

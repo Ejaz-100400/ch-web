@@ -8,6 +8,7 @@ import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
+import { LoadingText } from "../components/ui/Spinner";
 import { formatDate } from "../lib/format";
 import type { Employee, FollowUp, FollowUpStatus } from "../types";
 
@@ -105,7 +106,7 @@ export default function FollowUps() {
       </FilterBar>
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? "Loading…" : `${total} follow-up${total === 1 ? "" : "s"}`}
+        {loading ? <LoadingText /> : `${total} follow-up${total === 1 ? "" : "s"}`}
       </div>
 
       <div
