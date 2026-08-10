@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PhoneCall, Pencil, Save, X, Trash2 } from "lucide-react";
+import { PhoneCall, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
@@ -9,8 +9,8 @@ import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from 
 import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
-import { formatDuration, formatDateTime } from "../lib/format";
-import type { BusinessCategory, Call, Employee, SentimentType } from "../types";
+import { formatDuration, formatDateTime, formatDate } from "../lib/format";
+import type { BusinessCategory, Call, CallDuplicateGroup, Employee, SentimentType } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -61,6 +61,8 @@ export default function CallList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
@@ -116,7 +118,7 @@ export default function CallList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, employeeId, dateFrom, dateTo, page]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, employeeId, dateFrom, dateTo, page, refreshToken]);
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
   const hasActiveFilters = Boolean(
@@ -188,7 +190,36 @@ export default function CallList() {
         eyebrow="Calls"
         title="Call log"
         description="Every inbound enquiry across both lines, with AI-extracted vehicle details, sentiment, and processing status."
+        actions={
+          isAdmin ? (
+            <button
+              onClick={() => setShowDuplicates((v) => !v)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "9px 15px",
+                background: showDuplicates ? "var(--brand)" : "var(--paper-raised)",
+                color: showDuplicates ? "var(--on-brand)" : "var(--text)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: 13.5,
+                fontWeight: 700,
+                transition: "background 120ms ease, color 120ms ease",
+              }}
+            >
+              <Copy size={15} /> Possible duplicates
+            </button>
+          ) : undefined
+        }
       />
+
+      {showDuplicates && isAdmin && (
+        <DuplicateCallsPanel
+          onClose={() => setShowDuplicates(false)}
+          onResolved={() => setRefreshToken((v) => v + 1)}
+        />
+      )}
 
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Search customer name or summary" />
@@ -428,6 +459,143 @@ export default function CallList() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onResolved: () => void }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState<CallDuplicateGroup[]>([]);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api.calls
+      .duplicates()
+      .then((res) => {
+        if (active) setGroups(res);
+      })
+      .catch((err) => toast.show(err instanceof ApiError ? err.message : "Failed to load duplicates", "error"))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleDelete(callId: string) {
+    setDeletingId(callId);
+    try {
+      await api.calls.remove(callId);
+      // A group is only still "possibly duplicate" once it has 2+ calls left.
+      setGroups((prev) =>
+        prev.map((g) => ({ ...g, calls: g.calls.filter((c) => c.id !== callId) })).filter((g) => g.calls.length > 1),
+      );
+      toast.show("Duplicate call deleted.", "success");
+      onResolved();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to delete call", "error");
+    } finally {
+      setDeletingId(null);
+      setConfirmingId(null);
+    }
+  }
+
+  return (
+    <div
+      className="fade-in-up"
+      style={{
+        background: "var(--paper-raised)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-md)",
+        padding: 16,
+        marginBottom: 18,
+        boxShadow: "var(--shadow-card)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Possible duplicate calls</div>
+        <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
+          <X size={15} />
+        </button>
+      </div>
+
+      {loading && <p style={{ fontSize: 13, color: "var(--text-faint)" }}><LoadingText /></p>}
+      {!loading && groups.length === 0 && (
+        <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
+          No likely duplicates found -- same customer, same call date, and same vehicle.
+        </p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {groups.map((g) => (
+          <div key={`${g.customerId}-${g.callDate}`} style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)", padding: 12 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>
+              {g.customerName ?? g.customerPhone ?? "Unknown customer"} · {formatDate(g.callDate)}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {g.calls.map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 10px",
+                    border: "1px solid var(--border-soft)",
+                    borderRadius: "var(--radius-sm)",
+                    fontSize: 12.5,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    onClick={() => navigate(`/calls/${c.id}`)}
+                    style={{ background: "none", border: "none", color: "var(--brand-strong)", fontWeight: 700, textDecoration: "underline", padding: 0 }}
+                  >
+                    View
+                  </button>
+                  <CategoryBadge category={c.businessCategory} />
+                  <span style={{ color: "var(--text-soft)" }}>{[c.carMake, c.carModel].filter(Boolean).join(" ") || "—"}</span>
+                  {c.imported && <ImportedBadge />}
+                  <span style={{ color: "var(--text-faint)", flex: 1, minWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {c.summary ?? "No summary"}
+                  </span>
+                  <CallStatusBadge status={c.status} />
+                  {confirmingId === c.id ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        disabled={deletingId === c.id}
+                        style={{ padding: "5px 10px", background: "var(--coral)", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700 }}
+                      >
+                        {deletingId === c.id ? "Deleting…" : "Confirm delete"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmingId(null)}
+                        style={{ padding: "5px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12, fontWeight: 600 }}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmingId(c.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--coral-soft)", color: "var(--coral)", border: "1px solid var(--coral)", borderRadius: 6, fontSize: 12, fontWeight: 600 }}
+                    >
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

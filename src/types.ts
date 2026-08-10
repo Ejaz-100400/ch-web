@@ -110,6 +110,26 @@ export interface Call {
   importedBy?: { name: string; email: string } | null;
 }
 
+export interface CallDuplicateEntry {
+  id: string;
+  businessCategory: BusinessCategory;
+  carMake: string | null;
+  carModel: string | null;
+  employeeName: string | null;
+  status: CallStatus;
+  summary: string | null;
+  imported: boolean;
+  createdAt: string;
+}
+
+export interface CallDuplicateGroup {
+  customerId: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  callDate: string;
+  calls: CallDuplicateEntry[];
+}
+
 export interface FollowUp {
   id: string;
   callId: string;

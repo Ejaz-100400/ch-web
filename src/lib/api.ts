@@ -5,6 +5,7 @@ import type {
   BusinessCategory,
   BusinessNumber,
   Call,
+  CallDuplicateGroup,
   CallExtraction,
   CallsByPeriodPoint,
   Customer,
@@ -255,6 +256,7 @@ export const api = {
       request<{ deleted: number }>("/calls/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
     carMakes: () => request<string[]>("/calls/car-makes"),
     carModels: (carMake?: string) => request<string[]>(`/calls/car-models${query({ carMake })}`),
+    duplicates: () => request<CallDuplicateGroup[]>("/calls/duplicates"),
     reprocess: (id: string) => request<{ enqueued: true; callId: string }>(`/calls/${id}/reprocess`, { method: "POST" }),
     processingStatus: (id: string) =>
       request<{ id: string; status: Call["status"]; failureReason: string | null; updatedAt: string }>(
