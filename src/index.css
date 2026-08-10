@@ -247,6 +247,11 @@ a {
   gap: 20px;
 }
 
+.reports-layout {
+  display: grid;
+  gap: 20px;
+}
+
 /* Data tables render as a fixed-column grid; below their natural width,
    scroll horizontally instead of clipping columns. */
 .table-scroll {
@@ -279,6 +284,12 @@ a {
   }
   .grid-responsive-2 {
     grid-template-columns: 1fr !important;
+  }
+  .reports-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .reports-filter-panel {
+    position: static !important;
   }
 }
 

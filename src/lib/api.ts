@@ -16,8 +16,10 @@ import type {
   PhotoExtractResult,
   Product,
   ReportsSummary,
+  SentimentBreakdownPoint,
   SentimentType,
   TopCarModelPoint,
+  TopEmployeePoint,
   TopProductPoint,
   UserRole,
 } from "../types";
@@ -102,6 +104,13 @@ export interface CustomersQuery {
   category?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface ReportsQuery {
+  category?: string;
+  employeeId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export interface FollowUpsQuery {
@@ -289,12 +298,17 @@ export const api = {
   },
 
   reports: {
-    summary: () => request<ReportsSummary>("/reports/summary"),
-    callsByPeriod: (granularity: "daily" | "weekly" | "monthly" = "daily") =>
-      request<CallsByPeriodPoint[]>(`/reports/calls-by-period${query({ granularity })}`),
-    followUps: () => request<FollowUpBreakdownPoint[]>("/reports/follow-ups"),
-    topCarModels: (limit?: number) => request<TopCarModelPoint[]>(`/reports/top-car-models${query({ limit })}`),
-    topProducts: (limit?: number) => request<TopProductPoint[]>(`/reports/top-products${query({ limit })}`),
+    summary: (q: ReportsQuery = {}) => request<ReportsSummary>(`/reports/summary${query(q)}`),
+    callsByPeriod: (granularity: "daily" | "weekly" | "monthly" = "daily", q: ReportsQuery = {}) =>
+      request<CallsByPeriodPoint[]>(`/reports/calls-by-period${query({ granularity, ...q })}`),
+    followUps: (q: ReportsQuery = {}) => request<FollowUpBreakdownPoint[]>(`/reports/follow-ups${query(q)}`),
+    sentiment: (q: ReportsQuery = {}) => request<SentimentBreakdownPoint[]>(`/reports/sentiment${query(q)}`),
+    topCarModels: (limit?: number, q: ReportsQuery = {}) =>
+      request<TopCarModelPoint[]>(`/reports/top-car-models${query({ limit, ...q })}`),
+    topProducts: (limit?: number, q: ReportsQuery = {}) =>
+      request<TopProductPoint[]>(`/reports/top-products${query({ limit, ...q })}`),
+    topEmployees: (limit?: number, q: ReportsQuery = {}) =>
+      request<TopEmployeePoint[]>(`/reports/top-employees${query({ limit, ...q })}`),
   },
 
   businessNumbers: {

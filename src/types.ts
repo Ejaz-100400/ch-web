@@ -149,6 +149,16 @@ export interface FollowUpBreakdownPoint {
   count: number;
 }
 
+export interface SentimentBreakdownPoint {
+  sentiment: SentimentType;
+  count: number;
+}
+
+export interface TopEmployeePoint {
+  name: string;
+  count: number;
+}
+
 export interface TopCarModelPoint {
   car_model: string;
   count: number;

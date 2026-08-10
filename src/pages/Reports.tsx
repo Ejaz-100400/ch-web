@@ -13,19 +13,33 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { FilterBar, FilterSelect } from "../components/ui/FilterBar";
 import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { formatDate } from "../lib/format";
-import type { CallsByPeriodPoint, FollowUpBreakdownPoint, ReportsSummary, TopCarModelPoint, TopProductPoint } from "../types";
+import type {
+  CallsByPeriodPoint,
+  Employee,
+  FollowUpBreakdownPoint,
+  ReportsSummary,
+  SentimentBreakdownPoint,
+  TopCarModelPoint,
+  TopEmployeePoint,
+  TopProductPoint,
+} from "../types";
 
 const GRANULARITY_OPTIONS = [
   { value: "daily", label: "Daily" },
   { value: "weekly", label: "Weekly" },
   { value: "monthly", label: "Monthly" },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: "car_glasses", label: "Car Glasses" },
+  { value: "car_modifications", label: "Car Modifications" },
+  { value: "unknown", label: "Unknown" },
 ];
 
 const FOLLOWUP_COLORS: Record<string, string> = {
@@ -34,26 +48,61 @@ const FOLLOWUP_COLORS: Record<string, string> = {
   missed: "#d9503a",
 };
 
+const SENTIMENT_COLORS: Record<string, string> = {
+  interested: "#17967f",
+  not_interested: "#d9503a",
+  needs_follow_up: "#d99a2b",
+};
+
 export default function Reports() {
   const toast = useToast();
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [category, setCategory] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [callsByPeriod, setCallsByPeriod] = useState<CallsByPeriodPoint[]>([]);
   const [followUpBreakdown, setFollowUpBreakdown] = useState<FollowUpBreakdownPoint[]>([]);
+  const [sentimentBreakdown, setSentimentBreakdown] = useState<SentimentBreakdownPoint[]>([]);
   const [topCarModels, setTopCarModels] = useState<TopCarModelPoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProductPoint[]>([]);
+  const [topEmployees, setTopEmployees] = useState<TopEmployeePoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+  }, []);
+
+  useEffect(() => {
     let active = true;
-    Promise.all([api.reports.summary(), api.reports.followUps(), api.reports.topCarModels(8), api.reports.topProducts(8)])
-      .then(([s, f, cm, p]) => {
+    setLoading(true);
+    const filters = {
+      category: category || undefined,
+      employeeId: employeeId || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    };
+    Promise.all([
+      api.reports.summary(filters),
+      api.reports.callsByPeriod(granularity, filters),
+      api.reports.followUps(filters),
+      api.reports.sentiment(filters),
+      api.reports.topCarModels(8, filters),
+      api.reports.topProducts(8, filters),
+      api.reports.topEmployees(8, filters),
+    ])
+      .then(([s, cbp, f, sent, cm, p, emp]) => {
         if (!active) return;
         setSummary(s);
+        setCallsByPeriod(cbp);
         setFollowUpBreakdown(f);
+        setSentimentBreakdown(sent);
         setTopCarModels(cm);
         setTopProducts(p);
+        setTopEmployees(emp);
       })
       .catch((err) => toast.show(err instanceof ApiError ? err.message : "Failed to load reports", "error"))
       .finally(() => {
@@ -63,25 +112,21 @@ export default function Reports() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    api.reports
-      .callsByPeriod(granularity)
-      .then((res) => {
-        if (active) setCallsByPeriod(res);
-      })
-      .catch((err) => toast.show(err instanceof ApiError ? err.message : "Failed to load call volume", "error"));
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [granularity]);
+  }, [granularity, category, employeeId, dateFrom, dateTo]);
 
   const volumeData = [...callsByPeriod].reverse().map((p) => ({ period: formatDate(p.period), calls: p.count }));
   const followUpData = followUpBreakdown.map((f) => ({ name: f.status, value: f.count }));
+  const sentimentData = sentimentBreakdown.map((s) => ({ name: s.sentiment, value: s.count }));
   const productData = [...topProducts].reverse().map((p) => ({ name: p.name, count: p.count }));
+  const employeeData = [...topEmployees].reverse().map((e) => ({ name: e.name, count: e.count }));
+
+  const hasActiveFilters = Boolean(category || employeeId || dateFrom || dateTo);
+  function clearFilters() {
+    setCategory("");
+    setEmployeeId("");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   return (
     <div>
@@ -91,113 +136,221 @@ export default function Reports() {
         description="Enquiry volume, follow-up outcomes, and what customers are actually asking for."
       />
 
-      <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard icon={PhoneCall} label="Total enquiries" value={summary?.totalEnquiries ?? null} tint="var(--brand)" />
-        <KpiCard icon={Glasses} label="Car Glasses" value={summary?.carGlassesEnquiries ?? null} tint="var(--brand)" />
-        <KpiCard icon={Wrench} label="Car Modifications" value={summary?.carModificationEnquiries ?? null} tint="var(--violet)" />
-        <KpiCard icon={CalendarClock} label="Follow-ups pending" value={summary?.followUpsPending ?? null} tint="var(--amber)" />
+      <div className="reports-layout" style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 20, alignItems: "start" }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
+            <KpiCard icon={PhoneCall} label="Total enquiries" value={summary?.totalEnquiries ?? null} tint="var(--brand)" />
+            <KpiCard icon={Glasses} label="Car Glasses" value={summary?.carGlassesEnquiries ?? null} tint="var(--brand)" />
+            <KpiCard icon={Wrench} label="Car Modifications" value={summary?.carModificationEnquiries ?? null} tint="var(--violet)" />
+            <KpiCard icon={CalendarClock} label="Follow-ups pending" value={summary?.followUpsPending ?? null} tint="var(--amber)" />
+          </div>
+
+          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div style={cardStyle}>
+              <SectionLabel>Call volume</SectionLabel>
+              {loading ? (
+                <Skeleton height={220} />
+              ) : volumeData.length === 0 ? (
+                <EmptyChart message="No calls match these filters." />
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={volumeData} margin={{ left: -20, right: 8, top: 8 }}>
+                    <defs>
+                      <linearGradient id="volumeFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#17967f" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#17967f" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#ebecf1" vertical={false} />
+                    <XAxis dataKey="period" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                    <Area type="monotone" dataKey="calls" stroke="#17967f" strokeWidth={2.5} fill="url(#volumeFill)" isAnimationActive />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div style={cardStyle}>
+              <SectionLabel>Follow-up outcomes</SectionLabel>
+              {loading ? (
+                <Skeleton height={220} />
+              ) : followUpData.every((d) => d.value === 0) ? (
+                <EmptyChart message="No follow-ups yet." />
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={followUpData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={3} isAnimationActive>
+                        {followUpData.map((d) => (
+                          <Cell key={d.name} fill={FOLLOWUP_COLORS[d.name] ?? "#9199a8"} stroke="none" />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <Legend items={followUpData.map((d) => ({ key: d.name, label: d.name.replace("_", " "), color: FOLLOWUP_COLORS[d.name] ?? "#9199a8" }))} />
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div style={cardStyle}>
+              <SectionLabel>Top car models mentioned</SectionLabel>
+              {loading ? (
+                <Skeleton height={200} />
+              ) : topCarModels.length === 0 ? (
+                <EmptyChart message="No car models extracted yet." />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={topCarModels} margin={{ left: -20, right: 8, top: 8 }}>
+                    <CartesianGrid stroke="#ebecf1" vertical={false} />
+                    <XAxis dataKey="car_model" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                    <Bar dataKey="count" fill="#17967f" radius={[6, 6, 0, 0]} maxBarSize={44} isAnimationActive />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div style={cardStyle}>
+              <SectionLabel>Top products discussed</SectionLabel>
+              {loading ? (
+                <Skeleton height={200} />
+              ) : productData.length === 0 ? (
+                <EmptyChart message="No products linked to calls yet." />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={productData} layout="vertical" margin={{ left: 0, right: 16, top: 8 }}>
+                    <CartesianGrid stroke="#ebecf1" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                    <Bar dataKey="count" fill="#6a63d1" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={cardStyle}>
+              <SectionLabel>Sentiment breakdown</SectionLabel>
+              {loading ? (
+                <Skeleton height={200} />
+              ) : sentimentData.every((d) => d.value === 0) ? (
+                <EmptyChart message="No sentiment extracted yet." />
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={72} paddingAngle={3} isAnimationActive>
+                        {sentimentData.map((d) => (
+                          <Cell key={d.name} fill={SENTIMENT_COLORS[d.name] ?? "#9199a8"} stroke="none" />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <Legend items={sentimentData.map((d) => ({ key: d.name, label: d.name.replace("_", " "), color: SENTIMENT_COLORS[d.name] ?? "#9199a8" }))} />
+                </>
+              )}
+            </div>
+
+            <div style={cardStyle}>
+              <SectionLabel>Top employees by enquiries</SectionLabel>
+              {loading ? (
+                <Skeleton height={200} />
+              ) : employeeData.length === 0 ? (
+                <EmptyChart message="No calls assigned to an employee yet." />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={employeeData} layout="vertical" margin={{ left: 0, right: 16, top: 8 }}>
+                    <CartesianGrid stroke="#ebecf1" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={110} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                    <Bar dataKey="count" fill="#d99a2b" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="reports-filter-panel" style={{ ...cardStyle, position: "sticky", top: 20, padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <SlidersHorizontal size={14} color="var(--text-faint)" />
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Filters
+            </span>
+          </div>
+
+          <FilterField label="Granularity">
+            <select style={filterInputStyle} value={granularity} onChange={(e) => setGranularity(e.target.value as typeof granularity)}>
+              {GRANULARITY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </FilterField>
+
+          <FilterField label="Category">
+            <select style={filterInputStyle} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">All categories</option>
+              {CATEGORY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </FilterField>
+
+          <FilterField label="Employee">
+            <select style={filterInputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+              <option value="">All employees</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>{emp.name}</option>
+              ))}
+            </select>
+          </FilterField>
+
+          <FilterField label="From date">
+            <input type="date" style={filterInputStyle} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </FilterField>
+
+          <FilterField label="To date">
+            <input type="date" style={filterInputStyle} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </FilterField>
+
+          {hasActiveFilters && (
+            <button onClick={clearFilters} style={clearFiltersButtonStyle}>
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
 
-      <FilterBar>
-        <FilterSelect label="Granularity" value={granularity} onChange={(v) => setGranularity(v as typeof granularity)} options={GRANULARITY_OPTIONS} />
-      </FilterBar>
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--text-soft)", marginBottom: 14 }}>
+      {label}
+      {children}
+    </label>
+  );
+}
 
-      <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 14, marginBottom: 14 }}>
-        <div style={cardStyle}>
-          <SectionLabel>Call volume</SectionLabel>
-          {loading ? (
-            <Skeleton height={220} />
-          ) : volumeData.length === 0 ? (
-            <EmptyChart message="No calls recorded yet." />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={volumeData} margin={{ left: -20, right: 8, top: 8 }}>
-                <defs>
-                  <linearGradient id="volumeFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#17967f" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#17967f" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="#ebecf1" vertical={false} />
-                <XAxis dataKey="period" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
-                <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                <Area type="monotone" dataKey="calls" stroke="#17967f" strokeWidth={2.5} fill="url(#volumeFill)" isAnimationActive />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div style={cardStyle}>
-          <SectionLabel>Follow-up outcomes</SectionLabel>
-          {loading ? (
-            <Skeleton height={220} />
-          ) : followUpData.every((d) => d.value === 0) ? (
-            <EmptyChart message="No follow-ups yet." />
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={followUpData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={3} isAnimationActive>
-                    {followUpData.map((d) => (
-                      <Cell key={d.name} fill={FOLLOWUP_COLORS[d.name] ?? "#9199a8"} stroke="none" />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginTop: -8 }}>
-                {followUpData.map((d) => (
-                  <span key={d.name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text-soft)", textTransform: "capitalize" }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: FOLLOWUP_COLORS[d.name] ?? "#9199a8" }} />
-                    {d.name.replace("_", " ")}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <div style={cardStyle}>
-          <SectionLabel>Top car models mentioned</SectionLabel>
-          {loading ? (
-            <Skeleton height={200} />
-          ) : topCarModels.length === 0 ? (
-            <EmptyChart message="No car models extracted yet." />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={topCarModels} margin={{ left: -20, right: 8, top: 8 }}>
-                <CartesianGrid stroke="#ebecf1" vertical={false} />
-                <XAxis dataKey="car_model" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
-                <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                <Bar dataKey="count" fill="#17967f" radius={[6, 6, 0, 0]} maxBarSize={44} isAnimationActive />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div style={cardStyle}>
-          <SectionLabel>Top products discussed</SectionLabel>
-          {loading ? (
-            <Skeleton height={200} />
-          ) : productData.length === 0 ? (
-            <EmptyChart message="No products linked to calls yet." />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={productData} layout="vertical" margin={{ left: 0, right: 16, top: 8 }}>
-                <CartesianGrid stroke="#ebecf1" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
-                <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                <Bar dataKey="count" fill="#6a63d1" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
+function Legend({ items }: { items: { key: string; label: string; color: string }[] }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginTop: -8 }}>
+      {items.map((d) => (
+        <span key={d.key} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text-soft)", textTransform: "capitalize" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: d.color }} />
+          {d.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -228,7 +381,7 @@ function KpiCard({
 
 function EmptyChart({ message }: { message: string }) {
   return (
-    <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)", fontSize: 13 }}>
+    <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)", fontSize: 13, textAlign: "center", padding: "0 12px" }}>
       {message}
     </div>
   );
@@ -248,4 +401,24 @@ const cardStyle: CSSProperties = {
   borderRadius: "var(--radius-md)",
   padding: 18,
   boxShadow: "var(--shadow-card)",
+};
+
+const filterInputStyle: CSSProperties = {
+  width: "100%",
+  padding: "8px 10px",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  background: "var(--paper)",
+  fontSize: 13,
+};
+
+const clearFiltersButtonStyle: CSSProperties = {
+  width: "100%",
+  padding: "8px 10px",
+  background: "none",
+  color: "var(--text-soft)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 12.5,
+  fontWeight: 600,
 };
