@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PhoneCall, Pencil, Save, X } from "lucide-react";
+import { PhoneCall, Pencil, Save, X, Trash2 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
@@ -58,6 +58,10 @@ export default function CallList() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [total, setTotal] = useState(0);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
   }, []);
@@ -97,6 +101,10 @@ export default function CallList() {
         if (!active) return;
         setCalls(res.items);
         setTotal(res.total);
+        // A selection only makes sense against the rows currently on screen --
+        // a fresh fetch (new page, new filters) means it's stale.
+        setSelectedIds(new Set());
+        setConfirmingDelete(false);
       })
       .catch((err) => {
         if (active) toast.show(err instanceof ApiError ? err.message : "Failed to load calls", "error");
@@ -131,11 +139,44 @@ export default function CallList() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const gridCols = isAdmin
-    ? "120px 90px 1fr 1.3fr 1fr 80px 90px 1fr 36px"
+    ? "24px 120px 90px 1fr 1.3fr 1fr 80px 90px 1fr 36px"
     : "120px 90px 1fr 1.3fr 1fr 80px 90px 1fr";
 
   function refreshCall(updated: Call) {
     setCalls((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allOnPageSelected = calls.length > 0 && calls.every((c) => selectedIds.has(c.id));
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds(allOnPageSelected ? new Set() : new Set(calls.map((c) => c.id)));
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await api.calls.removeMany(ids);
+      setCalls((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+      setTotal((prev) => Math.max(0, prev - res.deleted));
+      setSelectedIds(new Set());
+      setConfirmingDelete(false);
+      toast.show(`Deleted ${res.deleted} call${res.deleted === 1 ? "" : "s"}.`, "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to delete calls", "error");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -205,8 +246,38 @@ export default function CallList() {
         />
       )}
 
-      <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? <LoadingText /> : `${total} call${total === 1 ? "" : "s"}`}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12.5, color: "var(--text-faint)" }}>
+          {loading ? <LoadingText /> : `${total} call${total === 1 ? "" : "s"}`}
+        </div>
+
+        {isAdmin && selectedIds.size > 0 && (
+          <div className="fade-in-up" style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+            {confirmingDelete ? (
+              <>
+                <span style={{ color: "var(--coral)", fontWeight: 700 }}>
+                  Delete {selectedIds.size} call{selectedIds.size === 1 ? "" : "s"}? This can't be undone.
+                </span>
+                <button onClick={handleBulkDelete} disabled={deleting} style={bulkDeleteConfirmButtonStyle}>
+                  {deleting ? "Deleting…" : "Confirm delete"}
+                </button>
+                <button onClick={() => setConfirmingDelete(false)} disabled={deleting} style={bulkCancelButtonStyle}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{ color: "var(--text-soft)", fontWeight: 600 }}>{selectedIds.size} selected</span>
+                <button onClick={() => setConfirmingDelete(true)} style={bulkDeleteButtonStyle}>
+                  <Trash2 size={13} /> Delete selected
+                </button>
+                <button onClick={() => setSelectedIds(new Set())} style={bulkCancelButtonStyle}>
+                  Clear
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div
@@ -235,6 +306,15 @@ export default function CallList() {
             borderBottom: "1px solid var(--border-soft)",
           }}
         >
+          {isAdmin && (
+            <input
+              type="checkbox"
+              checked={allOnPageSelected}
+              onChange={toggleSelectAllOnPage}
+              aria-label="Select all calls on this page"
+              style={{ accentColor: "var(--brand)" }}
+            />
+          )}
           <span>Date</span>
           <span>Category</span>
           <span>Vehicle</span>
@@ -273,6 +353,16 @@ export default function CallList() {
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--paper)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
+              {isAdmin && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(call.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleSelect(call.id)}
+                  aria-label={`Select call from ${formatDateTime(call.callDate)}`}
+                  style={{ accentColor: "var(--brand)" }}
+                />
+              )}
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>
                 {formatDateTime(call.callDate)}
               </span>
@@ -563,6 +653,39 @@ const editSecondaryButtonStyle = {
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-sm)",
   fontSize: 13.5,
+  fontWeight: 600,
+} as const;
+
+const bulkDeleteButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "6px 12px",
+  background: "var(--coral-soft)",
+  color: "var(--coral)",
+  border: "1px solid var(--coral)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 12.5,
+  fontWeight: 700,
+} as const;
+
+const bulkDeleteConfirmButtonStyle = {
+  padding: "6px 12px",
+  background: "var(--coral)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 12.5,
+  fontWeight: 700,
+} as const;
+
+const bulkCancelButtonStyle = {
+  padding: "6px 12px",
+  background: "none",
+  color: "var(--text-soft)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 12.5,
   fontWeight: 600,
 } as const;
 

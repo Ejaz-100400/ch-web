@@ -238,6 +238,8 @@ export const api = {
     updateExtraction: (id: string, dto: UpdateExtractionInput) =>
       request<CallExtraction>(`/calls/${id}/extraction`, { method: "PATCH", body: JSON.stringify(dto) }),
     remove: (id: string) => request<{ deleted: true }>(`/calls/${id}`, { method: "DELETE" }),
+    removeMany: (ids: string[]) =>
+      request<{ deleted: number }>("/calls/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
     reprocess: (id: string) => request<{ enqueued: true; callId: string }>(`/calls/${id}/reprocess`, { method: "POST" }),
     processingStatus: (id: string) =>
       request<{ id: string; status: Call["status"]; failureReason: string | null; updatedAt: string }>(
