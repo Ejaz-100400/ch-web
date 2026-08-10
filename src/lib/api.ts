@@ -342,7 +342,7 @@ export const api = {
   team: {
     list: () => request<AppUser[]>("/team"),
     invite: (dto: InviteTeamMemberInput) => request<AppUser>("/team/invite", { method: "POST", body: JSON.stringify(dto) }),
-    update: (id: string, dto: { role?: UserRole; active?: boolean }) =>
+    update: (id: string, dto: { name?: string; role?: UserRole; active?: boolean }) =>
       request<AppUser>(`/team/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
   },
 };

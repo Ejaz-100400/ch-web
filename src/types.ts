@@ -133,10 +133,14 @@ export interface Paginated<T> {
 
 export interface ReportsSummary {
   totalCalls: number;
-  totalEnquiries: number;
   carGlassesEnquiries: number;
   carModificationEnquiries: number;
+  unknownCategoryEnquiries: number;
   followUpsPending: number;
+  followUpsOverdue: number;
+  avgCallDurationSeconds: number | null;
+  totalBudgetPotential: number;
+  interestedRate: number | null;
 }
 
 export interface CallsByPeriodPoint {

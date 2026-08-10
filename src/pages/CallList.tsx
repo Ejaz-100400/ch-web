@@ -138,9 +138,12 @@ export default function CallList() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Category and Status render as pill badges whose text can't wrap -- give
+  // them enough fixed width for their longest label ("Car Modifications",
+  // "Processing") so the badge never bleeds into the next column.
   const gridCols = isAdmin
-    ? "24px 120px 90px 1fr 1.3fr 1fr 80px 90px 1fr 36px"
-    : "120px 90px 1fr 1.3fr 1fr 80px 90px 1fr";
+    ? "24px 120px 138px 1fr 1.2fr 1fr 76px 104px 1fr 36px"
+    : "120px 138px 1fr 1.2fr 1fr 76px 104px 1fr";
 
   function refreshCall(updated: Call) {
     setCalls((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
@@ -290,7 +293,7 @@ export default function CallList() {
         }}
       >
       <div className="table-scroll">
-        <div style={{ minWidth: 940 }}>
+        <div style={{ minWidth: 1000 }}>
         <div
           className="mono"
           style={{

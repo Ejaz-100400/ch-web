@@ -13,12 +13,12 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
-import { formatDate } from "../lib/format";
+import { formatCurrency, formatDate, formatDuration } from "../lib/format";
 import type {
   CallsByPeriodPoint,
   Employee,
@@ -118,6 +118,7 @@ export default function Reports() {
   const followUpData = followUpBreakdown.map((f) => ({ name: f.status, value: f.count }));
   const sentimentData = sentimentBreakdown.map((s) => ({ name: s.sentiment, value: s.count }));
   const productData = [...topProducts].reverse().map((p) => ({ name: p.name, count: p.count }));
+  const carModelData = [...topCarModels].reverse().map((c) => ({ name: c.car_model, count: c.count }));
   const employeeData = [...topEmployees].reverse().map((e) => ({ name: e.name, count: e.count }));
 
   const hasActiveFilters = Boolean(category || employeeId || dateFrom || dateTo);
@@ -139,10 +140,45 @@ export default function Reports() {
       <div className="reports-layout" style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 20, alignItems: "start" }}>
         <div style={{ minWidth: 0 }}>
           <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
-            <KpiCard icon={PhoneCall} label="Total enquiries" value={summary?.totalEnquiries ?? null} tint="var(--brand)" />
-            <KpiCard icon={Glasses} label="Car Glasses" value={summary?.carGlassesEnquiries ?? null} tint="var(--brand)" />
-            <KpiCard icon={Wrench} label="Car Modifications" value={summary?.carModificationEnquiries ?? null} tint="var(--violet)" />
-            <KpiCard icon={CalendarClock} label="Follow-ups pending" value={summary?.followUpsPending ?? null} tint="var(--amber)" />
+            <KpiCard icon={PhoneCall} label="Total calls" value={summary?.totalCalls} tint="var(--brand)" loading={loading} />
+            <KpiCard icon={Glasses} label="Car Glasses" value={summary?.carGlassesEnquiries} tint="var(--brand)" loading={loading} />
+            <KpiCard icon={Wrench} label="Car Modifications" value={summary?.carModificationEnquiries} tint="var(--violet)" loading={loading} />
+            <KpiCard icon={HelpCircle} label="Unknown category" value={summary?.unknownCategoryEnquiries} tint="var(--text-faint)" loading={loading} />
+          </div>
+
+          <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
+            <KpiCard icon={CalendarClock} label="Follow-ups pending" value={summary?.followUpsPending} tint="var(--amber)" loading={loading} />
+            <KpiCard
+              icon={AlertTriangle}
+              label="Follow-ups overdue"
+              value={summary?.followUpsOverdue}
+              tint="var(--coral)"
+              loading={loading}
+            />
+            <KpiCard
+              icon={Timer}
+              label="Avg. call duration"
+              value={summary?.avgCallDurationSeconds != null ? formatDuration(summary.avgCallDurationSeconds) : "—"}
+              tint="var(--violet)"
+              loading={loading}
+            />
+            <KpiCard
+              icon={Wallet}
+              label="Budget potential"
+              value={summary ? formatCurrency(summary.totalBudgetPotential) : undefined}
+              tint="var(--brand)"
+              loading={loading}
+            />
+          </div>
+
+          <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
+            <KpiCard
+              icon={Smile}
+              label="Interested rate"
+              value={summary?.interestedRate != null ? `${summary.interestedRate}%` : "—"}
+              tint="var(--brand)"
+              loading={loading}
+            />
           </div>
 
           <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 14, marginBottom: 14 }}>
@@ -200,16 +236,16 @@ export default function Reports() {
               <SectionLabel>Top car models mentioned</SectionLabel>
               {loading ? (
                 <Skeleton height={200} />
-              ) : topCarModels.length === 0 ? (
+              ) : carModelData.length === 0 ? (
                 <EmptyChart message="No car models extracted yet." />
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={topCarModels} margin={{ left: -20, right: 8, top: 8 }}>
-                    <CartesianGrid stroke="#ebecf1" vertical={false} />
-                    <XAxis dataKey="car_model" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                  <BarChart data={carModelData} layout="vertical" margin={{ left: 0, right: 16, top: 8 }}>
+                    <CartesianGrid stroke="#ebecf1" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={80} />
                     <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                    <Bar dataKey="count" fill="#17967f" radius={[6, 6, 0, 0]} maxBarSize={44} isAnimationActive />
+                    <Bar dataKey="count" fill="#17967f" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -360,11 +396,13 @@ function KpiCard({
   label,
   value,
   tint,
+  loading,
 }: {
   icon: typeof PhoneCall;
   label: string;
-  value: number | null;
+  value: ReactNode;
   tint: string;
+  loading: boolean;
 }) {
   return (
     <div style={cardStyle} className="fade-in-up">
@@ -372,8 +410,8 @@ function KpiCard({
         <Icon size={16} color={tint} strokeWidth={2.2} />
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-soft)" }}>{label}</span>
       </div>
-      {value === null ? <Skeleton width={60} height={26} /> : (
-        <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700 }}>{value}</div>
+      {loading ? <Skeleton width={60} height={26} /> : (
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700 }}>{value ?? "—"}</div>
       )}
     </div>
   );

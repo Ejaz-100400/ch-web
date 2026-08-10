@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Mail, Plus, ShieldAlert, UserRoundCheck, UserRoundX, X } from "lucide-react";
+import { Mail, Pencil, Plus, Save, ShieldAlert, UserRoundCheck, UserRoundX, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
@@ -26,6 +26,8 @@ export default function Team() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [inviting, setInviting] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   function load() {
     setLoading(true);
@@ -86,6 +88,29 @@ export default function Team() {
       load();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Failed to update role", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  function startEditName(member: AppUser) {
+    setEditingId(member.id);
+    setEditName(member.name);
+  }
+
+  async function handleSaveName(member: AppUser) {
+    if (!editName.trim()) {
+      toast.show("Name can't be empty.", "error");
+      return;
+    }
+    setUpdatingId(member.id);
+    try {
+      await api.team.update(member.id, { name: editName.trim() });
+      toast.show("Name updated.", "success");
+      setEditingId(null);
+      load();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to update name", "error");
     } finally {
       setUpdatingId(null);
     }
@@ -163,12 +188,12 @@ export default function Team() {
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: 680 }}>
+          <div style={{ minWidth: 700 }}>
             <div
               className="mono"
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.6fr 1.8fr 1fr 1fr 90px",
+                gridTemplateColumns: "1.6fr 1.8fr 1fr 1fr 116px",
                 padding: "10px 18px",
                 fontSize: 11,
                 fontFamily: "var(--font-body)",
@@ -189,45 +214,97 @@ export default function Team() {
             {loading && <SkeletonRows rows={5} />}
 
             {!loading &&
-              members.map((m) => (
-                <div
-                  key={m.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1.6fr 1.8fr 1fr 1fr 90px",
-                    alignItems: "center",
-                    padding: "12px 18px",
-                    borderBottom: "1px solid var(--border-soft)",
-                    fontSize: 13,
-                  }}
-                >
-                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
-                  <span style={{ color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.email}</span>
-                  <select
-                    value={m.role}
-                    disabled={updatingId === m.id || m.id === appUser?.id}
-                    onChange={(e) => handleRoleChange(m, e.target.value as UserRole)}
-                    title={m.id === appUser?.id ? "You can't change your own role" : "Change role"}
-                    style={{ ...inputStyle, width: "auto", padding: "5px 8px", fontSize: 12.5 }}
+              members.map((m) => {
+                const isEditing = editingId === m.id;
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1.6fr 1.8fr 1fr 1fr 116px",
+                      alignItems: "center",
+                      padding: "12px 18px",
+                      borderBottom: "1px solid var(--border-soft)",
+                      fontSize: 13,
+                    }}
                   >
-                    {ROLE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: m.active ? "var(--brand-strong)" : "var(--text-faint)" }}>
-                    {m.active ? "Active" : "Inactive"}
-                  </span>
-                  <button
-                    onClick={() => handleToggleActive(m)}
-                    disabled={updatingId === m.id || m.id === appUser?.id}
-                    aria-label={m.active ? `Deactivate ${m.name}` : `Reactivate ${m.name}`}
-                    title={m.id === appUser?.id ? "You can't deactivate yourself" : m.active ? "Deactivate" : "Reactivate"}
-                    style={{ ...iconButtonStyle, color: m.active ? "var(--coral)" : "var(--brand-strong)" }}
-                  >
-                    {m.active ? <UserRoundX size={14} /> : <UserRoundCheck size={14} />}
-                  </button>
-                </div>
-              ))}
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveName(m);
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }}
+                      />
+                    ) : (
+                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+                    )}
+                    <span style={{ color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.email}</span>
+                    <select
+                      value={m.role}
+                      disabled={updatingId === m.id || m.id === appUser?.id}
+                      onChange={(e) => handleRoleChange(m, e.target.value as UserRole)}
+                      title={m.id === appUser?.id ? "You can't change your own role" : "Change role"}
+                      style={{ ...inputStyle, width: "auto", padding: "5px 8px", fontSize: 12.5 }}
+                    >
+                      {ROLE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: m.active ? "var(--brand-strong)" : "var(--text-faint)" }}>
+                      {m.active ? "Active" : "Inactive"}
+                    </span>
+                    <span style={{ display: "flex", gap: 4 }}>
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => handleSaveName(m)}
+                            disabled={updatingId === m.id}
+                            aria-label={`Save ${m.name}`}
+                            title="Save"
+                            style={{ ...iconButtonStyle, color: "var(--brand-strong)" }}
+                          >
+                            <Save size={14} />
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            disabled={updatingId === m.id}
+                            aria-label="Cancel"
+                            title="Cancel"
+                            style={{ ...iconButtonStyle, color: "var(--text-faint)" }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEditName(m)}
+                            disabled={updatingId === m.id}
+                            aria-label={`Edit ${m.name}`}
+                            title="Edit name"
+                            style={{ ...iconButtonStyle, color: "var(--text-faint)" }}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleActive(m)}
+                            disabled={updatingId === m.id || m.id === appUser?.id}
+                            aria-label={m.active ? `Deactivate ${m.name}` : `Reactivate ${m.name}`}
+                            title={m.id === appUser?.id ? "You can't deactivate yourself" : m.active ? "Deactivate" : "Reactivate"}
+                            style={{ ...iconButtonStyle, color: m.active ? "var(--coral)" : "var(--brand-strong)" }}
+                          >
+                            {m.active ? <UserRoundX size={14} /> : <UserRoundCheck size={14} />}
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
           </div>
         </div>
 
