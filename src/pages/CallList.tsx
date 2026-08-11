@@ -468,8 +468,8 @@ function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onR
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<CallDuplicateGroup[]>([]);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ id: string; action: "merge" | "delete" } | null>(null);
+  const [workingId, setWorkingId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -488,21 +488,38 @@ function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A group is only still "possibly duplicate" once it has 2+ calls left.
+  function dropFromGroups(callId: string) {
+    setGroups((prev) => prev.map((g) => ({ ...g, calls: g.calls.filter((c) => c.id !== callId) })).filter((g) => g.calls.length > 1));
+  }
+
+  async function handleMerge(duplicateId: string, canonicalId: string) {
+    setWorkingId(duplicateId);
+    try {
+      await api.calls.mergeDuplicate(duplicateId, canonicalId);
+      dropFromGroups(duplicateId);
+      toast.show("Calls merged -- any field only the duplicate had was copied over.", "success");
+      onResolved();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to merge calls", "error");
+    } finally {
+      setWorkingId(null);
+      setConfirming(null);
+    }
+  }
+
   async function handleDelete(callId: string) {
-    setDeletingId(callId);
+    setWorkingId(callId);
     try {
       await api.calls.remove(callId);
-      // A group is only still "possibly duplicate" once it has 2+ calls left.
-      setGroups((prev) =>
-        prev.map((g) => ({ ...g, calls: g.calls.filter((c) => c.id !== callId) })).filter((g) => g.calls.length > 1),
-      );
+      dropFromGroups(callId);
       toast.show("Duplicate call deleted.", "success");
       onResolved();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Failed to delete call", "error");
     } finally {
-      setDeletingId(null);
-      setConfirmingId(null);
+      setWorkingId(null);
+      setConfirming(null);
     }
   }
 
@@ -531,70 +548,109 @@ function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onR
           No likely duplicates found -- same customer, same call date, and same vehicle.
         </p>
       )}
+      {!loading && groups.length > 0 && (
+        <p style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12 }}>
+          Merge keeps the "Primary" call and copies over any field only the other one had (budget, summary, follow-up, etc.)
+          before removing it. Delete just removes the row outright.
+        </p>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {groups.map((g) => (
-          <div key={`${g.customerId}-${g.callDate}`} style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)", padding: 12 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>
-              {g.customerName ?? g.customerPhone ?? "Unknown customer"} · {formatDate(g.callDate)}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {g.calls.map((c) => (
-                <div
-                  key={c.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 10px",
-                    border: "1px solid var(--border-soft)",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: 12.5,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <button
-                    onClick={() => navigate(`/calls/${c.id}`)}
-                    style={{ background: "none", border: "none", color: "var(--brand-strong)", fontWeight: 700, textDecoration: "underline", padding: 0 }}
-                  >
-                    View
-                  </button>
-                  <CategoryBadge category={c.businessCategory} />
-                  <span style={{ color: "var(--text-soft)" }}>{[c.carMake, c.carModel].filter(Boolean).join(" ") || "—"}</span>
-                  {c.imported && <ImportedBadge />}
-                  <span style={{ color: "var(--text-faint)", flex: 1, minWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {c.summary ?? "No summary"}
-                  </span>
-                  <CallStatusBadge status={c.status} />
-                  {confirmingId === c.id ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <button
-                        onClick={() => handleDelete(c.id)}
-                        disabled={deletingId === c.id}
-                        style={{ padding: "5px 10px", background: "var(--coral)", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700 }}
-                      >
-                        {deletingId === c.id ? "Deleting…" : "Confirm delete"}
-                      </button>
-                      <button
-                        onClick={() => setConfirmingId(null)}
-                        style={{ padding: "5px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12, fontWeight: 600 }}
-                      >
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmingId(c.id)}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--coral-soft)", color: "var(--coral)", border: "1px solid var(--coral)", borderRadius: 6, fontSize: 12, fontWeight: 600 }}
+        {groups.map((g) => {
+          const primaryId = g.calls[0]?.id;
+          return (
+            <div key={`${g.customerId}-${g.callDate}`} style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)", padding: 12 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>
+                {g.customerName ?? g.customerPhone ?? "Unknown customer"} · {formatDate(g.callDate)}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {g.calls.map((c) => {
+                  const isPrimary = c.id === primaryId;
+                  return (
+                    <div
+                      key={c.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 10px",
+                        border: `1px solid ${isPrimary ? "var(--brand)" : "var(--border-soft)"}`,
+                        borderRadius: "var(--radius-sm)",
+                        fontSize: 12.5,
+                        flexWrap: "wrap",
+                      }}
                     >
-                      <Trash2 size={12} /> Delete
-                    </button>
-                  )}
-                </div>
-              ))}
+                      <button
+                        onClick={() => navigate(`/calls/${c.id}`)}
+                        style={{ background: "none", border: "none", color: "var(--brand-strong)", fontWeight: 700, textDecoration: "underline", padding: 0 }}
+                      >
+                        View
+                      </button>
+                      {isPrimary && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-strong)", background: "var(--brand-soft)", padding: "2px 8px", borderRadius: 999 }}>
+                          Primary
+                        </span>
+                      )}
+                      <CategoryBadge category={c.businessCategory} />
+                      <span style={{ color: "var(--text-soft)" }}>{[c.carMake, c.carModel].filter(Boolean).join(" ") || "—"}</span>
+                      {c.imported && <ImportedBadge />}
+                      <span style={{ color: "var(--text-faint)", flex: 1, minWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {c.summary ?? "No summary"}
+                      </span>
+                      <CallStatusBadge status={c.status} />
+
+                      {!isPrimary && (
+                        confirming?.id === c.id ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
+                              {confirming.action === "merge" ? "Merge into primary?" : "Delete this call?"}
+                            </span>
+                            <button
+                              onClick={() => (confirming.action === "merge" ? handleMerge(c.id, primaryId!) : handleDelete(c.id))}
+                              disabled={workingId === c.id}
+                              style={{
+                                padding: "5px 10px",
+                                background: confirming.action === "merge" ? "var(--brand)" : "var(--coral)",
+                                color: confirming.action === "merge" ? "var(--on-brand)" : "#fff",
+                                border: "none",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {workingId === c.id ? "Working…" : "Confirm"}
+                            </button>
+                            <button
+                              onClick={() => setConfirming(null)}
+                              style={{ padding: "5px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12, fontWeight: 600 }}
+                            >
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <button
+                              onClick={() => setConfirming({ id: c.id, action: "merge" })}
+                              style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--brand-soft)", color: "var(--brand-strong)", border: "1px solid var(--brand)", borderRadius: 6, fontSize: 12, fontWeight: 600 }}
+                            >
+                              <Copy size={12} /> Merge
+                            </button>
+                            <button
+                              onClick={() => setConfirming({ id: c.id, action: "delete" })}
+                              style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "var(--coral-soft)", color: "var(--coral)", border: "1px solid var(--coral)", borderRadius: 6, fontSize: 12, fontWeight: 600 }}
+                            >
+                              <Trash2 size={12} /> Delete
+                            </button>
+                          </span>
+                        )
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

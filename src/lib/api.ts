@@ -257,6 +257,8 @@ export const api = {
     carMakes: () => request<string[]>("/calls/car-makes"),
     carModels: (carMake?: string) => request<string[]>(`/calls/car-models${query({ carMake })}`),
     duplicates: () => request<CallDuplicateGroup[]>("/calls/duplicates"),
+    mergeDuplicate: (duplicateId: string, canonicalId: string) =>
+      request<Call>(`/calls/duplicates/${duplicateId}/merge`, { method: "POST", body: JSON.stringify({ canonicalId }) }),
     reprocess: (id: string) => request<{ enqueued: true; callId: string }>(`/calls/${id}/reprocess`, { method: "POST" }),
     processingStatus: (id: string) =>
       request<{ id: string; status: Call["status"]; failureReason: string | null; updatedAt: string }>(
