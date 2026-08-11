@@ -14,6 +14,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
+import { MultiSelectFilter } from "../components/ui/FilterBar";
 import {
   api,
   ApiError,
@@ -27,7 +28,7 @@ import { useToast } from "../components/ui/Toast";
 import { Spinner, LoadingText } from "../components/ui/Spinner";
 import { ProgressOverlay } from "../components/ui/ProgressOverlay";
 import { formatDate, formatDateTime } from "../lib/format";
-import type { AuditLogEntry, BusinessCategory, Employee, ExtractedEntry, SentimentType } from "../types";
+import type { AuditLogEntry, BusinessCategory, Employee, ExtractedEntry, Product, SentimentType } from "../types";
 
 type Tab = "excel" | "photos" | "manual";
 
@@ -421,7 +422,7 @@ interface DraftRow {
   carModel: string;
   carVariant: string;
   location: string;
-  productsDiscussed: string;
+  productsDiscussed: string[];
   customerRequirements: string;
   budget: string;
   followUpRequired: boolean;
@@ -432,7 +433,7 @@ interface DraftRow {
 
 let draftKeySeq = 0;
 
-function toDraftRow(sourceFile: string, entry: ExtractedEntry, employees: Employee[]): DraftRow {
+function toDraftRow(sourceFile: string, entry: ExtractedEntry, employees: Employee[], products: Product[]): DraftRow {
   const matchedEmployee = entry.employeeName
     ? employees.find((e) => e.name.toLowerCase() === entry.employeeName!.trim().toLowerCase())
     : undefined;
@@ -454,7 +455,7 @@ function toDraftRow(sourceFile: string, entry: ExtractedEntry, employees: Employ
     carModel: entry.carModel ?? "",
     carVariant: entry.carVariant ?? "",
     location: entry.location ?? "",
-    productsDiscussed: entry.productsDiscussed.join(", "),
+    productsDiscussed: matchProductNames(entry.productsDiscussed, products),
     customerRequirements: entry.customerRequirements ?? "",
     budget: entry.budget != null ? String(entry.budget) : "",
     followUpRequired: entry.followUpRequired,
@@ -471,6 +472,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   const [scanErrors, setScanErrors] = useState<{ sourceFile: string; error: string }[]>([]);
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [knownCarMakes, setKnownCarMakes] = useState<string[]>([]);
   const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
   const [committing, setCommitting] = useState(false);
@@ -479,6 +481,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.products.list().then(setProducts).catch(() => setProducts([]));
     api.calls.carMakes().then(setKnownCarMakes).catch(() => setKnownCarMakes([]));
     api.calls.carModels().then(setKnownCarModels).catch(() => setKnownCarModels([]));
   }, []);
@@ -502,7 +505,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
           errors.push({ sourceFile: r.sourceFile, error: r.error });
           continue;
         }
-        for (const entry of r.entries) newDrafts.push(toDraftRow(r.sourceFile, entry, employees));
+        for (const entry of r.entries) newDrafts.push(toDraftRow(r.sourceFile, entry, employees, products));
       }
       setDrafts(newDrafts);
       setScanErrors(errors);
@@ -624,6 +627,7 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
                 key={d.key}
                 draft={d}
                 employees={employees}
+                products={products}
                 knownCarMakes={knownCarMakes}
                 knownCarModels={knownCarModels}
                 onChange={(patch) => updateDraft(d.key, patch)}
@@ -669,7 +673,7 @@ function emptyDraftRow(sourceFile = ""): DraftRow {
     carModel: "",
     carVariant: "",
     location: "",
-    productsDiscussed: "",
+    productsDiscussed: [],
     customerRequirements: "",
     budget: "",
     followUpRequired: false,
@@ -690,7 +694,7 @@ function draftToCommitInput(d: DraftRow): CommitPhotoRowInput {
     carModel: d.carModel.trim() || undefined,
     carVariant: d.carVariant.trim() || undefined,
     location: d.location.trim() || undefined,
-    productsDiscussed: d.productsDiscussed.split(",").map((p) => p.trim()).filter(Boolean),
+    productsDiscussed: d.productsDiscussed,
     customerRequirements: d.customerRequirements.trim() || undefined,
     budget: d.budget ? Number(d.budget) : undefined,
     followUpRequired: d.followUpRequired,
@@ -702,6 +706,7 @@ function draftToCommitInput(d: DraftRow): CommitPhotoRowInput {
 
 function ManualEntryPanel({ toast, onImported }: { toast: Toast; onImported: () => void }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [knownCarMakes, setKnownCarMakes] = useState<string[]>([]);
   const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
   const [draft, setDraft] = useState<DraftRow>(emptyDraftRow);
@@ -709,6 +714,7 @@ function ManualEntryPanel({ toast, onImported }: { toast: Toast; onImported: () 
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.products.list().then(setProducts).catch(() => setProducts([]));
     api.calls.carMakes().then(setKnownCarMakes).catch(() => setKnownCarMakes([]));
     api.calls.carModels().then(setKnownCarModels).catch(() => setKnownCarModels([]));
   }, []);
@@ -748,6 +754,7 @@ function ManualEntryPanel({ toast, onImported }: { toast: Toast; onImported: () 
       <DraftCard
         draft={draft}
         employees={employees}
+        products={products}
         knownCarMakes={knownCarMakes}
         knownCarModels={knownCarModels}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
@@ -788,9 +795,35 @@ function findLikelyTypo(value: string, known: string[]): string | null {
   return best ? best.value : null;
 }
 
+// Best-effort pre-fill for the products-discussed multi-select: matches raw
+// extracted phrases ("windshield crack repair") against catalog product
+// names, favoring substring containment (either direction) over pure edit
+// distance since phrases are often longer/shorter paraphrases of the
+// catalog name rather than typos of it. Purely a starting point -- the user
+// can add or remove catalog products afterward regardless of what matched.
+function matchProductNames(rawPhrases: string[], catalog: { name: string }[]): string[] {
+  const matched = new Set<string>();
+  for (const raw of rawPhrases) {
+    const cleaned = raw.trim().toLowerCase();
+    if (!cleaned) continue;
+    let best: { name: string; score: number } | null = null;
+    for (const p of catalog) {
+      const name = p.name.toLowerCase();
+      let score: number;
+      if (cleaned === name) score = 1;
+      else if (cleaned.includes(name) || name.includes(cleaned)) score = 0.85;
+      else score = 1 - levenshtein(cleaned, name) / Math.max(cleaned.length, name.length);
+      if (score > (best?.score ?? 0)) best = { name: p.name, score };
+    }
+    if (best && best.score >= 0.5) matched.add(best.name);
+  }
+  return Array.from(matched);
+}
+
 function DraftCard({
   draft,
   employees,
+  products,
   knownCarMakes,
   knownCarModels,
   onChange,
@@ -798,11 +831,18 @@ function DraftCard({
 }: {
   draft: DraftRow;
   employees: Employee[];
+  products: Product[];
   knownCarMakes: string[];
   knownCarModels: string[];
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove?: () => void;
 }) {
+  // Scoped to the row's category once one is picked, same cascading idea as
+  // the Reports/Call log/Customers filters -- otherwise every product from
+  // both categories.
+  const productOptions = products
+    .filter((p) => !draft.businessCategory || p.category === draft.businessCategory)
+    .map((p) => ({ value: p.name, label: p.name }));
   const carMakeTypo = useMemo(() => findLikelyTypo(draft.carMake, knownCarMakes), [draft.carMake, knownCarMakes]);
   const carModelTypo = useMemo(() => findLikelyTypo(draft.carModel, knownCarModels), [draft.carModel, knownCarModels]);
   const needsAttention = !draft.phoneNumber.trim();
@@ -912,8 +952,14 @@ function DraftCard({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginTop: 10 }}>
-        <Field label="Products discussed (comma-separated)">
-          <input style={inputStyle} value={draft.productsDiscussed} onChange={(e) => onChange({ productsDiscussed: e.target.value })} placeholder="Unknown" />
+        <Field label="Products discussed">
+          <MultiSelectFilter
+            label="Select products"
+            values={draft.productsDiscussed}
+            onChange={(v) => onChange({ productsDiscussed: v })}
+            options={productOptions}
+            triggerStyle={{ width: "100%" }}
+          />
         </Field>
         <Field label="Customer requirements">
           <input style={inputStyle} value={draft.customerRequirements} onChange={(e) => onChange({ customerRequirements: e.target.value })} placeholder="Unknown" />

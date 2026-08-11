@@ -3,6 +3,8 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -13,7 +15,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle, Users } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { Skeleton } from "../components/ui/Skeleton";
@@ -24,6 +26,7 @@ import { useVehicleFilters } from "../lib/useVehicleFilters";
 import type {
   CallsByPeriodPoint,
   CustomerCallHistoryRow,
+  CustomersByPeriodPoint,
   Employee,
   FollowUpBreakdownPoint,
   Paginated,
@@ -81,6 +84,7 @@ export default function Reports() {
   const [products, setProducts] = useState<Product[]>([]);
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [callsByPeriod, setCallsByPeriod] = useState<CallsByPeriodPoint[]>([]);
+  const [customersByPeriod, setCustomersByPeriod] = useState<CustomersByPeriodPoint[]>([]);
   const [followUpBreakdown, setFollowUpBreakdown] = useState<FollowUpBreakdownPoint[]>([]);
   const [sentimentBreakdown, setSentimentBreakdown] = useState<SentimentBreakdownPoint[]>([]);
   const [topCarModels, setTopCarModels] = useState<TopCarModelPoint[]>([]);
@@ -118,16 +122,18 @@ export default function Reports() {
     Promise.all([
       api.reports.summary(filters),
       api.reports.callsByPeriod(granularity, filters),
+      api.reports.customersByPeriod(granularity, filters),
       api.reports.followUps(filters),
       api.reports.sentiment(filters),
       api.reports.topCarModels(8, filters),
       api.reports.topProducts(8, filters),
       api.reports.topEmployees(8, filters),
     ])
-      .then(([s, cbp, f, sent, cm, p, emp]) => {
+      .then(([s, cbp, custp, f, sent, cm, p, emp]) => {
         if (!active) return;
         setSummary(s);
         setCallsByPeriod(cbp);
+        setCustomersByPeriod(custp);
         setFollowUpBreakdown(f);
         setSentimentBreakdown(sent);
         setTopCarModels(cm);
@@ -171,7 +177,10 @@ export default function Reports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, customerHistoryPage]);
 
-  const volumeData = [...callsByPeriod].reverse().map((p) => ({ period: formatDate(p.period), calls: p.count }));
+  const volumeData = [...callsByPeriod]
+    .reverse()
+    .map((p) => ({ period: formatDate(p.period), glasses: p.carGlasses, modifications: p.carModifications }));
+  const customerVolumeData = [...customersByPeriod].reverse().map((p) => ({ period: formatDate(p.period), customers: p.count }));
   const followUpData = followUpBreakdown.map((f) => ({ name: f.status, value: f.count }));
   const sentimentData = sentimentBreakdown.map((s) => ({ name: s.sentiment, value: s.count }));
   // Backend already returns these highest-first -- don't reverse, or the
@@ -243,9 +252,10 @@ export default function Reports() {
               tint="var(--brand)"
               loading={loading}
             />
+            <KpiCard icon={Users} label="Total customers" value={summary?.totalCustomers} tint="var(--violet)" loading={loading} />
           </div>
 
-          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
             <div style={cardStyle}>
               <SectionLabel>Call volume</SectionLabel>
               {loading ? (
@@ -253,24 +263,66 @@ export default function Reports() {
               ) : volumeData.length === 0 ? (
                 <EmptyChart message="No calls match these filters." />
               ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={volumeData} margin={{ left: -20, right: 8, top: 8 }}>
+                      <defs>
+                        <linearGradient id="volumeFillGlasses" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#17967f" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#17967f" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="volumeFillMods" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6a63d1" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#6a63d1" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke="#ebecf1" vertical={false} />
+                      <XAxis dataKey="period" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                      <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                      <Area type="monotone" name="Glasses" dataKey="glasses" stroke="#17967f" strokeWidth={2.5} fill="url(#volumeFillGlasses)" isAnimationActive />
+                      <Area type="monotone" name="Modifications" dataKey="modifications" stroke="#6a63d1" strokeWidth={2.5} fill="url(#volumeFillMods)" isAnimationActive />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                  <Legend
+                    items={[
+                      { key: "glasses", label: "Glasses", color: "#17967f" },
+                      { key: "modifications", label: "Modifications", color: "#6a63d1" },
+                    ]}
+                  />
+                </>
+              )}
+            </div>
+
+            <div style={cardStyle}>
+              <SectionLabel>Customer volume</SectionLabel>
+              {loading ? (
+                <Skeleton height={220} />
+              ) : customerVolumeData.length === 0 ? (
+                <EmptyChart message="No customers match these filters." />
+              ) : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={volumeData} margin={{ left: -20, right: 8, top: 8 }}>
-                    <defs>
-                      <linearGradient id="volumeFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#17967f" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#17967f" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <LineChart data={customerVolumeData} margin={{ left: -20, right: 8, top: 8 }}>
                     <CartesianGrid stroke="#ebecf1" vertical={false} />
                     <XAxis dataKey="period" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                     <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                    <Area type="monotone" dataKey="calls" stroke="#17967f" strokeWidth={2.5} fill="url(#volumeFill)" isAnimationActive />
-                  </AreaChart>
+                    <Line
+                      type="monotone"
+                      dataKey="customers"
+                      stroke="#d99a2b"
+                      strokeWidth={2.5}
+                      strokeDasharray="6 4"
+                      dot={{ r: 3, fill: "#d99a2b", strokeWidth: 0 }}
+                      isAnimationActive
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
+          </div>
 
+          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
             <div style={cardStyle}>
               <SectionLabel>Follow-up outcomes</SectionLabel>
               {loading ? (

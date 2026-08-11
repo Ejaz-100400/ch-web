@@ -161,9 +161,17 @@ export interface ReportsSummary {
   avgCallDurationSeconds: number | null;
   budgetPotentialPerCustomer: number;
   interestedRate: number | null;
+  totalCustomers: number;
 }
 
 export interface CallsByPeriodPoint {
+  period: string;
+  carGlasses: number;
+  carModifications: number;
+  unknown: number;
+}
+
+export interface CustomersByPeriodPoint {
   period: string;
   count: number;
 }

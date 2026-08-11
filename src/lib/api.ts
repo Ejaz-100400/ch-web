@@ -10,6 +10,7 @@ import type {
   CallsByPeriodPoint,
   Customer,
   CustomerCallHistoryRow,
+  CustomersByPeriodPoint,
   Employee,
   FollowUp,
   FollowUpBreakdownPoint,
@@ -336,6 +337,8 @@ export const api = {
     summary: (q: ReportsQuery = {}) => request<ReportsSummary>(`/reports/summary${query(q)}`),
     callsByPeriod: (granularity: "daily" | "weekly" | "monthly" = "daily", q: ReportsQuery = {}) =>
       request<CallsByPeriodPoint[]>(`/reports/calls-by-period${query({ granularity, ...q })}`),
+    customersByPeriod: (granularity: "daily" | "weekly" | "monthly" = "daily", q: ReportsQuery = {}) =>
+      request<CustomersByPeriodPoint[]>(`/reports/customers-by-period${query({ granularity, ...q })}`),
     followUps: (q: ReportsQuery = {}) => request<FollowUpBreakdownPoint[]>(`/reports/follow-ups${query(q)}`),
     sentiment: (q: ReportsQuery = {}) => request<SentimentBreakdownPoint[]>(`/reports/sentiment${query(q)}`),
     topCarModels: (limit?: number, q: ReportsQuery = {}) =>
