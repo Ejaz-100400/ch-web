@@ -254,7 +254,7 @@ export const api = {
     remove: (id: string) => request<{ deleted: true }>(`/calls/${id}`, { method: "DELETE" }),
     removeMany: (ids: string[]) =>
       request<{ deleted: number }>("/calls/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
-    carMakes: () => request<string[]>("/calls/car-makes"),
+    carMakes: (carModel?: string) => request<string[]>(`/calls/car-makes${query({ carModel })}`),
     carModels: (carMake?: string) => request<string[]>(`/calls/car-models${query({ carMake })}`),
     duplicates: () => request<CallDuplicateGroup[]>("/calls/duplicates"),
     mergeDuplicate: (duplicateId: string, canonicalId: string) =>
@@ -275,14 +275,24 @@ export const api = {
     update: (id: string, dto: { name?: string; notes?: string }) =>
       request<Customer>(`/customers/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
     duplicates: () =>
-      request<{ id_a: string; name_a: string; id_b: string; name_b: string; similarity: number }[]>(
-        "/customers/duplicates",
-      ),
+      request<
+        {
+          id_a: string;
+          name_a: string;
+          id_b: string;
+          name_b: string;
+          similarity: number;
+          call_count_a: number;
+          call_count_b: number;
+        }[]
+      >("/customers/duplicates"),
     merge: (duplicateId: string, canonicalId: string) =>
       request<Customer>(`/customers/duplicates/${duplicateId}/merge`, {
         method: "POST",
         body: JSON.stringify({ canonicalId }),
       }),
+    removeMany: (ids: string[]) =>
+      request<{ deleted: number }>("/customers/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
   },
 
   employees: {

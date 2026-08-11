@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Download,
   FileSpreadsheet,
@@ -471,12 +471,16 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   const [scanErrors, setScanErrors] = useState<{ sourceFile: string; error: string }[]>([]);
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [knownCarMakes, setKnownCarMakes] = useState<string[]>([]);
+  const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
   const [committing, setCommitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.calls.carMakes().then(setKnownCarMakes).catch(() => setKnownCarMakes([]));
+    api.calls.carModels().then(setKnownCarModels).catch(() => setKnownCarModels([]));
   }, []);
 
   function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -616,7 +620,15 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: 620, overflowY: "auto", paddingRight: 6 }}>
             {drafts.map((d) => (
-              <DraftCard key={d.key} draft={d} employees={employees} onChange={(patch) => updateDraft(d.key, patch)} onRemove={() => removeDraft(d.key)} />
+              <DraftCard
+                key={d.key}
+                draft={d}
+                employees={employees}
+                knownCarMakes={knownCarMakes}
+                knownCarModels={knownCarModels}
+                onChange={(patch) => updateDraft(d.key, patch)}
+                onRemove={() => removeDraft(d.key)}
+              />
             ))}
           </div>
 
@@ -690,11 +702,15 @@ function draftToCommitInput(d: DraftRow): CommitPhotoRowInput {
 
 function ManualEntryPanel({ toast, onImported }: { toast: Toast; onImported: () => void }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [knownCarMakes, setKnownCarMakes] = useState<string[]>([]);
+  const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
   const [draft, setDraft] = useState<DraftRow>(emptyDraftRow);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.calls.carMakes().then(setKnownCarMakes).catch(() => setKnownCarMakes([]));
+    api.calls.carModels().then(setKnownCarModels).catch(() => setKnownCarModels([]));
   }, []);
 
   async function handleSave() {
@@ -729,7 +745,13 @@ function ManualEntryPanel({ toast, onImported }: { toast: Toast; onImported: () 
         For walk-ins or calls that weren't captured automatically -- everything shows up in Calls, Reports, and Follow-ups
         just like a normal call. <strong>A phone number is required</strong>; everything else can stay Unknown.
       </p>
-      <DraftCard draft={draft} employees={employees} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} />
+      <DraftCard
+        draft={draft}
+        employees={employees}
+        knownCarMakes={knownCarMakes}
+        knownCarModels={knownCarModels}
+        onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+      />
       <button onClick={handleSave} disabled={saving} style={{ ...primaryButtonStyle, marginTop: 14, opacity: saving ? 0.7 : 1 }}>
         {saving ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <UserPlus size={16} />}
         {saving ? "Saving…" : "Save customer"}
@@ -738,17 +760,51 @@ function ManualEntryPanel({ toast, onImported }: { toast: Toast; onImported: () 
   );
 }
 
+function levenshtein(a: string, b: string): number {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+// Only flags likely typos of an already-known value (close but not exact) --
+// a genuinely new car make/model is expected and shouldn't be flagged.
+function findLikelyTypo(value: string, known: string[]): string | null {
+  const v = value.trim().toLowerCase();
+  if (!v || known.length === 0) return null;
+  if (known.some((k) => k.toLowerCase() === v)) return null;
+  let best: { value: string; ratio: number } | null = null;
+  for (const k of known) {
+    const kl = k.toLowerCase();
+    const distance = levenshtein(v, kl);
+    const ratio = 1 - distance / Math.max(v.length, kl.length);
+    if (ratio >= 0.6 && (!best || ratio > best.ratio)) best = { value: k, ratio };
+  }
+  return best ? best.value : null;
+}
+
 function DraftCard({
   draft,
   employees,
+  knownCarMakes,
+  knownCarModels,
   onChange,
   onRemove,
 }: {
   draft: DraftRow;
   employees: Employee[];
+  knownCarMakes: string[];
+  knownCarModels: string[];
   onChange: (patch: Partial<DraftRow>) => void;
   onRemove?: () => void;
 }) {
+  const carMakeTypo = useMemo(() => findLikelyTypo(draft.carMake, knownCarMakes), [draft.carMake, knownCarMakes]);
+  const carModelTypo = useMemo(() => findLikelyTypo(draft.carModel, knownCarModels), [draft.carModel, knownCarModels]);
   const needsAttention = !draft.phoneNumber.trim();
   return (
     <div
@@ -803,10 +859,38 @@ function DraftCard({
           </select>
         </Field>
         <Field label="Car make">
-          <input style={inputStyle} value={draft.carMake} onChange={(e) => onChange({ carMake: e.target.value })} placeholder="Unknown" />
+          <input
+            style={{ ...inputStyle, borderColor: carMakeTypo ? "var(--amber)" : "var(--border)" }}
+            value={draft.carMake}
+            onChange={(e) => onChange({ carMake: e.target.value })}
+            placeholder="Unknown"
+          />
+          {carMakeTypo && (
+            <button
+              type="button"
+              onClick={() => onChange({ carMake: carMakeTypo })}
+              style={{ background: "none", border: "none", padding: 0, marginTop: 3, fontSize: 11, color: "var(--amber)", textAlign: "left", cursor: "pointer" }}
+            >
+              Did you mean "{carMakeTypo}"?
+            </button>
+          )}
         </Field>
         <Field label="Car model">
-          <input style={inputStyle} value={draft.carModel} onChange={(e) => onChange({ carModel: e.target.value })} placeholder="Unknown" />
+          <input
+            style={{ ...inputStyle, borderColor: carModelTypo ? "var(--amber)" : "var(--border)" }}
+            value={draft.carModel}
+            onChange={(e) => onChange({ carModel: e.target.value })}
+            placeholder="Unknown"
+          />
+          {carModelTypo && (
+            <button
+              type="button"
+              onClick={() => onChange({ carModel: carModelTypo })}
+              style={{ background: "none", border: "none", padding: 0, marginTop: 3, fontSize: 11, color: "var(--amber)", textAlign: "left", cursor: "pointer" }}
+            >
+              Did you mean "{carModelTypo}"?
+            </button>
+          )}
         </Field>
         <Field label="Variant">
           <input style={inputStyle} value={draft.carVariant} onChange={(e) => onChange({ carVariant: e.target.value })} placeholder="Unknown" />

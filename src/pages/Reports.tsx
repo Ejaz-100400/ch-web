@@ -19,6 +19,7 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { formatCurrency, formatDate, formatDuration } from "../lib/format";
+import { useVehicleFilters } from "../lib/useVehicleFilters";
 import type {
   CallsByPeriodPoint,
   Employee,
@@ -67,8 +68,7 @@ export default function Reports() {
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
   const [category, setCategory] = useState("");
   const [employeeId, setEmployeeId] = useState("");
-  const [carMake, setCarMake] = useState("");
-  const [carModel, setCarModel] = useState("");
+  const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
   const [sentiment, setSentiment] = useState("");
   const [productId, setProductId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -76,8 +76,6 @@ export default function Reports() {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [carMakeOptions, setCarMakeOptions] = useState<string[]>([]);
-  const [carModelOptions, setCarModelOptions] = useState<string[]>([]);
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [callsByPeriod, setCallsByPeriod] = useState<CallsByPeriodPoint[]>([]);
   const [followUpBreakdown, setFollowUpBreakdown] = useState<FollowUpBreakdownPoint[]>([]);
@@ -90,26 +88,7 @@ export default function Reports() {
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
     api.products.list().then(setProducts).catch(() => setProducts([]));
-    api.calls.carMakes().then(setCarMakeOptions).catch(() => setCarMakeOptions([]));
   }, []);
-
-  // Scope the Car Model dropdown to the selected make, if any -- otherwise
-  // every model on record. A previously-picked model that doesn't belong to
-  // the newly-selected make can't stay selected, so clear it.
-  useEffect(() => {
-    let active = true;
-    api.calls
-      .carModels(carMake || undefined)
-      .then((models) => {
-        if (!active) return;
-        setCarModelOptions(models);
-        setCarModel((prev) => (prev && !models.includes(prev) ? "" : prev));
-      })
-      .catch(() => active && setCarModelOptions([]));
-    return () => {
-      active = false;
-    };
-  }, [carMake]);
 
   useEffect(() => {
     let active = true;
@@ -166,8 +145,7 @@ export default function Reports() {
   function clearFilters() {
     setCategory("");
     setEmployeeId("");
-    setCarMake("");
-    setCarModel("");
+    resetVehicleFilters();
     setSentiment("");
     setProductId("");
     setDateFrom("");
