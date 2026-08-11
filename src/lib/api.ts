@@ -9,6 +9,7 @@ import type {
   CallExtraction,
   CallsByPeriodPoint,
   Customer,
+  CustomerCallHistoryRow,
   Employee,
   FollowUp,
   FollowUpBreakdownPoint,
@@ -73,10 +74,18 @@ async function requestBlob(path: string): Promise<Blob> {
   return res.blob();
 }
 
+// Array values are comma-joined into a single query param (matching the
+// backend's ToArray() parsing) -- simpler than repeated keys and works the
+// same whether the caller passes one value or several.
 function query(params: object): string {
   const usp = new URLSearchParams();
-  for (const [key, value] of Object.entries(params as Record<string, string | number | boolean | undefined>)) {
-    if (value !== undefined && value !== "") usp.set(key, String(value));
+  for (const [key, value] of Object.entries(params as Record<string, string | number | boolean | string[] | undefined>)) {
+    if (value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      if (value.length > 0) usp.set(key, value.join(","));
+    } else {
+      usp.set(key, String(value));
+    }
   }
   const qs = usp.toString();
   return qs ? `?${qs}` : "";
@@ -85,14 +94,14 @@ function query(params: object): string {
 export interface CallsQuery {
   search?: string;
   phone?: string;
-  carMake?: string;
-  carModel?: string;
-  sentiment?: SentimentType;
+  carMake?: string[];
+  carModel?: string[];
+  sentiment?: SentimentType[];
   followUpRequired?: boolean;
-  category?: string;
+  category?: string[];
   dateFrom?: string;
   dateTo?: string;
-  employeeId?: string;
+  employeeId?: string[];
   page?: number;
   pageSize?: number;
 }
@@ -100,20 +109,20 @@ export interface CallsQuery {
 export interface CustomersQuery {
   search?: string;
   phone?: string;
-  carMake?: string;
-  carModel?: string;
-  category?: string;
+  carMake?: string[];
+  carModel?: string[];
+  category?: string[];
   page?: number;
   pageSize?: number;
 }
 
 export interface ReportsQuery {
-  category?: string;
-  employeeId?: string;
-  carMake?: string;
-  carModel?: string;
-  sentiment?: SentimentType;
-  productId?: string;
+  category?: string[];
+  employeeId?: string[];
+  carMake?: string[];
+  carModel?: string[];
+  sentiment?: SentimentType[];
+  productId?: string[];
   dateFrom?: string;
   dateTo?: string;
 }
@@ -254,8 +263,8 @@ export const api = {
     remove: (id: string) => request<{ deleted: true }>(`/calls/${id}`, { method: "DELETE" }),
     removeMany: (ids: string[]) =>
       request<{ deleted: number }>("/calls/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
-    carMakes: (carModel?: string) => request<string[]>(`/calls/car-makes${query({ carModel })}`),
-    carModels: (carMake?: string) => request<string[]>(`/calls/car-models${query({ carMake })}`),
+    carMakes: (carModel?: string[]) => request<string[]>(`/calls/car-makes${query({ carModel })}`),
+    carModels: (carMake?: string[]) => request<string[]>(`/calls/car-models${query({ carMake })}`),
     duplicates: () => request<CallDuplicateGroup[]>("/calls/duplicates"),
     mergeDuplicate: (duplicateId: string, canonicalId: string) =>
       request<Call>(`/calls/duplicates/${duplicateId}/merge`, { method: "POST", body: JSON.stringify({ canonicalId }) }),
@@ -279,9 +288,15 @@ export const api = {
         {
           id_a: string;
           name_a: string;
+          phone_a: string;
           id_b: string;
           name_b: string;
-          similarity: number;
+          phone_b: string;
+          name_similarity: number;
+          phone_similarity: number;
+          vehicle_match: boolean;
+          vehicle_a: string | null;
+          vehicle_b: string | null;
           call_count_a: number;
           call_count_b: number;
         }[]
@@ -329,6 +344,8 @@ export const api = {
       request<TopProductPoint[]>(`/reports/top-products${query({ limit, ...q })}`),
     topEmployees: (limit?: number, q: ReportsQuery = {}) =>
       request<TopEmployeePoint[]>(`/reports/top-employees${query({ limit, ...q })}`),
+    customerCallHistory: (page = 1, pageSize = 20, q: ReportsQuery = {}) =>
+      request<Paginated<CustomerCallHistoryRow>>(`/reports/customer-call-history${query({ page, pageSize, ...q })}`),
   },
 
   businessNumbers: {

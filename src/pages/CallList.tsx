@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PhoneCall, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { FilterBar, SearchInput, FilterSelect, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
+import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
@@ -44,10 +44,10 @@ export default function CallList() {
   const [phone, setPhone] = useState("");
   const [debouncedPhone, setDebouncedPhone] = useState("");
   const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
-  const [sentiment, setSentiment] = useState("");
+  const [sentiment, setSentiment] = useState<string[]>([]);
   const [followUpRequired, setFollowUpRequired] = useState("");
-  const [category, setCategory] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [category, setCategory] = useState<string[]>([]);
+  const [employeeId, setEmployeeId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -88,12 +88,12 @@ export default function CallList() {
       .list({
         search: debouncedSearch || undefined,
         phone: debouncedPhone || undefined,
-        carMake: carMake || undefined,
-        carModel: carModel || undefined,
-        sentiment: (sentiment as SentimentType) || undefined,
+        carMake: carMake.length ? carMake : undefined,
+        carModel: carModel.length ? carModel : undefined,
+        sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
         followUpRequired: followUpRequired ? followUpRequired === "true" : undefined,
-        category: category || undefined,
-        employeeId: employeeId || undefined,
+        category: category.length ? category : undefined,
+        employeeId: employeeId.length ? employeeId : undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         page,
@@ -122,18 +122,27 @@ export default function CallList() {
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
   const hasActiveFilters = Boolean(
-    search || phone || carMake || carModel || sentiment || followUpRequired || category || employeeId || dateFrom || dateTo,
+    search ||
+      phone ||
+      carMake.length ||
+      carModel.length ||
+      sentiment.length ||
+      followUpRequired ||
+      category.length ||
+      employeeId.length ||
+      dateFrom ||
+      dateTo,
   );
-  const advancedFilterCount = [carMake, carModel, sentiment, followUpRequired].filter(Boolean).length;
+  const advancedFilterCount = [carMake, carModel, sentiment].filter((v) => v.length > 0).length + (followUpRequired ? 1 : 0);
 
   function clearFilters() {
     setSearch("");
     setPhone("");
     resetVehicleFilters();
-    setSentiment("");
+    setSentiment([]);
     setFollowUpRequired("");
-    setCategory("");
-    setEmployeeId("");
+    setCategory([]);
+    setEmployeeId([]);
     setDateFrom("");
     setDateTo("");
   }
@@ -229,8 +238,8 @@ export default function CallList() {
           placeholder="Phone number"
           style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 130 }}
         />
-        <FilterSelect label="Category" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
-        <FilterSelect label="Employee" value={employeeId} onChange={setEmployeeId} options={employeeOptions} />
+        <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+        <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} />
         <input
           type="date"
           value={dateFrom}
@@ -251,19 +260,19 @@ export default function CallList() {
 
       {showAdvanced && (
         <FilterBar>
-          <select style={vehicleSelectStyle} value={carMake} onChange={(e) => setCarMake(e.target.value)}>
-            <option value="">All makes</option>
-            {carMakeOptions.map((make) => (
-              <option key={make} value={make}>{make}</option>
-            ))}
-          </select>
-          <select style={vehicleSelectStyle} value={carModel} onChange={(e) => setCarModel(e.target.value)}>
-            <option value="">All models</option>
-            {carModelOptions.map((model) => (
-              <option key={model} value={model}>{model}</option>
-            ))}
-          </select>
-          <FilterSelect label="Sentiment" value={sentiment} onChange={setSentiment} options={SENTIMENT_OPTIONS} />
+          <MultiSelectFilter
+            label="Car make"
+            values={carMake}
+            onChange={setCarMake}
+            options={carMakeOptions.map((make) => ({ value: make, label: make }))}
+          />
+          <MultiSelectFilter
+            label="Car model"
+            values={carModel}
+            onChange={setCarModel}
+            options={carModelOptions.map((model) => ({ value: model, label: model }))}
+          />
+          <MultiSelectFilter label="Sentiment" values={sentiment} onChange={setSentiment} options={SENTIMENT_OPTIONS} />
           <FilterSelect label="Follow-up" value={followUpRequired} onChange={setFollowUpRequired} options={FOLLOW_UP_OPTIONS} />
         </FilterBar>
       )}
@@ -926,14 +935,6 @@ function mergeGainedFields(duplicate: CallDuplicateEntry, primary: CallDuplicate
   return gains;
 }
 
-const vehicleSelectStyle = {
-  padding: "9px 12px",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius-sm)",
-  background: "var(--paper)",
-  fontSize: 13.5,
-  width: 160,
-} as const;
 
 const bulkDeleteButtonStyle = {
   display: "flex",

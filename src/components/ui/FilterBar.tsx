@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 
 export function FilterBar({ children }: { children: ReactNode }) {
   return (
@@ -112,6 +112,136 @@ export function FilterSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+export function MultiSelectFilter({
+  label,
+  values,
+  onChange,
+  options,
+  triggerStyle,
+}: {
+  label: string;
+  values: string[];
+  onChange: (v: string[]) => void;
+  options: { value: string; label: string }[];
+  triggerStyle?: CSSProperties;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const isActive = values.length > 0;
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  function toggleValue(value: string) {
+    onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  }
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={label}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "9px 12px",
+          border: `1px solid ${isActive ? "var(--brand)" : "var(--border)"}`,
+          borderRadius: "var(--radius-sm)",
+          background: isActive ? "var(--brand-soft)" : "var(--paper)",
+          color: isActive ? "var(--brand-strong)" : "var(--text)",
+          fontSize: 13.5,
+          fontWeight: isActive ? 600 : 400,
+          whiteSpace: "nowrap",
+          ...triggerStyle,
+        }}
+      >
+        {label}
+        {isActive && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 16,
+              height: 16,
+              padding: "0 4px",
+              borderRadius: 999,
+              background: "var(--brand)",
+              color: "var(--on-brand)",
+              fontSize: 10,
+              fontWeight: 800,
+            }}
+          >
+            {values.length}
+          </span>
+        )}
+        <ChevronDown size={13} style={{ opacity: 0.6, transform: open ? "rotate(180deg)" : undefined, transition: "transform 120ms ease" }} />
+      </button>
+
+      {open && (
+        <div
+          className="fade-in-up"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            zIndex: 20,
+            minWidth: 210,
+            maxHeight: 260,
+            overflowY: "auto",
+            background: "var(--paper-raised)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            boxShadow: "var(--shadow-card)",
+            padding: 6,
+          }}
+        >
+          {options.length === 0 && (
+            <div style={{ fontSize: 12.5, color: "var(--text-faint)", padding: "6px 8px" }}>No options</div>
+          )}
+          {options.map((o) => (
+            <label
+              key={o.value}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", fontSize: 13, borderRadius: 6, cursor: "pointer" }}
+            >
+              <input type="checkbox" checked={values.includes(o.value)} onChange={() => toggleValue(o.value)} />
+              {o.label}
+            </label>
+          ))}
+          {isActive && (
+            <button
+              onClick={() => onChange([])}
+              style={{
+                width: "100%",
+                marginTop: 4,
+                padding: "6px 8px",
+                background: "none",
+                border: "none",
+                borderTop: "1px solid var(--border-soft)",
+                color: "var(--text-soft)",
+                fontSize: 12,
+                fontWeight: 600,
+                textAlign: "left",
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

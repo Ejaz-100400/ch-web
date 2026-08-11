@@ -194,6 +194,17 @@ export interface TopProductPoint {
   count: number;
 }
 
+export interface CustomerCallHistoryRow {
+  customerId: string;
+  name: string | null;
+  phoneNumber: string;
+  callCount: number;
+  lastCallDate: string;
+  totalBudget: number;
+  latestCarMake: string | null;
+  latestCarModel: string | null;
+}
+
 export interface ExtractedEntry {
   customerName: string | null;
   phoneNumber: string | null;

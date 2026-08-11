@@ -3,26 +3,36 @@ import { api } from "./api";
 
 /**
  * Car Make and Car Model filter dropdowns, each scoped to whichever the
- * other currently has selected -- pick a model first and the make list
- * narrows to makes that have it, and vice versa. Whenever the *other* side
- * changes and the current selection is no longer in the freshly-fetched
- * option list, it's cleared (rather than left pointing at a value the
- * <select> no longer renders as an option).
+ * other currently has selected -- pick one or more models and the make list
+ * narrows to makes that have any of them, and vice versa. Whenever the
+ * *other* side changes and the current selection includes values no longer
+ * in the freshly-fetched option list, those are dropped (rather than left
+ * pointing at values the dropdown no longer renders as options).
+ *
+ * Prune helpers return the *same array reference* when nothing was actually
+ * removed -- returning a fresh (but equal-content) array from a state setter
+ * would still change identity, which would re-trigger the other side's
+ * effect and the two could ping-pong indefinitely.
  */
+function pruneToOptions(current: string[], options: string[]): string[] {
+  const kept = current.filter((v) => options.includes(v));
+  return kept.length === current.length ? current : kept;
+}
+
 export function useVehicleFilters() {
-  const [carMake, setCarMake] = useState("");
-  const [carModel, setCarModel] = useState("");
+  const [carMake, setCarMake] = useState<string[]>([]);
+  const [carModel, setCarModel] = useState<string[]>([]);
   const [carMakeOptions, setCarMakeOptions] = useState<string[]>([]);
   const [carModelOptions, setCarModelOptions] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
     api.calls
-      .carMakes(carModel || undefined)
+      .carMakes(carModel.length ? carModel : undefined)
       .then((res) => {
         if (!active) return;
         setCarMakeOptions(res);
-        setCarMake((prev) => (prev && !res.includes(prev) ? "" : prev));
+        setCarMake((prev) => pruneToOptions(prev, res));
       })
       .catch(() => {
         if (active) setCarMakeOptions([]);
@@ -36,11 +46,11 @@ export function useVehicleFilters() {
   useEffect(() => {
     let active = true;
     api.calls
-      .carModels(carMake || undefined)
+      .carModels(carMake.length ? carMake : undefined)
       .then((res) => {
         if (!active) return;
         setCarModelOptions(res);
-        setCarModel((prev) => (prev && !res.includes(prev) ? "" : prev));
+        setCarModel((prev) => pruneToOptions(prev, res));
       })
       .catch(() => {
         if (active) setCarModelOptions([]);
@@ -52,8 +62,8 @@ export function useVehicleFilters() {
   }, [carMake]);
 
   function reset() {
-    setCarMake("");
-    setCarModel("");
+    setCarMake([]);
+    setCarModel([]);
   }
 
   return { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset };

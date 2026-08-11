@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { FileSpreadsheet, FileText, Download, ShieldAlert } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { FilterSelect } from "../components/ui/FilterBar";
+import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { api, ApiError, downloadBlob, type CallsQuery } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -11,13 +11,30 @@ import type { AuditLogEntry, Employee } from "../types";
 
 type ExportFormat = "xlsx" | "pdf";
 
+const CATEGORY_LABELS: Record<string, string> = {
+  car_glasses: "Car Glasses",
+  car_modifications: "Car Modifications",
+  unknown: "Unknown",
+};
+
+// filters.category/employeeId may be a plain string on older audit log
+// entries logged before these became multi-select arrays -- normalize
+// either shape to an array so old history still renders correctly.
+function asArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value as string[];
+  if (typeof value === "string" && value) return [value];
+  return [];
+}
+
 function summarizeFilters(filters: Record<string, unknown> | undefined, employees: Employee[]): string {
   if (!filters) return "All calls";
   const parts: string[] = [];
-  if (filters.category) {
-    parts.push(filters.category === "car_glasses" ? "Car Glasses" : filters.category === "car_modifications" ? "Car Modifications" : "Unknown");
+  const categories = asArray(filters.category);
+  if (categories.length) parts.push(categories.map((c) => CATEGORY_LABELS[c] ?? c).join(" or "));
+  const employeeIds = asArray(filters.employeeId);
+  if (employeeIds.length) {
+    parts.push(employeeIds.map((id) => employees.find((e) => e.id === id)?.name ?? "employee").join(", "));
   }
-  if (filters.employeeId) parts.push(employees.find((e) => e.id === filters.employeeId)?.name ?? "employee");
   if (filters.dateFrom || filters.dateTo) parts.push(`${filters.dateFrom ?? "…"} – ${filters.dateTo ?? "…"}`);
   return parts.length ? parts.join(", ") : "All calls";
 }
@@ -37,8 +54,8 @@ export default function Export() {
   const { appUser } = useAuth();
   const toast = useToast();
 
-  const [category, setCategory] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [category, setCategory] = useState<string[]>([]);
+  const [employeeId, setEmployeeId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [format, setFormat] = useState<ExportFormat>("xlsx");
@@ -78,8 +95,8 @@ export default function Export() {
   async function handleGenerate() {
     setGenerating(true);
     const query: CallsQuery = {
-      category: category || undefined,
-      employeeId: employeeId || undefined,
+      category: category.length ? category : undefined,
+      employeeId: employeeId.length ? employeeId : undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     };
@@ -111,8 +128,8 @@ export default function Export() {
         <div style={cardStyle}>
           <SectionLabel>1. Filter which calls</SectionLabel>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 22 }}>
-            <FilterSelect label="Category" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
-            <FilterSelect label="Employee" value={employeeId} onChange={setEmployeeId} options={employeeOptions} />
+            <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} triggerStyle={{ width: "100%" }} />
+            <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} triggerStyle={{ width: "100%" }} />
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1 }}>
                 <label style={fieldLabelStyle}>From</label>

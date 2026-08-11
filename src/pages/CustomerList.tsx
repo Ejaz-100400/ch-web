@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronRight, Copy, Merge, Pencil, Save, Trash2, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { FilterBar, SearchInput, FilterSelect, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
+import { FilterBar, SearchInput, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge } from "../components/ui/StatusBadge";
 import { Avatar } from "../components/ui/Avatar";
 import { SkeletonRows } from "../components/ui/Skeleton";
@@ -32,7 +32,7 @@ export default function CustomerList() {
   const [phone, setPhone] = useState("");
   const [debouncedPhone, setDebouncedPhone] = useState("");
   const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -76,9 +76,9 @@ export default function CustomerList() {
       .list({
         search: debouncedSearch || undefined,
         phone: debouncedPhone || undefined,
-        carMake: carMake || undefined,
-        carModel: carModel || undefined,
-        category: category || undefined,
+        carMake: carMake.length ? carMake : undefined,
+        carModel: carModel.length ? carModel : undefined,
+        category: category.length ? category : undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -119,8 +119,8 @@ export default function CustomerList() {
     }
   }
 
-  const hasActiveFilters = Boolean(search || phone || carMake || carModel || category);
-  const advancedFilterCount = [carMake, carModel, category].filter(Boolean).length;
+  const hasActiveFilters = Boolean(search || phone || carMake.length || carModel.length || category.length);
+  const advancedFilterCount = [carMake, carModel, category].filter((v) => v.length > 0).length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const gridCols = isAdmin ? "24px 28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr 40px" : "28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr";
 
@@ -193,6 +193,11 @@ export default function CustomerList() {
           onMerged={() => {
             setPage(1);
             setRefreshToken((t) => t + 1);
+            // A merge can move calls onto a customer whose row is already
+            // expanded and cached -- drop the cache so re-expanding refetches
+            // instead of showing the pre-merge call list.
+            setCallsByCustomer({});
+            setExpanded(null);
           }}
         />
       )}
@@ -217,7 +222,7 @@ export default function CustomerList() {
               setSearch("");
               setPhone("");
               resetVehicleFilters();
-              setCategory("");
+              setCategory([]);
             }}
           />
         )}
@@ -225,19 +230,19 @@ export default function CustomerList() {
 
       {showAdvanced && (
         <FilterBar>
-          <select style={vehicleSelectStyle} value={carMake} onChange={(e) => setCarMake(e.target.value)}>
-            <option value="">All makes</option>
-            {carMakeOptions.map((make) => (
-              <option key={make} value={make}>{make}</option>
-            ))}
-          </select>
-          <select style={vehicleSelectStyle} value={carModel} onChange={(e) => setCarModel(e.target.value)}>
-            <option value="">All models</option>
-            {carModelOptions.map((model) => (
-              <option key={model} value={model}>{model}</option>
-            ))}
-          </select>
-          <FilterSelect label="Category" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+          <MultiSelectFilter
+            label="Car make"
+            values={carMake}
+            onChange={setCarMake}
+            options={carMakeOptions.map((make) => ({ value: make, label: make }))}
+          />
+          <MultiSelectFilter
+            label="Car model"
+            values={carModel}
+            onChange={setCarModel}
+            options={carModelOptions.map((model) => ({ value: model, label: model }))}
+          />
+          <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
         </FilterBar>
       )}
 
@@ -573,15 +578,6 @@ const editSecondaryButtonStyle = {
   fontWeight: 600,
 } as const;
 
-const vehicleSelectStyle = {
-  padding: "9px 12px",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius-sm)",
-  background: "var(--paper)",
-  fontSize: 13.5,
-  width: 160,
-} as const;
-
 const bulkDeleteButtonStyle = {
   display: "flex",
   alignItems: "center",
@@ -628,14 +624,51 @@ function pagerButtonStyle(disabled: boolean) {
   } as const;
 }
 
+function FieldSimilarityBadge({ label, pct }: { label: string; pct: number }) {
+  const percent = Math.round(pct * 100);
+  const strong = percent === 100;
+  return (
+    <span
+      className="mono"
+      style={{
+        fontSize: 11,
+        padding: "2px 7px",
+        borderRadius: 999,
+        background: strong ? "var(--brand-soft)" : "var(--paper)",
+        color: strong ? "var(--brand-strong)" : "var(--text-faint)",
+        border: `1px solid ${strong ? "var(--brand)" : "var(--border)"}`,
+      }}
+    >
+      {label} {percent}%
+    </span>
+  );
+}
+
+type CustomerDuplicatePair = {
+  id_a: string;
+  name_a: string;
+  phone_a: string;
+  id_b: string;
+  name_b: string;
+  phone_b: string;
+  name_similarity: number;
+  phone_similarity: number;
+  vehicle_match: boolean;
+  vehicle_a: string | null;
+  vehicle_b: string | null;
+  call_count_a: number;
+  call_count_b: number;
+};
+
 function DuplicatesPanel({ onClose, onMerged }: { onClose: () => void; onMerged: () => void }) {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
-  const [pairs, setPairs] = useState<
-    { id_a: string; name_a: string; id_b: string; name_b: string; similarity: number; call_count_a: number; call_count_b: number }[]
-  >([]);
+  const [pairs, setPairs] = useState<CustomerDuplicatePair[]>([]);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [merging, setMerging] = useState<string | null>(null);
+  const [bulkReviewOpen, setBulkReviewOpen] = useState(false);
+  const [bulkExcluded, setBulkExcluded] = useState<Set<string>>(new Set());
+  const [bulkMerging, setBulkMerging] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -654,6 +687,8 @@ function DuplicatesPanel({ onClose, onMerged }: { onClose: () => void; onMerged:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const exactMatches = pairs.filter((p) => p.name_similarity === 1);
+
   async function merge(duplicateId: string, canonicalId: string, key: string) {
     setMerging(key);
     try {
@@ -666,6 +701,32 @@ function DuplicatesPanel({ onClose, onMerged }: { onClose: () => void; onMerged:
     } finally {
       setMerging(null);
       setConfirming(null);
+    }
+  }
+
+  async function mergeExactMatches() {
+    const toMerge = exactMatches.filter((p) => !bulkExcluded.has(`${p.id_a}-${p.id_b}`));
+    if (toMerge.length === 0) return;
+    setBulkMerging(true);
+    let merged = 0;
+    for (const p of toMerge) {
+      try {
+        await api.customers.merge(p.id_a, p.id_b);
+        merged++;
+      } catch {
+        // keep going -- report the count that actually succeeded below
+      }
+    }
+    setPairs((prev) => prev.filter((p) => !toMerge.some((t) => t.id_a === p.id_a && t.id_b === p.id_b)));
+    setBulkMerging(false);
+    setBulkReviewOpen(false);
+    setBulkExcluded(new Set());
+    if (merged > 0) {
+      toast.show(`Merged ${merged} exact-name match${merged === 1 ? "" : "es"}.`, "success");
+      onMerged();
+    }
+    if (merged < toMerge.length) {
+      toast.show(`${toMerge.length - merged} merge${toMerge.length - merged === 1 ? "" : "s"} failed.`, "error");
     }
   }
 
@@ -691,6 +752,76 @@ function DuplicatesPanel({ onClose, onMerged }: { onClose: () => void; onMerged:
       {loading && <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Checking for duplicates…</p>}
       {!loading && pairs.length === 0 && <p style={{ fontSize: 13, color: "var(--text-faint)" }}>No likely duplicates found by name similarity.</p>}
 
+      {!loading && exactMatches.length > 0 && (
+        <div style={{ padding: 12, marginBottom: 12, border: "1px solid var(--brand)", borderRadius: "var(--radius-sm)", background: "var(--brand-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--brand-strong)" }}>
+              {exactMatches.length} pair{exactMatches.length === 1 ? "" : "s"} have identical names
+            </span>
+            <button
+              onClick={() => setBulkReviewOpen((v) => !v)}
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--brand)", color: "var(--on-brand)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700 }}
+            >
+              <Merge size={13} /> {bulkReviewOpen ? "Hide" : "Review & merge all"}
+            </button>
+          </div>
+
+          {bulkReviewOpen && (
+            <div className="fade-in-up" style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+              <p style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
+                Same name doesn't always mean same person -- check phone/vehicle below and uncheck any that look like different customers.
+              </p>
+              {exactMatches.map((p) => {
+                const key = `${p.id_a}-${p.id_b}`;
+                const excluded = bulkExcluded.has(key);
+                return (
+                  <label
+                    key={key}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "var(--paper)", border: "1px solid var(--border-soft)", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!excluded}
+                      onChange={() =>
+                        setBulkExcluded((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(key)) next.delete(key);
+                          else next.add(key);
+                          return next;
+                        })
+                      }
+                    />
+                    <span style={{ flex: 1 }}>
+                      <strong>{p.name_a}</strong> ({p.phone_a}{p.vehicle_a ? `, ${p.vehicle_a}` : ""}) will merge into{" "}
+                      <strong>{p.name_b}</strong> ({p.phone_b}{p.vehicle_b ? `, ${p.vehicle_b}` : ""})
+                    </span>
+                    <span className="mono" style={{ color: p.vehicle_match ? "var(--brand-strong)" : "var(--text-faint)", fontSize: 11 }}>
+                      {p.vehicle_match ? "same vehicle" : "phone " + Math.round(p.phone_similarity * 100) + "% alike"}
+                    </span>
+                  </label>
+                );
+              })}
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <button
+                  onClick={mergeExactMatches}
+                  disabled={bulkMerging || exactMatches.every((p) => bulkExcluded.has(`${p.id_a}-${p.id_b}`))}
+                  style={{ padding: "6px 12px", background: "var(--brand)", color: "var(--on-brand)", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700 }}
+                >
+                  {bulkMerging ? "Merging…" : `Confirm merge (${exactMatches.length - bulkExcluded.size})`}
+                </button>
+                <button
+                  onClick={() => setBulkReviewOpen(false)}
+                  disabled={bulkMerging}
+                  style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12.5, fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {pairs.map((p) => {
           const key = `${p.id_a}-${p.id_b}`;
@@ -705,12 +836,26 @@ function DuplicatesPanel({ onClose, onMerged }: { onClose: () => void; onMerged:
                 overflow: "hidden",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px" }}>
-                <span style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", flexWrap: "wrap" }}>
+                <span style={{ flex: 1, minWidth: 160 }}>
                   <strong>{p.name_a}</strong> <span style={{ color: "var(--text-faint)" }}>vs</span> <strong>{p.name_b}</strong>
                 </span>
-                <span className="mono" style={{ fontSize: 12, color: "var(--text-faint)" }}>
-                  {Math.round(p.similarity * 100)}% similar
+                <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <FieldSimilarityBadge label="Name" pct={p.name_similarity} />
+                  <FieldSimilarityBadge label="Phone" pct={p.phone_similarity} />
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: 11,
+                      padding: "2px 7px",
+                      borderRadius: 999,
+                      background: p.vehicle_match ? "var(--brand-soft)" : "var(--paper)",
+                      color: p.vehicle_match ? "var(--brand-strong)" : "var(--text-faint)",
+                      border: `1px solid ${p.vehicle_match ? "var(--brand)" : "var(--border)"}`,
+                    }}
+                  >
+                    {p.vehicle_match ? "Vehicle: match" : p.vehicle_a || p.vehicle_b ? "Vehicle: differs" : "Vehicle: n/a"}
+                  </span>
                 </span>
                 <button
                   onClick={() => setConfirming(isReviewing ? null : key)}
@@ -728,14 +873,18 @@ function DuplicatesPanel({ onClose, onMerged }: { onClose: () => void; onMerged:
                         Will be deleted
                       </div>
                       <div style={{ fontWeight: 700 }}>{p.name_a}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{p.call_count_a} call{p.call_count_a === 1 ? "" : "s"} moved over</div>
+                      <div className="mono" style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{p.phone_a}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{p.vehicle_a ?? "No vehicle on record"}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 4 }}>{p.call_count_a} call{p.call_count_a === 1 ? "" : "s"} moved over</div>
                     </div>
                     <div style={{ padding: 10, border: "1px solid var(--brand)", borderRadius: 6, background: "var(--paper-raised)" }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "var(--brand)", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 4 }}>
                         Kept (survivor)
                       </div>
                       <div style={{ fontWeight: 700 }}>{p.name_b}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{p.call_count_b} existing call{p.call_count_b === 1 ? "" : "s"}</div>
+                      <div className="mono" style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{p.phone_b}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{p.vehicle_b ?? "No vehicle on record"}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 4 }}>{p.call_count_b} existing call{p.call_count_b === 1 ? "" : "s"}</div>
                     </div>
                   </div>
                   <p style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 12 }}>

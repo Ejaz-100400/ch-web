@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type ReactNode, type CSSProperties } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
+import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
@@ -22,8 +23,10 @@ import { formatCurrency, formatDate, formatDuration } from "../lib/format";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
 import type {
   CallsByPeriodPoint,
+  CustomerCallHistoryRow,
   Employee,
   FollowUpBreakdownPoint,
+  Paginated,
   Product,
   ReportsSummary,
   SentimentBreakdownPoint,
@@ -66,11 +69,11 @@ const SENTIMENT_COLORS: Record<string, string> = {
 export default function Reports() {
   const toast = useToast();
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
-  const [category, setCategory] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [category, setCategory] = useState<string[]>([]);
+  const [employeeId, setEmployeeId] = useState<string[]>([]);
   const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
-  const [sentiment, setSentiment] = useState("");
-  const [productId, setProductId] = useState("");
+  const [sentiment, setSentiment] = useState<string[]>([]);
+  const [productId, setProductId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -85,6 +88,25 @@ export default function Reports() {
   const [topEmployees, setTopEmployees] = useState<TopEmployeePoint[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [customerHistory, setCustomerHistory] = useState<Paginated<CustomerCallHistoryRow> | null>(null);
+  const [customerHistoryLoading, setCustomerHistoryLoading] = useState(true);
+  const [customerHistoryPage, setCustomerHistoryPage] = useState(1);
+  const CUSTOMER_HISTORY_PAGE_SIZE = 10;
+
+  const filters = useMemo(
+    () => ({
+      category: category.length ? category : undefined,
+      employeeId: employeeId.length ? employeeId : undefined,
+      carMake: carMake.length ? carMake : undefined,
+      carModel: carModel.length ? carModel : undefined,
+      sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
+      productId: productId.length ? productId : undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    }),
+    [category, employeeId, carMake, carModel, sentiment, productId, dateFrom, dateTo],
+  );
+
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
     api.products.list().then(setProducts).catch(() => setProducts([]));
@@ -93,16 +115,6 @@ export default function Reports() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    const filters = {
-      category: category || undefined,
-      employeeId: employeeId || undefined,
-      carMake: carMake || undefined,
-      carModel: carModel || undefined,
-      sentiment: (sentiment as SentimentType) || undefined,
-      productId: productId || undefined,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
-    };
     Promise.all([
       api.reports.summary(filters),
       api.reports.callsByPeriod(granularity, filters),
@@ -130,7 +142,34 @@ export default function Reports() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [granularity, category, employeeId, carMake, carModel, sentiment, productId, dateFrom, dateTo]);
+  }, [granularity, filters]);
+
+  // A filter change invalidates whatever page of the customer table was
+  // showing -- page 1 of the new filtered set is the only one guaranteed to
+  // still make sense.
+  useEffect(() => {
+    setCustomerHistoryPage(1);
+  }, [filters]);
+
+  useEffect(() => {
+    let active = true;
+    setCustomerHistoryLoading(true);
+    api.reports
+      .customerCallHistory(customerHistoryPage, CUSTOMER_HISTORY_PAGE_SIZE, filters)
+      .then((res) => {
+        if (active) setCustomerHistory(res);
+      })
+      .catch((err) => {
+        if (active) toast.show(err instanceof ApiError ? err.message : "Failed to load customer call history", "error");
+      })
+      .finally(() => {
+        if (active) setCustomerHistoryLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, customerHistoryPage]);
 
   const volumeData = [...callsByPeriod].reverse().map((p) => ({ period: formatDate(p.period), calls: p.count }));
   const followUpData = followUpBreakdown.map((f) => ({ name: f.status, value: f.count }));
@@ -141,13 +180,15 @@ export default function Reports() {
   const carModelData = topCarModels.map((c) => ({ name: c.car_model, count: c.count }));
   const employeeData = topEmployees.map((e) => ({ name: e.name, count: e.count }));
 
-  const hasActiveFilters = Boolean(category || employeeId || carMake || carModel || sentiment || productId || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(
+    category.length || employeeId.length || carMake.length || carModel.length || sentiment.length || productId.length || dateFrom || dateTo,
+  );
   function clearFilters() {
-    setCategory("");
-    setEmployeeId("");
+    setCategory([]);
+    setEmployeeId([]);
     resetVehicleFilters();
-    setSentiment("");
-    setProductId("");
+    setSentiment([]);
+    setProductId([]);
     setDateFrom("");
     setDateTo("");
   }
@@ -337,6 +378,17 @@ export default function Reports() {
               )}
             </div>
           </div>
+
+          <div style={{ ...cardStyle, marginTop: 14 }}>
+            <SectionLabel>Customers &amp; call history</SectionLabel>
+            <CustomerHistoryTable
+              data={customerHistory}
+              loading={customerHistoryLoading}
+              page={customerHistoryPage}
+              pageSize={CUSTOMER_HISTORY_PAGE_SIZE}
+              onPageChange={setCustomerHistoryPage}
+            />
+          </div>
         </div>
 
         <div className="reports-filter-panel" style={{ ...cardStyle, position: "sticky", top: 20, padding: 16 }}>
@@ -356,57 +408,63 @@ export default function Reports() {
           </FilterField>
 
           <FilterField label="Category">
-            <select style={filterInputStyle} value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">All categories</option>
-              {CATEGORY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              label="All categories"
+              values={category}
+              onChange={setCategory}
+              options={CATEGORY_OPTIONS}
+              triggerStyle={{ width: "100%" }}
+            />
           </FilterField>
 
           <FilterField label="Employee">
-            <select style={filterInputStyle} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-              <option value="">All employees</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              label="All employees"
+              values={employeeId}
+              onChange={setEmployeeId}
+              options={employees.map((emp) => ({ value: emp.id, label: emp.name }))}
+              triggerStyle={{ width: "100%" }}
+            />
           </FilterField>
 
           <FilterField label="Car make">
-            <select style={filterInputStyle} value={carMake} onChange={(e) => setCarMake(e.target.value)}>
-              <option value="">All makes</option>
-              {carMakeOptions.map((make) => (
-                <option key={make} value={make}>{make}</option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              label="All makes"
+              values={carMake}
+              onChange={setCarMake}
+              options={carMakeOptions.map((make) => ({ value: make, label: make }))}
+              triggerStyle={{ width: "100%" }}
+            />
           </FilterField>
 
           <FilterField label="Car model">
-            <select style={filterInputStyle} value={carModel} onChange={(e) => setCarModel(e.target.value)}>
-              <option value="">All models</option>
-              {carModelOptions.map((model) => (
-                <option key={model} value={model}>{model}</option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              label="All models"
+              values={carModel}
+              onChange={setCarModel}
+              options={carModelOptions.map((model) => ({ value: model, label: model }))}
+              triggerStyle={{ width: "100%" }}
+            />
           </FilterField>
 
           <FilterField label="Sentiment">
-            <select style={filterInputStyle} value={sentiment} onChange={(e) => setSentiment(e.target.value)}>
-              <option value="">All sentiments</option>
-              {SENTIMENT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              label="All sentiments"
+              values={sentiment}
+              onChange={setSentiment}
+              options={SENTIMENT_OPTIONS}
+              triggerStyle={{ width: "100%" }}
+            />
           </FilterField>
 
           <FilterField label="Product">
-            <select style={filterInputStyle} value={productId} onChange={(e) => setProductId(e.target.value)}>
-              <option value="">All products</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              label="All products"
+              values={productId}
+              onChange={setProductId}
+              options={products.map((p) => ({ value: p.id, label: p.name }))}
+              triggerStyle={{ width: "100%" }}
+            />
           </FilterField>
 
           <FilterField label="From date">
@@ -446,6 +504,105 @@ function Legend({ items }: { items: { key: string; label: string; color: string 
           {d.label}
         </span>
       ))}
+    </div>
+  );
+}
+
+function CustomerHistoryTable({
+  data,
+  loading,
+  page,
+  pageSize,
+  onPageChange,
+}: {
+  data: Paginated<CustomerCallHistoryRow> | null;
+  loading: boolean;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (loading) return <Skeleton height={220} />;
+
+  const rows = data?.items ?? [];
+  if (rows.length === 0) {
+    return <EmptyChart message="No customers match the current filters." />;
+  }
+
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return (
+    <div>
+      <div className="table-scroll">
+        <div style={{ minWidth: 640 }}>
+          <div
+            className="mono"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.6fr 1.1fr 70px 1fr 1.2fr 1fr",
+              padding: "8px 4px",
+              fontSize: 11,
+              fontFamily: "var(--font-body)",
+              fontWeight: 700,
+              color: "var(--text-faint)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              borderBottom: "1px solid var(--border-soft)",
+            }}
+          >
+            <span>Customer</span>
+            <span>Phone</span>
+            <span>Calls</span>
+            <span>Last call</span>
+            <span>Latest vehicle</span>
+            <span>Budget</span>
+          </div>
+          {rows.map((r) => (
+            <div
+              key={r.customerId}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.6fr 1.1fr 70px 1fr 1.2fr 1fr",
+                alignItems: "center",
+                padding: "10px 4px",
+                fontSize: 13,
+                borderBottom: "1px solid var(--border-soft)",
+              }}
+            >
+              <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {r.name ?? <span style={{ color: "var(--text-faint)", fontWeight: 600 }}>Unnamed caller</span>}
+              </span>
+              <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
+                {r.phoneNumber}
+              </span>
+              <span className="mono" style={{ color: "var(--text-soft)" }}>{r.callCount}</span>
+              <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{formatDate(r.lastCallDate)}</span>
+              <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
+                {[r.latestCarMake, r.latestCarModel].filter(Boolean).join(" ") || "—"}
+              </span>
+              <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
+                {r.totalBudget > 0 ? formatCurrency(r.totalBudget) : "—"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, fontSize: 12.5 }}>
+          <span style={{ color: "var(--text-faint)" }}>
+            Page {page} of {totalPages} · {total} customer{total === 1 ? "" : "s"}
+          </span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} style={pagerButtonStyle(page <= 1)}>
+              Previous
+            </button>
+            <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} style={pagerButtonStyle(page >= totalPages)}>
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -519,3 +676,16 @@ const clearFiltersButtonStyle: CSSProperties = {
   fontSize: 12.5,
   fontWeight: 600,
 };
+
+function pagerButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    padding: "6px 12px",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-sm)",
+    background: "var(--paper)",
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: disabled ? "var(--text-faint)" : "var(--text)",
+    opacity: disabled ? 0.6 : 1,
+  };
+}
