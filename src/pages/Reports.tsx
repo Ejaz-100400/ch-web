@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -8,22 +9,25 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  CartesianGrid,
   BarChart,
   Bar,
+  LabelList,
   PieChart,
   Pie,
   Cell,
+  ReferenceDot,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle, Users } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle, Users, Eye, EyeOff, X, ChevronDown, ChevronRight } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { Skeleton } from "../components/ui/Skeleton";
-import { api, ApiError } from "../lib/api";
+import { CategoryBadge, CallStatusBadge } from "../components/ui/StatusBadge";
+import { api, ApiError, type ReportsQuery } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
-import { formatCurrency, formatDate, formatDuration } from "../lib/format";
+import { formatCurrency, formatDate, formatDateTime, formatDuration } from "../lib/format";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
 import type {
+  Call,
   CallsByPeriodPoint,
   CustomerCallHistoryRow,
   CustomersByPeriodPoint,
@@ -71,6 +75,8 @@ const SENTIMENT_COLORS: Record<string, string> = {
 
 export default function Reports() {
   const toast = useToast();
+  const [filtersVisible, setFiltersVisible] = useState(true);
+  const [showAllCustomers, setShowAllCustomers] = useState(false);
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
   const [category, setCategory] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
@@ -208,18 +214,55 @@ export default function Reports() {
         eyebrow="Reports"
         title="Business performance"
         description="Enquiry volume, follow-up outcomes, and what customers are actually asking for."
+        actions={
+          <button
+            onClick={() => setFiltersVisible((v) => !v)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 15px",
+              background: filtersVisible ? "var(--brand)" : "var(--paper-raised)",
+              color: filtersVisible ? "var(--on-brand)" : "var(--text)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              fontSize: 13.5,
+              fontWeight: 700,
+              transition: "background 120ms ease, color 120ms ease",
+            }}
+          >
+            {filtersVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+            {filtersVisible ? "Hide filters" : "Show filters"}
+          </button>
+        }
       />
 
-      <div className="reports-layout" style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 20, alignItems: "start" }}>
+      <div className="reports-layout" style={{ display: "grid", gridTemplateColumns: filtersVisible ? "1fr 260px" : "1fr", gap: 20, alignItems: "start" }}>
         <div style={{ minWidth: 0 }}>
-          <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
+          {/* Left-to-right, top-to-bottom = business priority: overall volume
+              and reach first, then what's being called about, then how
+              likely it is to turn into revenue, then follow-up execution,
+              then call efficiency last. */}
+          <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 14 }}>
             <KpiCard icon={PhoneCall} label="Total calls" value={summary?.totalCalls} tint="var(--brand)" loading={loading} />
+            <KpiCard icon={Users} label="Total customers" value={summary?.totalCustomers} tint="var(--violet)" loading={loading} />
             <KpiCard icon={Glasses} label="Car Glasses" value={summary?.carGlassesEnquiries} tint="var(--brand)" loading={loading} />
             <KpiCard icon={Wrench} label="Car Modifications" value={summary?.carModificationEnquiries} tint="var(--violet)" loading={loading} />
             <KpiCard icon={HelpCircle} label="Unknown category" value={summary?.unknownCategoryEnquiries} tint="var(--text-faint)" loading={loading} />
-          </div>
-
-          <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
+            <KpiCard
+              icon={Smile}
+              label="Interested rate"
+              value={summary?.interestedRate != null ? `${summary.interestedRate}%` : "—"}
+              tint="var(--brand)"
+              loading={loading}
+            />
+            <KpiCard
+              icon={Wallet}
+              label="Budget potential / customer"
+              value={summary ? formatCurrency(summary.budgetPotentialPerCustomer) : undefined}
+              tint="var(--brand)"
+              loading={loading}
+            />
             <KpiCard icon={CalendarClock} label="Follow-ups pending" value={summary?.followUpsPending} tint="var(--amber)" loading={loading} />
             <KpiCard
               icon={AlertTriangle}
@@ -235,24 +278,6 @@ export default function Reports() {
               tint="var(--violet)"
               loading={loading}
             />
-            <KpiCard
-              icon={Wallet}
-              label="Budget potential / customer"
-              value={summary ? formatCurrency(summary.budgetPotentialPerCustomer) : undefined}
-              tint="var(--brand)"
-              loading={loading}
-            />
-          </div>
-
-          <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
-            <KpiCard
-              icon={Smile}
-              label="Interested rate"
-              value={summary?.interestedRate != null ? `${summary.interestedRate}%` : "—"}
-              tint="var(--brand)"
-              loading={loading}
-            />
-            <KpiCard icon={Users} label="Total customers" value={summary?.totalCustomers} tint="var(--violet)" loading={loading} />
           </div>
 
           <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
@@ -276,12 +301,13 @@ export default function Reports() {
                           <stop offset="100%" stopColor="#6a63d1" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="#ebecf1" vertical={false} />
                       <XAxis dataKey="period" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                       <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
                       <Area type="monotone" name="Glasses" dataKey="glasses" stroke="#17967f" strokeWidth={2.5} fill="url(#volumeFillGlasses)" isAnimationActive />
                       <Area type="monotone" name="Modifications" dataKey="modifications" stroke="#6a63d1" strokeWidth={2.5} fill="url(#volumeFillMods)" isAnimationActive />
+                      <MaxMinDots data={volumeData} dataKey="glasses" color="#17967f" />
+                      <MaxMinDots data={volumeData} dataKey="modifications" color="#6a63d1" />
                     </AreaChart>
                   </ResponsiveContainer>
                   <Legend
@@ -303,7 +329,6 @@ export default function Reports() {
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={customerVolumeData} margin={{ left: -20, right: 8, top: 8 }}>
-                    <CartesianGrid stroke="#ebecf1" vertical={false} />
                     <XAxis dataKey="period" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                     <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
@@ -316,6 +341,7 @@ export default function Reports() {
                       dot={{ r: 3, fill: "#d99a2b", strokeWidth: 0 }}
                       isAnimationActive
                     />
+                    <MaxMinDots data={customerVolumeData} dataKey="customers" color="#d99a2b" />
                   </LineChart>
                 </ResponsiveContainer>
               )}
@@ -345,60 +371,18 @@ export default function Reports() {
                 </>
               )}
             </div>
-          </div>
 
-          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            <div style={cardStyle}>
-              <SectionLabel>Top car models mentioned</SectionLabel>
-              {loading ? (
-                <Skeleton height={200} />
-              ) : carModelData.length === 0 ? (
-                <EmptyChart message="No car models extracted yet." />
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={carModelData} layout="vertical" margin={{ left: 0, right: 16, top: 8 }}>
-                    <CartesianGrid stroke="#ebecf1" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={80} />
-                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                    <Bar dataKey="count" fill="#17967f" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            <div style={cardStyle}>
-              <SectionLabel>Top products discussed</SectionLabel>
-              {loading ? (
-                <Skeleton height={200} />
-              ) : productData.length === 0 ? (
-                <EmptyChart message="No products linked to calls yet." />
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={productData} layout="vertical" margin={{ left: 0, right: 16, top: 8 }}>
-                    <CartesianGrid stroke="#ebecf1" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
-                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                    <Bar dataKey="count" fill="#6a63d1" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div style={cardStyle}>
               <SectionLabel>Sentiment breakdown</SectionLabel>
               {loading ? (
-                <Skeleton height={200} />
+                <Skeleton height={220} />
               ) : sentimentData.every((d) => d.value === 0) ? (
                 <EmptyChart message="No sentiment extracted yet." />
               ) : (
                 <>
-                  <ResponsiveContainer width="100%" height={200}>
+                  <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
-                      <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={72} paddingAngle={3} isAnimationActive>
+                      <Pie data={sentimentData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={3} isAnimationActive>
                         {sentimentData.map((d) => (
                           <Cell key={d.name} fill={SENTIMENT_COLORS[d.name] ?? "#9199a8"} stroke="none" />
                         ))}
@@ -410,29 +394,84 @@ export default function Reports() {
                 </>
               )}
             </div>
+          </div>
+
+          <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <div style={cardStyle}>
+              <SectionLabel>Top car models mentioned</SectionLabel>
+              {loading ? (
+                <Skeleton height={240} />
+              ) : carModelData.length === 0 ? (
+                <EmptyChart message="No car models extracted yet." />
+              ) : (
+                <ResponsiveContainer width="100%" height={Math.max(240, carModelData.length * 30)}>
+                  <BarChart data={carModelData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
+                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
+                    <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={90} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                    <Bar dataKey="count" fill="#17967f" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
 
             <div style={cardStyle}>
-              <SectionLabel>Top employees by enquiries</SectionLabel>
+              <SectionLabel>Top products discussed</SectionLabel>
               {loading ? (
-                <Skeleton height={200} />
-              ) : employeeData.length === 0 ? (
-                <EmptyChart message="No calls assigned to an employee yet." />
+                <Skeleton height={240} />
+              ) : productData.length === 0 ? (
+                <EmptyChart message="No products linked to calls yet." />
               ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={employeeData} layout="vertical" margin={{ left: 0, right: 16, top: 8 }}>
-                    <CartesianGrid stroke="#ebecf1" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={110} />
+                <ResponsiveContainer width="100%" height={Math.max(240, productData.length * 30)}>
+                  <BarChart data={productData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
+                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
+                    <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={140} />
                     <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                    <Bar dataKey="count" fill="#d99a2b" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive />
+                    <Bar dataKey="count" fill="#6a63d1" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
           </div>
 
+          <div style={{ ...cardStyle, marginBottom: 14 }}>
+            <SectionLabel>Top employees by enquiries</SectionLabel>
+            {loading ? (
+              <Skeleton height={220} />
+            ) : employeeData.length === 0 ? (
+              <EmptyChart message="No calls assigned to an employee yet." />
+            ) : (
+              <ResponsiveContainer width="100%" height={Math.max(220, employeeData.length * 32)}>
+                <BarChart data={employeeData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
+                  <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
+                  <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
+                  <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                  <Bar dataKey="count" fill="#d99a2b" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
+                    <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
           <div style={{ ...cardStyle, marginTop: 14 }}>
-            <SectionLabel>Customers &amp; call history</SectionLabel>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Customers &amp; call history
+              </div>
+              {(customerHistory?.total ?? 0) > CUSTOMER_HISTORY_PAGE_SIZE && (
+                <button
+                  onClick={() => setShowAllCustomers(true)}
+                  style={{ background: "none", border: "none", color: "var(--brand-strong)", fontSize: 12.5, fontWeight: 700 }}
+                >
+                  View all {customerHistory?.total} &rarr;
+                </button>
+              )}
+            </div>
             <CustomerHistoryTable
               data={customerHistory}
               loading={customerHistoryLoading}
@@ -441,8 +480,11 @@ export default function Reports() {
               onPageChange={setCustomerHistoryPage}
             />
           </div>
+
+          {showAllCustomers && <CustomerHistoryModal onClose={() => setShowAllCustomers(false)} filters={filters} />}
         </div>
 
+        {filtersVisible && (
         <div className="reports-filter-panel" style={{ ...cardStyle, position: "sticky", top: 20, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <SlidersHorizontal size={14} color="var(--text-faint)" />
@@ -533,6 +575,7 @@ export default function Reports() {
             </button>
           )}
         </div>
+        )}
       </div>
     </div>
   );
@@ -659,6 +702,248 @@ function CustomerHistoryTable({
   );
 }
 
+// Full-detail view of the same customer-call-history data: bigger page size,
+// and each row expands in place to show that customer's actual calls (same
+// lazy-fetch-and-cache idea as the Customer directory page) rather than just
+// the rolled-up counts the compact table on the page shows.
+function CustomerHistoryModal({ onClose, filters }: { onClose: () => void; filters: ReportsQuery }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const PAGE_SIZE = 25;
+  const [data, setData] = useState<Paginated<CustomerCallHistoryRow> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [callsByCustomer, setCallsByCustomer] = useState<Record<string, Call[]>>({});
+  const [callsLoading, setCallsLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    api.reports
+      .customerCallHistory(page, PAGE_SIZE, filters)
+      .then((res) => {
+        if (active) setData(res);
+      })
+      .catch((err) => {
+        if (active) toast.show(err instanceof ApiError ? err.message : "Failed to load customer history", "error");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  async function toggleExpand(customerId: string) {
+    const isOpen = expandedId === customerId;
+    setExpandedId(isOpen ? null : customerId);
+    if (!isOpen && !callsByCustomer[customerId]) {
+      setCallsLoading(customerId);
+      try {
+        const calls = await api.customers.calls(customerId);
+        setCallsByCustomer((prev) => ({ ...prev, [customerId]: calls }));
+      } catch (err) {
+        toast.show(err instanceof ApiError ? err.message : "Failed to load calls", "error");
+      } finally {
+        setCallsLoading(null);
+      }
+    }
+  }
+
+  const rows = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0, 0, 0, 0.45)",
+        backdropFilter: "blur(2px)",
+        zIndex: 1900,
+        padding: 20,
+      }}
+    >
+      <div
+        className="fade-in-up"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--paper-raised)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-md)",
+          boxShadow: "var(--shadow-pop)",
+          width: "min(960px, 100%)",
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--border-soft)" }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>All customers &amp; call history{total > 0 ? ` (${total})` : ""}</div>
+          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ overflowY: "auto", padding: 16, flex: 1 }}>
+          {loading ? (
+            <Skeleton height={320} />
+          ) : rows.length === 0 ? (
+            <EmptyChart message="No customers match the current filters." />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div
+                className="mono"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "20px 1.6fr 1.1fr 70px 1fr 1.2fr 1fr",
+                  gap: 8,
+                  padding: "0 12px 6px",
+                  fontSize: 11,
+                  fontFamily: "var(--font-body)",
+                  fontWeight: 700,
+                  color: "var(--text-faint)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                <span />
+                <span>Customer</span>
+                <span>Phone</span>
+                <span>Calls</span>
+                <span>Last call</span>
+                <span>Latest vehicle</span>
+                <span>Budget</span>
+              </div>
+
+              {rows.map((r) => {
+                const isOpen = expandedId === r.customerId;
+                const calls = callsByCustomer[r.customerId] ?? [];
+                return (
+                  <div key={r.customerId} style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleExpand(r.customerId)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") toggleExpand(r.customerId);
+                      }}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "20px 1.6fr 1.1fr 70px 1fr 1.2fr 1fr",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        background: isOpen ? "var(--paper)" : "transparent",
+                      }}
+                    >
+                      <span style={{ color: "var(--text-faint)", display: "flex" }}>
+                        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </span>
+                      <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.name ?? <span style={{ color: "var(--text-faint)", fontWeight: 600 }}>Unnamed caller</span>}
+                      </span>
+                      <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{r.phoneNumber}</span>
+                      <span className="mono" style={{ color: "var(--text-soft)" }}>{r.callCount}</span>
+                      <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{formatDate(r.lastCallDate)}</span>
+                      <span style={{ color: "var(--text-soft)", fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {[r.latestCarMake, r.latestCarModel].filter(Boolean).join(" ") || "—"}
+                      </span>
+                      <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
+                        {r.totalBudget > 0 ? formatCurrency(r.totalBudget) : "—"}
+                      </span>
+                    </div>
+
+                    {isOpen && (
+                      <div className="expand-row-anim" style={{ background: "var(--paper)", padding: "6px 12px 12px 38px", borderTop: "1px solid var(--border-soft)" }}>
+                        {callsLoading === r.customerId ? (
+                          <p style={{ fontSize: 12.5, color: "var(--text-faint)", padding: "8px 0" }}>Loading calls…</p>
+                        ) : calls.length === 0 ? (
+                          <p style={{ fontSize: 12.5, color: "var(--text-faint)", padding: "8px 0" }}>No calls logged yet.</p>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {calls.map((call) => (
+                              <button
+                                key={call.id}
+                                onClick={() => navigate(`/calls/${call.id}`)}
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "110px auto 1fr auto",
+                                  alignItems: "center",
+                                  gap: 12,
+                                  padding: "8px 10px",
+                                  background: "var(--paper-raised)",
+                                  border: "1px solid var(--border-soft)",
+                                  borderRadius: "var(--radius-sm)",
+                                  textAlign: "left",
+                                  fontSize: 12.5,
+                                }}
+                              >
+                                <span className="mono" style={{ color: "var(--text-soft)", fontSize: 11.5 }}>
+                                  {formatDateTime(call.callDate)}
+                                </span>
+                                <CategoryBadge category={call.businessCategory} />
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-soft)" }}>
+                                  {call.extraction?.summary ?? "No summary yet"}
+                                </span>
+                                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span className="mono" style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
+                                    {formatDuration(call.durationSeconds)}
+                                  </span>
+                                  <CallStatusBadge status={call.status} />
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid var(--border-soft)", fontSize: 12.5 }}>
+            <span style={{ color: "var(--text-faint)" }}>
+              Page {page} of {totalPages}
+            </span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setPage((p) => p - 1)} disabled={page <= 1} style={pagerButtonStyle(page <= 1)}>
+                Previous
+              </button>
+              <button onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages} style={pagerButtonStyle(page >= totalPages)}>
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function KpiCard({
   icon: Icon,
   label,
@@ -682,6 +967,37 @@ function KpiCard({
         <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700 }}>{value ?? "—"}</div>
       )}
     </div>
+  );
+}
+
+// Highlights only the peak and trough of a line/area series with a labeled
+// dot -- the line itself has no gridlines to read values off of, so the
+// extremes need calling out directly rather than left for the eye to guess.
+function MaxMinDots({ data, dataKey, color }: { data: Record<string, string | number>[]; dataKey: string; color: string }) {
+  if (data.length === 0) return null;
+  let maxIdx = 0;
+  let minIdx = 0;
+  data.forEach((d, i) => {
+    if ((d[dataKey] as number) > (data[maxIdx][dataKey] as number)) maxIdx = i;
+    if ((d[dataKey] as number) < (data[minIdx][dataKey] as number)) minIdx = i;
+  });
+  if (data[maxIdx][dataKey] === data[minIdx][dataKey]) return null; // flat series -- nothing to call out
+  const dotStyle = { r: 4, fill: color, stroke: "var(--paper-raised)", strokeWidth: 2 };
+  return (
+    <>
+      <ReferenceDot
+        x={data[maxIdx].period}
+        y={data[maxIdx][dataKey]}
+        {...dotStyle}
+        label={{ value: `${data[maxIdx][dataKey]}`, position: "top", fontSize: 11, fontWeight: 700, fill: color }}
+      />
+      <ReferenceDot
+        x={data[minIdx].period}
+        y={data[minIdx][dataKey]}
+        {...dotStyle}
+        label={{ value: `${data[minIdx][dataKey]}`, position: "bottom", fontSize: 11, fontWeight: 700, fill: color }}
+      />
+    </>
   );
 }
 
