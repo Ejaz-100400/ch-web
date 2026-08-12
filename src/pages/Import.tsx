@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   UserPlus,
+  Trash2,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
@@ -27,6 +28,7 @@ import {
   type SheetPreview,
 } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
+import { useAuth } from "../lib/auth-context";
 import { Spinner, LoadingText } from "../components/ui/Spinner";
 import { ProgressOverlay } from "../components/ui/ProgressOverlay";
 import { formatDate, formatDateTime } from "../lib/format";
@@ -112,10 +114,12 @@ const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
 
 export default function Import() {
   const toast = useToast();
+  const { appUser } = useAuth();
   const [tab, setTab] = useState<Tab>("excel");
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [deletingHistoryId, setDeletingHistoryId] = useState<string | null>(null);
 
   useEffect(() => {
     loadHistory();
@@ -128,6 +132,28 @@ export default function Import() {
       .then(setHistory)
       .catch(() => setHistory([]))
       .finally(() => setHistoryLoading(false));
+  }
+
+  async function handleDeleteHistory(entry: AuditLogEntry, rowCount: number) {
+    // Entries recorded before each row tracked its callId (older imports)
+    // have nothing for the backend to delete except the history entry
+    // itself -- word the confirmation accordingly so it isn't misleading.
+    const hasLinkedCalls = ((entry.details?.rows as ImportedRowSummary[] | undefined) ?? []).some((r) => r.callId);
+    const message = hasLinkedCalls
+      ? `Delete this import? This permanently removes the ${rowCount} call${rowCount === 1 ? "" : "s"} it created. This can't be undone.`
+      : "This import predates per-row tracking, so its calls can't be identified and deleted automatically -- use Calls -> Find Duplicates for those. This will only remove the history entry itself. Continue?";
+    if (!window.confirm(message)) return;
+
+    setDeletingHistoryId(entry.id);
+    try {
+      const res = await api.import.deleteHistory(entry.id);
+      toast.show(res.deletedCalls > 0 ? `Deleted ${res.deletedCalls} call${res.deletedCalls === 1 ? "" : "s"}.` : "Removed from history.", "success");
+      loadHistory();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Could not delete this import", "error");
+    } finally {
+      setDeletingHistoryId(null);
+    }
   }
 
   return (
@@ -164,40 +190,66 @@ export default function Import() {
                 h.details?.source === "photo_ocr" ? "Photo scan" : h.details?.source === "manual" ? "Manual entry" : "Spreadsheet";
               const rows = (h.details?.rows as ImportedRowSummary[] | undefined) ?? [];
               const isOpen = expandedHistoryId === h.id;
+              const deleting = deletingHistoryId === h.id;
               return (
                 <div key={h.id} className="fade-in-up" style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)" }}>
-                  <button
-                    onClick={() => setExpandedHistoryId(isOpen ? null : h.id)}
-                    disabled={rows.length === 0}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 14,
-                      padding: "12px 14px",
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: rows.length === 0 ? "default" : "pointer",
-                    }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", flexShrink: 0 }}>
-                      <History size={16} color="var(--brand-strong)" />
-                    </span>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                        {imported} imported{skipped > 0 ? `, ${skipped} skipped` : ""}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
-                        {source} · {h.user?.name ?? "Unknown user"} · {formatDateTime(h.createdAt)}
-                      </div>
-                    </div>
-                    {rows.length > 0 && (
-                      <span style={{ color: "var(--text-faint)", flexShrink: 0, display: "flex" }}>
-                        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  <div style={{ display: "flex", alignItems: "stretch" }}>
+                    <button
+                      onClick={() => setExpandedHistoryId(isOpen ? null : h.id)}
+                      disabled={rows.length === 0}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: "12px 14px",
+                        background: "transparent",
+                        border: "none",
+                        textAlign: "left",
+                        cursor: rows.length === 0 ? "default" : "pointer",
+                      }}
+                    >
+                      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", flexShrink: 0 }}>
+                        <History size={16} color="var(--brand-strong)" />
                       </span>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                          {imported} imported{skipped > 0 ? `, ${skipped} skipped` : ""}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
+                          {source} · {h.user?.name ?? "Unknown user"} · {formatDateTime(h.createdAt)}
+                        </div>
+                      </div>
+                      {rows.length > 0 && (
+                        <span style={{ color: "var(--text-faint)", flexShrink: 0, display: "flex" }}>
+                          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </span>
+                      )}
+                    </button>
+
+                    {appUser?.role === "admin" && (
+                      <button
+                        onClick={() => handleDeleteHistory(h, imported)}
+                        disabled={deleting}
+                        title="Delete this import"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 44,
+                          flexShrink: 0,
+                          background: "transparent",
+                          border: "none",
+                          borderLeft: "1px solid var(--border-soft)",
+                          color: deleting ? "var(--text-faint)" : "var(--coral)",
+                          cursor: deleting ? "default" : "pointer",
+                        }}
+                      >
+                        {deleting ? <Spinner size={15} /> : <Trash2 size={15} />}
+                      </button>
                     )}
-                  </button>
+                  </div>
 
                   {isOpen && rows.length > 0 && (
                     <div className="expand-row-anim" style={{ padding: "0 14px 12px 60px", display: "flex", flexDirection: "column", gap: 6 }}>

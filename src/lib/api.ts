@@ -184,6 +184,7 @@ export interface ImportResult {
 }
 
 export interface ImportedRowSummary {
+  callId: string;
   customerName?: string;
   phoneNumber: string;
   businessCategory: BusinessCategory;
@@ -380,6 +381,7 @@ export const api = {
       return request<ParseExcelResult>("/import/calls", { method: "POST", body });
     },
     history: () => request<AuditLogEntry[]>("/import/calls/history"),
+    deleteHistory: (id: string) => request<{ deletedCalls: number }>(`/import/calls/history/${id}`, { method: "DELETE" }),
     extractPhotos: (files: File[]) => {
       const body = new FormData();
       files.forEach((f) => body.append("files", f));
