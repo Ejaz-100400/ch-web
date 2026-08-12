@@ -375,9 +375,10 @@ export const api = {
 
   import: {
     template: () => requestBlob("/import/calls/template"),
-    parseExcel: (file: File) => {
+    parseExcel: (file: File, sheetIndex = 0) => {
       const body = new FormData();
       body.append("file", file);
+      body.append("sheetIndex", String(sheetIndex));
       return request<ParseExcelResult>("/import/calls", { method: "POST", body });
     },
     history: () => request<AuditLogEntry[]>("/import/calls/history"),

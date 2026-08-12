@@ -311,12 +311,23 @@ function TabButton({ active, onClick, icon: Icon, label }: { active: boolean; on
 
 type Toast = ReturnType<typeof useToast>;
 
+interface Committable {
+  rows: ParsedExcelRow[];
+  errors: { row: number; reason: string }[];
+}
+
 function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
-  const [parsed, setParsed] = useState<{ rows: ParsedExcelRow[]; errors: { row: number; reason: string }[]; sheets: SheetPreview[] } | null>(null);
+  // The full set of sheet previews is fetched once per file and never
+  // changes when switching tabs -- only `committable` (the actual rows that
+  // would be imported) is re-fetched, scoped to whichever sheet is active,
+  // since only one sheet at a time is ever actually imported.
+  const [sheets, setSheets] = useState<SheetPreview[] | null>(null);
   const [activeSheet, setActiveSheet] = useState(0);
+  const [committable, setCommittable] = useState<Committable | null>(null);
+  const [resolvingSheet, setResolvingSheet] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
@@ -336,7 +347,8 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
 
   function clearFile() {
     setFile(null);
-    setParsed(null);
+    setSheets(null);
+    setCommittable(null);
     setActiveSheet(0);
     setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -349,12 +361,15 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
     const picked = e.target.files?.[0] ?? null;
     setFile(picked);
     setResult(null);
-    setParsed(null);
+    setSheets(null);
+    setCommittable(null);
     setActiveSheet(0);
     if (!picked) return;
     setParsing(true);
     try {
-      setParsed(await api.import.parseExcel(picked));
+      const res = await api.import.parseExcel(picked, 0);
+      setSheets(res.sheets);
+      setCommittable({ rows: res.rows, errors: res.errors });
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Could not read this file", "error");
       clearFile();
@@ -363,29 +378,47 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
     }
   }
 
+  // Switching tabs only needs to re-fetch which rows are actually
+  // committable -- the raw preview grid/tabs already have every sheet's
+  // content from the initial parse, so they stay put while this resolves.
+  async function selectSheet(i: number) {
+    if (!file || i === activeSheet) return;
+    setActiveSheet(i);
+    setCommittable(null);
+    setResolvingSheet(true);
+    try {
+      const res = await api.import.parseExcel(file, i);
+      setCommittable({ rows: res.rows, errors: res.errors });
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Could not read this sheet", "error");
+    } finally {
+      setResolvingSheet(false);
+    }
+  }
+
   async function handleUpload() {
-    if (!file || !parsed) return;
+    if (!file || !committable) return;
     setUploading(true);
     setResult(null);
     setProgress(null);
     try {
-      if (parsed.rows.length === 0) {
-        setResult({ imported: 0, skipped: 0, errors: parsed.errors });
+      if (committable.rows.length === 0) {
+        setResult({ imported: 0, skipped: 0, errors: committable.errors });
         toast.show("No rows were imported — check the errors below.", "error");
         return;
       }
 
-      setProgress({ done: 0, total: parsed.rows.length });
+      setProgress({ done: 0, total: committable.rows.length });
       const commitRes = await commitRowsInBatches(
-        parsed.rows.map(excelRowToCommitInput),
-        parsed.rows.map((r) => r.sourceRow),
+        committable.rows.map(excelRowToCommitInput),
+        committable.rows.map((r) => r.sourceRow),
         "excel",
         (done, total) => setProgress({ done, total }),
       );
       const combined: ImportResult = {
         imported: commitRes.imported,
-        skipped: commitRes.skipped + parsed.errors.length,
-        errors: [...parsed.errors, ...commitRes.errors],
+        skipped: commitRes.skipped + committable.errors.length,
+        errors: [...committable.errors, ...commitRes.errors],
       };
       setResult(combined);
       toast.show(
@@ -396,7 +429,8 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
       // clearFile() also resets `result`, which used to wipe this confirmation
       // in the same tick, right before it could ever render.
       setFile(null);
-      setParsed(null);
+      setSheets(null);
+      setCommittable(null);
       setActiveSheet(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
       onImported();
@@ -447,11 +481,21 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
 
           <button
             onClick={handleUpload}
-            disabled={!file || !parsed || uploading || parsing}
-            style={{ ...primaryButtonStyle, marginTop: 14, opacity: !file || !parsed || uploading || parsing ? 0.6 : 1 }}
+            disabled={!file || !committable || uploading || parsing || resolvingSheet}
+            style={{ ...primaryButtonStyle, marginTop: 14, opacity: !file || !committable || uploading || parsing || resolvingSheet ? 0.6 : 1 }}
           >
             {uploading ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <Upload size={16} />}
-            {progress ? `Importing… (${progress.done}/${progress.total})` : uploading ? "Importing…" : parsing ? "Reading file…" : "Upload & import"}
+            {progress
+              ? `Importing… (${progress.done}/${progress.total})`
+              : uploading
+                ? "Importing…"
+                : parsing
+                  ? "Reading file…"
+                  : resolvingSheet
+                    ? "Reading sheet…"
+                    : sheets && sheets.length > 1
+                      ? `Upload & import "${sheets[activeSheet]?.name}"`
+                      : "Upload & import"}
           </button>
         </div>
         <div style={cardStyle}>
@@ -459,7 +503,7 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
           <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
             Rows are matched to customers by phone number and to products by name — same matching logic the live AI pipeline
             uses — so imported calls show up correctly in Reports and product analytics too. Pick a file to preview it below
-            before anything is saved.
+            before anything is saved. Files with multiple sheets show a tab per sheet — select one to import that sheet instead.
           </p>
         </div>
       </div>
@@ -472,13 +516,11 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         </div>
       )}
 
-      {!parsing && parsed && parsed.sheets[activeSheet] && (
+      {!parsing && sheets && sheets[activeSheet] && (
         <div style={{ ...cardStyle, marginTop: 20 }}>
           <SectionLabel>Sheet preview — {file?.name}</SectionLabel>
-          <RawSheetPreviewGrid preview={parsed.sheets[activeSheet].preview} />
-          {parsed.sheets.length > 1 && (
-            <SheetTabs sheets={parsed.sheets} active={activeSheet} onSelect={setActiveSheet} />
-          )}
+          <RawSheetPreviewGrid preview={sheets[activeSheet].preview} />
+          {sheets.length > 1 && <SheetTabs sheets={sheets} active={activeSheet} onSelect={selectSheet} />}
         </div>
       )}
 
@@ -495,10 +537,9 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   );
 }
 
-// Mirrors Excel's own sheet tabs at the bottom of the window -- only the
-// first sheet is ever actually imported (see parseExcel on the backend); the
-// rest are here purely so the user can flip through and double-check the
-// file, same as they'd do in Excel itself.
+// Mirrors Excel's own sheet tabs at the bottom of the window. Whichever tab
+// is active is the sheet that "Upload & import" will actually commit --
+// clicking a different tab re-parses that sheet's rows (see selectSheet).
 function SheetTabs({ sheets, active, onSelect }: { sheets: SheetPreview[]; active: number; onSelect: (i: number) => void }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-soft)" }}>
@@ -517,7 +558,7 @@ function SheetTabs({ sheets, active, onSelect }: { sheets: SheetPreview[]; activ
           }}
         >
           {s.name}
-          {i === 0 && (
+          {i === active && (
             <span style={{ marginLeft: 6, fontWeight: 600, opacity: 0.8, fontSize: 11 }}>(imported)</span>
           )}
         </button>
