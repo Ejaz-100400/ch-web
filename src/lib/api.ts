@@ -216,9 +216,16 @@ export interface ParsedExcelRow {
   sentiment?: SentimentType;
 }
 
+export interface RawSheetPreview {
+  headers: string[];
+  rows: string[][];
+  totalDataRows: number;
+}
+
 export interface ParseExcelResult {
   rows: ParsedExcelRow[];
   errors: { row: number; reason: string }[];
+  rawPreview: RawSheetPreview;
 }
 
 export interface RecordImportHistoryInput {

@@ -23,6 +23,7 @@ import {
   type ImportedRowSummary,
   type ImportResult,
   type ParsedExcelRow,
+  type RawSheetPreview,
 } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { Spinner, LoadingText } from "../components/ui/Spinner";
@@ -257,6 +258,8 @@ type Toast = ReturnType<typeof useToast>;
 function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [parsed, setParsed] = useState<{ rows: ParsedExcelRow[]; errors: { row: number; reason: string }[]; rawPreview: RawSheetPreview } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
@@ -274,18 +277,39 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
     }
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setFile(e.target.files?.[0] ?? null);
+  function clearFile() {
+    setFile(null);
+    setParsed(null);
     setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  // Parses (but doesn't commit) as soon as a file is picked, so the sheet
+  // preview below can show the actual file content -- "Upload & import"
+  // reuses this same parsed result rather than re-parsing on click.
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files?.[0] ?? null;
+    setFile(picked);
+    setResult(null);
+    setParsed(null);
+    if (!picked) return;
+    setParsing(true);
+    try {
+      setParsed(await api.import.parseExcel(picked));
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Could not read this file", "error");
+      clearFile();
+    } finally {
+      setParsing(false);
+    }
   }
 
   async function handleUpload() {
-    if (!file) return;
+    if (!file || !parsed) return;
     setUploading(true);
     setResult(null);
     setProgress(null);
     try {
-      const parsed = await api.import.parseExcel(file);
       if (parsed.rows.length === 0) {
         setResult({ imported: 0, skipped: 0, errors: parsed.errors });
         toast.show("No rows were imported — check the errors below.", "error");
@@ -309,8 +333,7 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         combined.imported > 0 ? `Imported ${combined.imported} call${combined.imported === 1 ? "" : "s"}.` : "No rows were imported — check the errors below.",
         combined.imported > 0 ? "success" : "error",
       );
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      clearFile();
       onImported();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Import failed", "error");
@@ -321,65 +344,143 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   }
 
   return (
-    <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 20, alignItems: "start" }}>
-      <div style={cardStyle}>
-        <SectionLabel>1. Get the template</SectionLabel>
-        <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 14 }}>
-          Download the Excel template, fill in one row per historical call, then upload it below. Column headers just need to roughly
-          match the template (e.g. any header containing "phone" is read as the phone number) — order doesn't matter.
-        </p>
-        <button onClick={handleDownloadTemplate} disabled={downloadingTemplate} style={secondaryButtonStyle}>
-          {downloadingTemplate ? <Spinner size={15} /> : <Download size={15} />}
-          {downloadingTemplate ? "Preparing…" : "Download template (.xlsx)"}
-        </button>
-
-        <div style={{ height: 1, background: "var(--border-soft)", margin: "22px 0" }} />
-
-        <SectionLabel>2. Upload your filled-in file</SectionLabel>
-        <label
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 8,
-            padding: "26px 16px",
-            border: "1.5px dashed var(--border)",
-            borderRadius: "var(--radius-sm)",
-            cursor: "pointer",
-            textAlign: "center",
-            background: "var(--paper)",
-          }}
-        >
-          <FileSpreadsheet size={22} color="var(--text-faint)" />
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{file ? file.name : "Choose an .xlsx file"}</span>
-          <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>Up to 1,000 rows per file, 5MB max</span>
-          <input ref={fileInputRef} type="file" accept=".xlsx" onChange={handleFileChange} style={{ display: "none" }} />
-        </label>
-
-        <button
-          onClick={handleUpload}
-          disabled={!file || uploading}
-          style={{ ...primaryButtonStyle, marginTop: 14, opacity: !file || uploading ? 0.6 : 1 }}
-        >
-          {uploading ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <Upload size={16} />}
-          {progress ? `Importing… (${progress.done}/${progress.total})` : uploading ? "Reading file…" : "Upload & import"}
-        </button>
-      </div>
-      <ProgressOverlay open={progress !== null} title="Importing calls…" done={progress?.done ?? 0} total={progress?.total ?? 0} />
-
-      <div style={cardStyle}>
-        <SectionLabel>Result</SectionLabel>
-        {!result ? (
-          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
-            Nothing imported yet this session. Rows are matched to customers by phone number and to products by name — same
-            matching logic the live AI pipeline uses — so imported calls show up correctly in Reports and product analytics too.
+    <div>
+      <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 20, alignItems: "start" }}>
+        <div style={cardStyle}>
+          <SectionLabel>1. Get the template</SectionLabel>
+          <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 14 }}>
+            Download the Excel template, fill in one row per historical call, then upload it below. Column headers just need to roughly
+            match the template (e.g. any header containing "phone" is read as the phone number) — order doesn't matter.
           </p>
-        ) : (
-          <ImportResultView result={result} />
-        )}
+          <button onClick={handleDownloadTemplate} disabled={downloadingTemplate} style={secondaryButtonStyle}>
+            {downloadingTemplate ? <Spinner size={15} /> : <Download size={15} />}
+            {downloadingTemplate ? "Preparing…" : "Download template (.xlsx)"}
+          </button>
+
+          <div style={{ height: 1, background: "var(--border-soft)", margin: "22px 0" }} />
+
+          <SectionLabel>2. Upload your filled-in file</SectionLabel>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 8,
+              padding: "26px 16px",
+              border: "1.5px dashed var(--border)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              textAlign: "center",
+              background: "var(--paper)",
+            }}
+          >
+            <FileSpreadsheet size={22} color="var(--text-faint)" />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{file ? file.name : "Choose an .xlsx file"}</span>
+            <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>Up to 1,000 rows per file, 5MB max</span>
+            <input ref={fileInputRef} type="file" accept=".xlsx" onChange={handleFileChange} style={{ display: "none" }} />
+          </label>
+
+          <button
+            onClick={handleUpload}
+            disabled={!file || !parsed || uploading || parsing}
+            style={{ ...primaryButtonStyle, marginTop: 14, opacity: !file || !parsed || uploading || parsing ? 0.6 : 1 }}
+          >
+            {uploading ? <Spinner size={16} color="var(--on-brand)" trackColor="rgba(255,255,255,0.35)" /> : <Upload size={16} />}
+            {progress ? `Importing… (${progress.done}/${progress.total})` : uploading ? "Importing…" : parsing ? "Reading file…" : "Upload & import"}
+          </button>
+        </div>
+        <ProgressOverlay open={progress !== null} title="Importing calls…" done={progress?.done ?? 0} total={progress?.total ?? 0} />
+
+        <div style={cardStyle}>
+          <SectionLabel>Result</SectionLabel>
+          {!result ? (
+            <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
+              Nothing imported yet this session. Rows are matched to customers by phone number and to products by name — same
+              matching logic the live AI pipeline uses — so imported calls show up correctly in Reports and product analytics too.
+            </p>
+          ) : (
+            <ImportResultView result={result} />
+          )}
+        </div>
       </div>
+
+      {parsing && (
+        <div style={{ ...cardStyle, marginTop: 20 }}>
+          <SectionLabel>Sheet preview</SectionLabel>
+          <LoadingText label="Reading file…" />
+        </div>
+      )}
+
+      {!parsing && parsed && (
+        <div style={{ ...cardStyle, marginTop: 20 }}>
+          <SectionLabel>Sheet preview — {file?.name}</SectionLabel>
+          <RawSheetPreviewGrid preview={parsed.rawPreview} />
+        </div>
+      )}
     </div>
   );
+}
+
+// Column-letter + row-number chrome to make this read as "the actual
+// spreadsheet", not just another data table -- the point is letting the user
+// visually confirm it's the right file before committing anything.
+function RawSheetPreviewGrid({ preview }: { preview: RawSheetPreview }) {
+  const columnLetters = preview.headers.map((_, i) => excelColumnLetter(i));
+  const truncated = preview.totalDataRows > preview.rows.length;
+
+  return (
+    <div>
+      <div className="table-scroll">
+        <table style={{ borderCollapse: "collapse", fontSize: 12.5, minWidth: 480 }}>
+          <thead>
+            <tr>
+              <th style={excelCornerCellStyle} />
+              {columnLetters.map((letter) => (
+                <th key={letter} style={excelLetterCellStyle}>
+                  {letter}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={excelRowNumberCellStyle}>1</td>
+              {preview.headers.map((h, i) => (
+                <td key={i} style={excelHeaderCellStyle} title={h}>
+                  {h || <span style={{ color: "var(--text-faint)" }}>—</span>}
+                </td>
+              ))}
+            </tr>
+            {preview.rows.map((row, ri) => (
+              <tr key={ri}>
+                <td style={excelRowNumberCellStyle}>{ri + 2}</td>
+                {row.map((cell, ci) => (
+                  <td key={ci} style={excelDataCellStyle} title={cell}>
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {truncated && (
+        <p style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 8 }}>
+          Showing the first {preview.rows.length} of {preview.totalDataRows} data rows.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function excelColumnLetter(index: number): string {
+  let n = index;
+  let letters = "";
+  do {
+    letters = String.fromCharCode(65 + (n % 26)) + letters;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return letters;
 }
 
 function ImportResultView({ result }: { result: ImportResult }) {
@@ -1018,6 +1119,68 @@ const cardStyle = {
   padding: 20,
   boxShadow: "var(--shadow-card)",
 } as const;
+
+const excelGridBorder = "1px solid var(--border-soft)";
+
+const excelCornerCellStyle = {
+  position: "sticky" as const,
+  top: 0,
+  left: 0,
+  zIndex: 2,
+  minWidth: 40,
+  background: "var(--paper)",
+  border: excelGridBorder,
+};
+
+const excelLetterCellStyle = {
+  position: "sticky" as const,
+  top: 0,
+  zIndex: 1,
+  minWidth: 100,
+  padding: "6px 10px",
+  background: "var(--paper)",
+  border: excelGridBorder,
+  fontWeight: 700,
+  color: "var(--text-faint)",
+  textAlign: "center" as const,
+};
+
+const excelRowNumberCellStyle = {
+  position: "sticky" as const,
+  left: 0,
+  zIndex: 1,
+  minWidth: 40,
+  padding: "6px 8px",
+  background: "var(--paper)",
+  border: excelGridBorder,
+  fontWeight: 700,
+  color: "var(--text-faint)",
+  textAlign: "center" as const,
+};
+
+const excelHeaderCellStyle = {
+  minWidth: 100,
+  maxWidth: 220,
+  padding: "6px 10px",
+  border: excelGridBorder,
+  background: "var(--paper-sunken, var(--paper))",
+  fontWeight: 700,
+  color: "var(--text)",
+  whiteSpace: "nowrap" as const,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const excelDataCellStyle = {
+  minWidth: 100,
+  maxWidth: 220,
+  padding: "6px 10px",
+  border: excelGridBorder,
+  color: "var(--text-soft)",
+  whiteSpace: "nowrap" as const,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
 
 const primaryButtonStyle = {
   width: "100%",
