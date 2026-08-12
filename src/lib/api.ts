@@ -222,10 +222,15 @@ export interface RawSheetPreview {
   totalDataRows: number;
 }
 
+export interface SheetPreview {
+  name: string;
+  preview: RawSheetPreview;
+}
+
 export interface ParseExcelResult {
   rows: ParsedExcelRow[];
   errors: { row: number; reason: string }[];
-  rawPreview: RawSheetPreview;
+  sheets: SheetPreview[];
 }
 
 export interface RecordImportHistoryInput {

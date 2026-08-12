@@ -24,6 +24,7 @@ import {
   type ImportResult,
   type ParsedExcelRow,
   type RawSheetPreview,
+  type SheetPreview,
 } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { Spinner, LoadingText } from "../components/ui/Spinner";
@@ -259,7 +260,8 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
-  const [parsed, setParsed] = useState<{ rows: ParsedExcelRow[]; errors: { row: number; reason: string }[]; rawPreview: RawSheetPreview } | null>(null);
+  const [parsed, setParsed] = useState<{ rows: ParsedExcelRow[]; errors: { row: number; reason: string }[]; sheets: SheetPreview[] } | null>(null);
+  const [activeSheet, setActiveSheet] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
@@ -280,6 +282,7 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
   function clearFile() {
     setFile(null);
     setParsed(null);
+    setActiveSheet(0);
     setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -292,6 +295,7 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
     setFile(picked);
     setResult(null);
     setParsed(null);
+    setActiveSheet(0);
     if (!picked) return;
     setParsing(true);
     try {
@@ -411,12 +415,46 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         </div>
       )}
 
-      {!parsing && parsed && (
+      {!parsing && parsed && parsed.sheets[activeSheet] && (
         <div style={{ ...cardStyle, marginTop: 20 }}>
           <SectionLabel>Sheet preview — {file?.name}</SectionLabel>
-          <RawSheetPreviewGrid preview={parsed.rawPreview} />
+          <RawSheetPreviewGrid preview={parsed.sheets[activeSheet].preview} />
+          {parsed.sheets.length > 1 && (
+            <SheetTabs sheets={parsed.sheets} active={activeSheet} onSelect={setActiveSheet} />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Mirrors Excel's own sheet tabs at the bottom of the window -- only the
+// first sheet is ever actually imported (see parseExcel on the backend); the
+// rest are here purely so the user can flip through and double-check the
+// file, same as they'd do in Excel itself.
+function SheetTabs({ sheets, active, onSelect }: { sheets: SheetPreview[]; active: number; onSelect: (i: number) => void }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-soft)" }}>
+      {sheets.map((s, i) => (
+        <button
+          key={s.name + i}
+          onClick={() => onSelect(i)}
+          style={{
+            padding: "6px 12px",
+            fontSize: 12.5,
+            fontWeight: 700,
+            borderRadius: "var(--radius-sm)",
+            border: i === active ? "1px solid var(--brand)" : "1px solid var(--border)",
+            background: i === active ? "var(--brand)" : "var(--paper)",
+            color: i === active ? "var(--on-brand)" : "var(--text-soft)",
+          }}
+        >
+          {s.name}
+          {i === 0 && (
+            <span style={{ marginLeft: 6, fontWeight: 600, opacity: 0.8, fontSize: 11 }}>(imported)</span>
+          )}
+        </button>
+      ))}
     </div>
   );
 }
