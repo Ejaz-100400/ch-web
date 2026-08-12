@@ -337,7 +337,13 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         combined.imported > 0 ? `Imported ${combined.imported} call${combined.imported === 1 ? "" : "s"}.` : "No rows were imported — check the errors below.",
         combined.imported > 0 ? "success" : "error",
       );
-      clearFile();
+      // Clears the file/preview without clobbering the result we just set --
+      // clearFile() also resets `result`, which used to wipe this confirmation
+      // in the same tick, right before it could ever render.
+      setFile(null);
+      setParsed(null);
+      setActiveSheet(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       onImported();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Import failed", "error");
@@ -393,20 +399,16 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
             {progress ? `Importing… (${progress.done}/${progress.total})` : uploading ? "Importing…" : parsing ? "Reading file…" : "Upload & import"}
           </button>
         </div>
-        <ProgressOverlay open={progress !== null} title="Importing calls…" done={progress?.done ?? 0} total={progress?.total ?? 0} />
-
         <div style={cardStyle}>
-          <SectionLabel>Result</SectionLabel>
-          {!result ? (
-            <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
-              Nothing imported yet this session. Rows are matched to customers by phone number and to products by name — same
-              matching logic the live AI pipeline uses — so imported calls show up correctly in Reports and product analytics too.
-            </p>
-          ) : (
-            <ImportResultView result={result} />
-          )}
+          <SectionLabel>How this works</SectionLabel>
+          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
+            Rows are matched to customers by phone number and to products by name — same matching logic the live AI pipeline
+            uses — so imported calls show up correctly in Reports and product analytics too. Pick a file to preview it below
+            before anything is saved.
+          </p>
         </div>
       </div>
+      <ProgressOverlay open={progress !== null} title="Importing calls…" done={progress?.done ?? 0} total={progress?.total ?? 0} />
 
       {parsing && (
         <div style={{ ...cardStyle, marginTop: 20 }}>
@@ -422,6 +424,16 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
           {parsed.sheets.length > 1 && (
             <SheetTabs sheets={parsed.sheets} active={activeSheet} onSelect={setActiveSheet} />
           )}
+        </div>
+      )}
+
+      {/* Renders right where the sheet preview was, so the confirmation lands
+          wherever the user's attention already is instead of only updating a
+          card back up in the top grid they may have scrolled past. */}
+      {result && (
+        <div style={{ ...cardStyle, marginTop: 20 }} className="fade-in-up">
+          <SectionLabel>Result</SectionLabel>
+          <ImportResultView result={result} />
         </div>
       )}
     </div>
