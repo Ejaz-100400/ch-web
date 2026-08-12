@@ -5,6 +5,7 @@ import { ThemeProvider } from "./lib/theme-context";
 import { ToastProvider } from "./components/ui/Toast";
 import Login from "./pages/Login";
 import CustomerList from "./pages/CustomerList";
+import CustomerDetails from "./pages/CustomerDetails";
 import CallList from "./pages/CallList";
 import CallDetails from "./pages/CallDetails";
 import FollowUps from "./pages/FollowUps";
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="/set-password" element={<SetPassword />} />
               <Route element={<AppShell />}>
                 <Route path="/customers" element={<CustomerList />} />
+                <Route path="/customers/:id" element={<CustomerDetails />} />
                 <Route path="/calls" element={<CallList />} />
                 <Route path="/calls/:id" element={<CallDetails />} />
                 <Route path="/follow-ups" element={<FollowUps />} />

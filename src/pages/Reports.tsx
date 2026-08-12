@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode, type CSSProperties } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -17,17 +16,15 @@ import {
   Cell,
   ReferenceDot,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle, Users, Eye, EyeOff, X, ChevronDown, ChevronRight } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle, Users, Eye, EyeOff } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { Skeleton } from "../components/ui/Skeleton";
-import { CategoryBadge, CallStatusBadge } from "../components/ui/StatusBadge";
-import { api, ApiError, type ReportsQuery } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
-import { formatCurrency, formatDate, formatDateTime, formatDuration } from "../lib/format";
+import { formatCurrency, formatDate, formatDuration } from "../lib/format";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
 import type {
-  Call,
   CallsByPeriodPoint,
   CustomerCallHistoryRow,
   CustomersByPeriodPoint,
@@ -76,7 +73,6 @@ const SENTIMENT_COLORS: Record<string, string> = {
 export default function Reports() {
   const toast = useToast();
   const [filtersVisible, setFiltersVisible] = useState(true);
-  const [showAllCustomers, setShowAllCustomers] = useState(false);
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
   const [category, setCategory] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
@@ -459,18 +455,8 @@ export default function Reports() {
           </div>
 
           <div style={{ ...cardStyle, marginTop: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Customers &amp; call history
-              </div>
-              {(customerHistory?.total ?? 0) > CUSTOMER_HISTORY_PAGE_SIZE && (
-                <button
-                  onClick={() => setShowAllCustomers(true)}
-                  style={{ background: "none", border: "none", color: "var(--brand-strong)", fontSize: 12.5, fontWeight: 700 }}
-                >
-                  View all {customerHistory?.total} &rarr;
-                </button>
-              )}
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 }}>
+              Customers &amp; call history
             </div>
             <CustomerHistoryTable
               data={customerHistory}
@@ -480,8 +466,6 @@ export default function Reports() {
               onPageChange={setCustomerHistoryPage}
             />
           </div>
-
-          {showAllCustomers && <CustomerHistoryModal onClose={() => setShowAllCustomers(false)} filters={filters} />}
         </div>
 
         {filtersVisible && (
@@ -582,11 +566,16 @@ export default function Reports() {
 }
 
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  // A <label> would be right for a lone <select>/<input>, but MultiSelectFilter
+  // nests a whole popover of checkboxes inside it -- clicking one inside a
+  // <label> can trigger the browser's implicit label-click-forwarding onto
+  // the first labelable descendant (the trigger button), snapping the
+  // popover shut mid-click. Plain div + visual-only text avoids that.
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--text-soft)", marginBottom: 14 }}>
-      {label}
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-soft)" }}>{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -653,8 +642,11 @@ function CustomerHistoryTable({
             <span>Budget</span>
           </div>
           {rows.map((r) => (
-            <div
+            <a
               key={r.customerId}
+              href={`/customers/${r.customerId}`}
+              target="_blank"
+              rel="noreferrer"
               style={{
                 display: "grid",
                 gridTemplateColumns: "1.6fr 1.1fr 70px 1fr 1.2fr 1fr",
@@ -662,9 +654,13 @@ function CustomerHistoryTable({
                 padding: "10px 4px",
                 fontSize: 13,
                 borderBottom: "1px solid var(--border-soft)",
+                color: "inherit",
+                textDecoration: "none",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--paper)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
-              <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontWeight: 700, color: "var(--brand-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {r.name ?? <span style={{ color: "var(--text-faint)", fontWeight: 600 }}>Unnamed caller</span>}
               </span>
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
@@ -678,7 +674,7 @@ function CustomerHistoryTable({
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
                 {r.totalBudget > 0 ? formatCurrency(r.totalBudget) : "—"}
               </span>
-            </div>
+            </a>
           ))}
         </div>
       </div>
@@ -698,248 +694,6 @@ function CustomerHistoryTable({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// Full-detail view of the same customer-call-history data: bigger page size,
-// and each row expands in place to show that customer's actual calls (same
-// lazy-fetch-and-cache idea as the Customer directory page) rather than just
-// the rolled-up counts the compact table on the page shows.
-function CustomerHistoryModal({ onClose, filters }: { onClose: () => void; filters: ReportsQuery }) {
-  const toast = useToast();
-  const navigate = useNavigate();
-  const PAGE_SIZE = 25;
-  const [data, setData] = useState<Paginated<CustomerCallHistoryRow> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [callsByCustomer, setCallsByCustomer] = useState<Record<string, Call[]>>({});
-  const [callsLoading, setCallsLoading] = useState<string | null>(null);
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    api.reports
-      .customerCallHistory(page, PAGE_SIZE, filters)
-      .then((res) => {
-        if (active) setData(res);
-      })
-      .catch((err) => {
-        if (active) toast.show(err instanceof ApiError ? err.message : "Failed to load customer history", "error");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
-  async function toggleExpand(customerId: string) {
-    const isOpen = expandedId === customerId;
-    setExpandedId(isOpen ? null : customerId);
-    if (!isOpen && !callsByCustomer[customerId]) {
-      setCallsLoading(customerId);
-      try {
-        const calls = await api.customers.calls(customerId);
-        setCallsByCustomer((prev) => ({ ...prev, [customerId]: calls }));
-      } catch (err) {
-        toast.show(err instanceof ApiError ? err.message : "Failed to load calls", "error");
-      } finally {
-        setCallsLoading(null);
-      }
-    }
-  }
-
-  const rows = data?.items ?? [];
-  const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.45)",
-        backdropFilter: "blur(2px)",
-        zIndex: 1900,
-        padding: 20,
-      }}
-    >
-      <div
-        className="fade-in-up"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--paper-raised)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius-md)",
-          boxShadow: "var(--shadow-pop)",
-          width: "min(960px, 100%)",
-          maxHeight: "85vh",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--border-soft)" }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>All customers &amp; call history{total > 0 ? ` (${total})` : ""}</div>
-          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <div style={{ overflowY: "auto", padding: 16, flex: 1 }}>
-          {loading ? (
-            <Skeleton height={320} />
-          ) : rows.length === 0 ? (
-            <EmptyChart message="No customers match the current filters." />
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div
-                className="mono"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "20px 1.6fr 1.1fr 70px 1fr 1.2fr 1fr",
-                  gap: 8,
-                  padding: "0 12px 6px",
-                  fontSize: 11,
-                  fontFamily: "var(--font-body)",
-                  fontWeight: 700,
-                  color: "var(--text-faint)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                <span />
-                <span>Customer</span>
-                <span>Phone</span>
-                <span>Calls</span>
-                <span>Last call</span>
-                <span>Latest vehicle</span>
-                <span>Budget</span>
-              </div>
-
-              {rows.map((r) => {
-                const isOpen = expandedId === r.customerId;
-                const calls = callsByCustomer[r.customerId] ?? [];
-                return (
-                  <div key={r.customerId} style={{ border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleExpand(r.customerId)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") toggleExpand(r.customerId);
-                      }}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "20px 1.6fr 1.1fr 70px 1fr 1.2fr 1fr",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "10px 12px",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        background: isOpen ? "var(--paper)" : "transparent",
-                      }}
-                    >
-                      <span style={{ color: "var(--text-faint)", display: "flex" }}>
-                        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </span>
-                      <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {r.name ?? <span style={{ color: "var(--text-faint)", fontWeight: 600 }}>Unnamed caller</span>}
-                      </span>
-                      <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{r.phoneNumber}</span>
-                      <span className="mono" style={{ color: "var(--text-soft)" }}>{r.callCount}</span>
-                      <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{formatDate(r.lastCallDate)}</span>
-                      <span style={{ color: "var(--text-soft)", fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {[r.latestCarMake, r.latestCarModel].filter(Boolean).join(" ") || "—"}
-                      </span>
-                      <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
-                        {r.totalBudget > 0 ? formatCurrency(r.totalBudget) : "—"}
-                      </span>
-                    </div>
-
-                    {isOpen && (
-                      <div className="expand-row-anim" style={{ background: "var(--paper)", padding: "6px 12px 12px 38px", borderTop: "1px solid var(--border-soft)" }}>
-                        {callsLoading === r.customerId ? (
-                          <p style={{ fontSize: 12.5, color: "var(--text-faint)", padding: "8px 0" }}>Loading calls…</p>
-                        ) : calls.length === 0 ? (
-                          <p style={{ fontSize: 12.5, color: "var(--text-faint)", padding: "8px 0" }}>No calls logged yet.</p>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {calls.map((call) => (
-                              <button
-                                key={call.id}
-                                onClick={() => navigate(`/calls/${call.id}`)}
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "110px auto 1fr auto",
-                                  alignItems: "center",
-                                  gap: 12,
-                                  padding: "8px 10px",
-                                  background: "var(--paper-raised)",
-                                  border: "1px solid var(--border-soft)",
-                                  borderRadius: "var(--radius-sm)",
-                                  textAlign: "left",
-                                  fontSize: 12.5,
-                                }}
-                              >
-                                <span className="mono" style={{ color: "var(--text-soft)", fontSize: 11.5 }}>
-                                  {formatDateTime(call.callDate)}
-                                </span>
-                                <CategoryBadge category={call.businessCategory} />
-                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-soft)" }}>
-                                  {call.extraction?.summary ?? "No summary yet"}
-                                </span>
-                                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span className="mono" style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
-                                    {formatDuration(call.durationSeconds)}
-                                  </span>
-                                  <CallStatusBadge status={call.status} />
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {totalPages > 1 && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid var(--border-soft)", fontSize: 12.5 }}>
-            <span style={{ color: "var(--text-faint)" }}>
-              Page {page} of {totalPages}
-            </span>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setPage((p) => p - 1)} disabled={page <= 1} style={pagerButtonStyle(page <= 1)}>
-                Previous
-              </button>
-              <button onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages} style={pagerButtonStyle(page >= totalPages)}>
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
