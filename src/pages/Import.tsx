@@ -42,9 +42,12 @@ const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
 
 const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
 
-// Rows are committed in small batches (rather than all at once) purely so the
-// UI can show real progress -- each batch is a real round-trip, not a fake timer.
-const BATCH_SIZE = 15;
+// Rows are committed in batches (rather than all at once) purely so the UI
+// can show real progress -- each batch is a real round-trip, not a fake
+// timer. The backend now processes a batch's rows concurrently rather than
+// one at a time, so a larger batch means fewer HTTP round-trips without
+// making any single request noticeably slower.
+const BATCH_SIZE = 50;
 
 async function commitRowsInBatches(
   rows: CommitPhotoRowInput[],
