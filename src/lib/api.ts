@@ -150,6 +150,12 @@ export interface ProductInput {
   active?: boolean;
 }
 
+export interface BusinessNumberInput {
+  phoneNumber: string;
+  category: "car_glasses" | "car_modifications";
+  label: string;
+}
+
 export interface InviteTeamMemberInput {
   name: string;
   email: string;
@@ -366,6 +372,10 @@ export const api = {
 
   businessNumbers: {
     list: () => request<BusinessNumber[]>("/business-numbers"),
+    create: (dto: BusinessNumberInput) => request<BusinessNumber>("/business-numbers", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: Partial<BusinessNumberInput>) =>
+      request<BusinessNumber>(`/business-numbers/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    remove: (id: string) => request<{ deleted: true }>(`/business-numbers/${id}`, { method: "DELETE" }),
   },
 
   export: {

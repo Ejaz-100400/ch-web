@@ -248,6 +248,7 @@ export interface AuditLogEntry {
 }
 
 export interface BusinessNumber {
+  id: string;
   number: string;
   category: BusinessCategory;
   label: string;
