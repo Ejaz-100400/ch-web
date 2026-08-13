@@ -8,17 +8,22 @@ export function formatPhone(raw: string): string {
   return raw;
 }
 
+// This business and its staff are all IST -- pin dates/times to Asia/Kolkata
+// explicitly rather than the viewer's browser timezone/locale, so a call
+// logged at 11pm IST doesn't display as the next day (or vice versa) for
+// anyone whose machine happens to be set to a different timezone.
+const IST_TIMEZONE = "Asia/Kolkata";
+
 export function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: IST_TIMEZONE });
 }
 
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${d.toLocaleTimeString(
-    undefined,
-    { hour: "numeric", minute: "2-digit" }
-  )}`;
+  const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: IST_TIMEZONE });
+  const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: IST_TIMEZONE });
+  return `${date}, ${time}`;
 }
 
 export function relativeDay(iso: string): string {

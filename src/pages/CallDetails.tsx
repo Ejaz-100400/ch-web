@@ -92,8 +92,23 @@ export default function CallDetails() {
   }, [call?.status]);
 
   function startEdit() {
-    if (!call?.extraction) return;
-    const e = call.extraction;
+    if (!call) return;
+    // Calls with no extraction yet (missed/unanswered, or the AI pipeline
+    // hasn't run) start from a blank form -- the backend upserts on save,
+    // so there's no need for one to already exist before it can be edited.
+    const e = call.extraction ?? {
+      customerName: null,
+      carMake: null,
+      carModel: null,
+      carVariant: null,
+      location: null,
+      customerRequirements: null,
+      budget: null,
+      followUpRequired: false,
+      followUpDate: null,
+      summary: null,
+      sentiment: null,
+    };
     setForm({
       customerName: e.customerName ?? undefined,
       carMake: e.carMake ?? undefined,
@@ -327,7 +342,7 @@ export default function CallDetails() {
           <div style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <SectionLabelInline>AI extraction</SectionLabelInline>
-              {canEdit && e && !editing && (
+              {canEdit && !editing && (
                 <button onClick={startEdit} style={iconButtonStyle}>
                   <Pencil size={13} /> Edit
                 </button>
@@ -344,9 +359,9 @@ export default function CallDetails() {
               )}
             </div>
 
-            {!e && (
+            {!e && !editing && (
               <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
-                No extraction yet — it will appear here once processing completes.
+                No extraction yet — it will appear here once processing completes, or click Edit to fill it in by hand.
               </p>
             )}
 
@@ -396,7 +411,7 @@ export default function CallDetails() {
               </div>
             )}
 
-            {e && editing && (
+            {editing && (
               <div className="fade-in-up" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {isAdmin && (
                   <div style={{ display: "flex", gap: 10 }}>
