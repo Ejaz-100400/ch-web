@@ -57,7 +57,7 @@ async function commitRowsInBatches(
   rowNumbers: number[],
   source: "excel" | "photo_ocr",
   onProgress: (done: number, total: number) => void,
-): Promise<ImportResult> {
+): Promise<ImportResult & { historyRecorded: boolean }> {
   const total = rows.length;
   let imported = 0;
   let skipped = 0;
@@ -77,12 +77,20 @@ async function commitRowsInBatches(
     onProgress(Math.min(i + BATCH_SIZE, total), total);
   }
 
+  // The calls themselves are already safely persisted either way -- this is
+  // just the audit-log entry -- but a failure here used to be swallowed
+  // silently, leaving large imports invisible in Recent Imports with no
+  // indication anything had gone wrong. Surface it to the caller instead.
+  let historyRecorded = true;
   if (imported > 0 || skipped > 0) {
-    // Non-critical -- the rows are already safely persisted either way.
-    await api.import.recordHistory({ source, imported, skipped, errors, rows: importedRows }).catch(() => {});
+    try {
+      await api.import.recordHistory({ source, imported, skipped, errors, rows: importedRows });
+    } catch {
+      historyRecorded = false;
+    }
   }
 
-  return { imported, skipped, errors };
+  return { imported, skipped, errors, historyRecorded };
 }
 
 function excelRowToCommitInput(r: ParsedExcelRow): CommitPhotoRowInput {
@@ -426,6 +434,9 @@ function ExcelImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
         combined.imported > 0 ? `Imported ${combined.imported} call${combined.imported === 1 ? "" : "s"}.` : "No rows were imported — check the errors below.",
         combined.imported > 0 ? "success" : "error",
       );
+      if (!commitRes.historyRecorded) {
+        toast.show("Calls were saved, but this import couldn't be recorded in Recent Imports.", "error");
+      }
       // Clears the file/preview without clobbering the result we just set --
       // clearFile() also resets `result`, which used to wipe this confirmation
       // in the same tick, right before it could ever render.
@@ -797,6 +808,9 @@ function PhotoImportPanel({ toast, onImported }: { toast: Toast; onImported: () 
       );
       setResult(res);
       toast.show(res.imported > 0 ? `Imported ${res.imported} call${res.imported === 1 ? "" : "s"}.` : "Nothing was imported — check the errors below.", res.imported > 0 ? "success" : "error");
+      if (!res.historyRecorded) {
+        toast.show("Calls were saved, but this import couldn't be recorded in Recent Imports.", "error");
+      }
       setDrafts([]);
       setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
