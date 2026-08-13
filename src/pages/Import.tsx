@@ -588,7 +588,7 @@ function RawSheetPreviewGrid({ preview }: { preview: RawSheetPreview }) {
 
   return (
     <div>
-      <div className="table-scroll">
+      <div className="table-scroll" style={{ maxHeight: 480, overflowY: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 12.5, minWidth: 480 }}>
           <thead>
             <tr>
