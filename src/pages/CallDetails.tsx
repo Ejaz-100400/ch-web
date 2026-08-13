@@ -19,6 +19,7 @@ import { CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui
 import { Avatar } from "../components/ui/Avatar";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Spinner } from "../components/ui/Spinner";
+import { DateInput } from "../components/ui/DateInput";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -423,7 +424,7 @@ export default function CallDetails() {
                       </select>
                     </FormRow>
                     <FormRow label="Call date">
-                      <input type="date" style={inputStyle} value={callDate} onChange={(ev) => setCallDate(ev.target.value)} />
+                      <DateInput style={inputStyle} value={callDate} onChange={setCallDate} />
                     </FormRow>
                     <FormRow label="Employee">
                       <select style={inputStyle} value={employeeId} onChange={(ev) => setEmployeeId(ev.target.value)}>
@@ -484,11 +485,10 @@ export default function CallDetails() {
                     Follow-up required
                   </label>
                   <FormRow label="Follow-up date">
-                    <input
-                      type="date"
+                    <DateInput
                       style={inputStyle}
                       value={form.followUpDate ?? ""}
-                      onChange={(ev) => setForm((f) => ({ ...f, followUpDate: ev.target.value || undefined }))}
+                      onChange={(value) => setForm((f) => ({ ...f, followUpDate: value || undefined }))}
                       disabled={!form.followUpRequired}
                     />
                   </FormRow>

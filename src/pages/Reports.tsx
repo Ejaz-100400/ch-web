@@ -19,6 +19,7 @@ import {
 import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle, Users, Eye, EyeOff } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
+import { DateInput } from "../components/ui/DateInput";
 import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
@@ -546,11 +547,11 @@ export default function Reports() {
           </FilterField>
 
           <FilterField label="From date">
-            <input type="date" style={filterInputStyle} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <DateInput style={filterInputStyle} value={dateFrom} onChange={setDateFrom} />
           </FilterField>
 
           <FilterField label="To date">
-            <input type="date" style={filterInputStyle} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <DateInput style={filterInputStyle} value={dateTo} onChange={setDateTo} />
           </FilterField>
 
           {hasActiveFilters && (

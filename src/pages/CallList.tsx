@@ -5,6 +5,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
+import { DateInput } from "../components/ui/DateInput";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -240,17 +241,15 @@ export default function CallList() {
         />
         <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
         <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} />
-        <input
-          type="date"
+        <DateInput
           value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
+          onChange={setDateFrom}
           aria-label="From date"
           style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
         />
-        <input
-          type="date"
+        <DateInput
           value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
+          onChange={setDateTo}
           aria-label="To date"
           style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
         />
@@ -844,7 +843,7 @@ function CallEditForm({
         </label>
         <label style={editFieldLabelStyle}>
           Call date
-          <input type="date" style={editInputStyle} value={callDate} onChange={(ev) => setCallDate(ev.target.value)} />
+          <DateInput style={editInputStyle} value={callDate} onChange={setCallDate} />
         </label>
         <label style={editFieldLabelStyle}>
           Employee
@@ -913,7 +912,7 @@ function CallEditForm({
             </label>
             <label style={editFieldLabelStyle}>
               Follow-up date
-              <input type="date" style={editInputStyle} value={followUpDate} onChange={(ev) => setFollowUpDate(ev.target.value)} disabled={!followUpRequired} />
+              <DateInput style={editInputStyle} value={followUpDate} onChange={setFollowUpDate} disabled={!followUpRequired} />
             </label>
           </div>
           <label style={{ ...editFieldLabelStyle, marginBottom: 16 }}>

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
+import { DateInput } from "../components/ui/DateInput";
 import {
   api,
   ApiError,
@@ -1135,7 +1136,7 @@ function DraftCard({
           </select>
         </Field>
         <Field label="Call date">
-          <input type="date" style={inputStyle} value={draft.callDate} onChange={(e) => onChange({ callDate: e.target.value })} placeholder="Unknown" />
+          <DateInput style={inputStyle} value={draft.callDate} onChange={(value) => onChange({ callDate: value })} placeholder="Unknown" />
         </Field>
         <Field label="Employee">
           <select style={inputStyle} value={draft.employeeId} onChange={(e) => onChange({ employeeId: e.target.value })}>
@@ -1222,7 +1223,7 @@ function DraftCard({
           Follow-up required
         </label>
         {draft.followUpRequired && (
-          <input type="date" style={{ ...inputStyle, width: "auto" }} value={draft.followUpDate} onChange={(e) => onChange({ followUpDate: e.target.value })} />
+          <DateInput style={{ ...inputStyle, width: "auto" }} value={draft.followUpDate} onChange={(value) => onChange({ followUpDate: value })} />
         )}
       </div>
     </div>

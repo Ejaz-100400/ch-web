@@ -5,6 +5,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { FollowUpStatusBadge, CategoryBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
+import { DateInput } from "../components/ui/DateInput";
 import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -95,10 +96,9 @@ export default function FollowUps() {
       <FilterBar>
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
         <FilterSelect label="Assigned to" value={assignedTo} onChange={setAssignedTo} options={employeeOptions} />
-        <input
-          type="date"
+        <DateInput
           value={dueBefore}
-          onChange={(e) => setDueBefore(e.target.value)}
+          onChange={setDueBefore}
           aria-label="Due before"
           style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
         />

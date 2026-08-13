@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { FileSpreadsheet, FileText, Download, ShieldAlert } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
+import { DateInput } from "../components/ui/DateInput";
 import { api, ApiError, downloadBlob, type CallsQuery } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -133,11 +134,11 @@ export default function Export() {
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1 }}>
                 <label style={fieldLabelStyle}>From</label>
-                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
+                <DateInput value={dateFrom} onChange={setDateFrom} style={inputStyle} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={fieldLabelStyle}>To</label>
-                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
+                <DateInput value={dateTo} onChange={setDateTo} style={inputStyle} />
               </div>
             </div>
           </div>
