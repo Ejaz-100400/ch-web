@@ -476,6 +476,7 @@ function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onR
   const [groups, setGroups] = useState<CallDuplicateGroup[]>([]);
   const [confirming, setConfirming] = useState<{ id: string; action: "merge" | "delete" } | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [bulkMerging, setBulkMerging] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -529,6 +530,42 @@ function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onR
     }
   }
 
+  // Every group here is already an exact-signature match (same customer,
+  // same call date, same vehicle -- see findDuplicates()'s comment on the
+  // backend), so unlike customers' name-similarity matches there's no
+  // meaningful false-positive risk in merging all of them at once without a
+  // per-pair review step.
+  const totalDuplicates = groups.reduce((sum, g) => sum + g.calls.length - 1, 0);
+
+  async function handleMergeAll() {
+    if (totalDuplicates === 0) return;
+    if (!window.confirm(`Merge all ${totalDuplicates} duplicate call${totalDuplicates === 1 ? "" : "s"} into their primary call? This can't be undone.`)) return;
+    setBulkMerging(true);
+    let merged = 0;
+    let failed = 0;
+    for (const g of groups) {
+      const [primary, ...rest] = g.calls;
+      if (!primary) continue;
+      for (const dup of rest) {
+        try {
+          await api.calls.mergeDuplicate(dup.id, primary.id);
+          merged++;
+        } catch {
+          failed++;
+        }
+      }
+    }
+    setGroups([]);
+    setBulkMerging(false);
+    if (merged > 0) {
+      toast.show(`Merged ${merged} duplicate call${merged === 1 ? "" : "s"}.`, "success");
+      onResolved();
+    }
+    if (failed > 0) {
+      toast.show(`${failed} merge${failed === 1 ? "" : "s"} failed.`, "error");
+    }
+  }
+
   return (
     <div
       className="fade-in-up"
@@ -555,10 +592,32 @@ function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onR
         </p>
       )}
       {!loading && groups.length > 0 && (
-        <p style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12 }}>
-          Merge keeps the "Primary" call and copies over any field only the other one had (budget, summary, follow-up, etc.)
-          before removing it. Delete just removes the row outright.
-        </p>
+        <>
+          <p style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12 }}>
+            Merge keeps the "Primary" call and copies over any field only the other one had (budget, summary, follow-up, etc.)
+            before removing it. Delete just removes the row outright.
+          </p>
+          <button
+            onClick={handleMergeAll}
+            disabled={bulkMerging}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              marginBottom: 12,
+              background: "var(--brand)",
+              color: "var(--on-brand)",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 12.5,
+              fontWeight: 700,
+              opacity: bulkMerging ? 0.7 : 1,
+            }}
+          >
+            {bulkMerging ? "Merging…" : `Merge all ${totalDuplicates} duplicate${totalDuplicates === 1 ? "" : "s"}`}
+          </button>
+        </>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
