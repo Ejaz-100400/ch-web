@@ -13,7 +13,7 @@ const CATEGORY_OPTIONS = [
   { value: "car_modifications", label: "Car Modifications" },
 ];
 
-const EMPTY_FORM: BusinessNumberInput = { phoneNumber: "", category: "car_glasses", label: "" };
+const EMPTY_FORM: BusinessNumberInput = { phoneNumber: "", exophoneNumber: "", category: "car_glasses", label: "" };
 
 export default function BusinessNumbers() {
   const { appUser } = useAuth();
@@ -47,7 +47,12 @@ export default function BusinessNumbers() {
 
   function openEdit(n: BusinessNumber) {
     setEditing(n);
-    setForm({ phoneNumber: n.number, category: n.category === "unknown" ? "car_glasses" : n.category, label: n.label });
+    setForm({
+      phoneNumber: n.number,
+      exophoneNumber: n.exophoneNumber ?? "",
+      category: n.category === "unknown" ? "car_glasses" : n.category,
+      label: n.label,
+    });
     setFormOpen(true);
   }
 
@@ -57,7 +62,12 @@ export default function BusinessNumbers() {
       return;
     }
     setSaving(true);
-    const dto: BusinessNumberInput = { phoneNumber: form.phoneNumber.trim(), category: form.category, label: form.label.trim() };
+    const dto: BusinessNumberInput = {
+      phoneNumber: form.phoneNumber.trim(),
+      exophoneNumber: form.exophoneNumber?.trim() || undefined,
+      category: form.category,
+      label: form.label.trim(),
+    };
     try {
       if (editing) {
         await api.businessNumbers.update(editing.id, dto);
@@ -144,6 +154,11 @@ export default function BusinessNumbers() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="mono" style={{ fontSize: 15, fontWeight: 700 }}>{n.number}</div>
               <div style={{ fontSize: 12.5, color: "var(--text-soft)" }}>{n.label}</div>
+              {n.exophoneNumber && (
+                <div className="mono" style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>
+                  ExoPhone: {n.exophoneNumber}
+                </div>
+              )}
             </div>
             <CategoryBadge category={n.category} />
             {isAdmin && (
@@ -219,7 +234,16 @@ function BusinessNumberForm({
       </div>
       <label style={{ ...fieldLabelStyle, marginBottom: 16 }}>
         Label
-        <input style={inputStyle} value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Car Modifications ExoPhone" />
+        <input style={inputStyle} value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Car Modifications" />
+      </label>
+      <label style={{ ...fieldLabelStyle, marginBottom: 16 }}>
+        ExoPhone number (used for call routing/category, not shown to customers)
+        <input
+          style={inputStyle}
+          value={form.exophoneNumber ?? ""}
+          onChange={(e) => setForm((f) => ({ ...f, exophoneNumber: e.target.value }))}
+          placeholder="04447614996"
+        />
       </label>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={onSave} disabled={saving} style={primaryButtonStyle}>

@@ -250,6 +250,7 @@ export interface AuditLogEntry {
 export interface BusinessNumber {
   id: string;
   number: string;
+  exophoneNumber: string | null;
   category: BusinessCategory;
   label: string;
 }

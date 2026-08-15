@@ -152,6 +152,7 @@ export interface ProductInput {
 
 export interface BusinessNumberInput {
   phoneNumber: string;
+  exophoneNumber?: string;
   category: "car_glasses" | "car_modifications";
   label: string;
 }
