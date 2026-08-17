@@ -21,6 +21,7 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { Spinner } from "../components/ui/Spinner";
 import { DateInput } from "../components/ui/DateInput";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
+import { SuggestInput } from "../components/ui/SuggestInput";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -450,32 +451,22 @@ export default function CallDetails() {
                 </FormRow>
                 <div style={{ display: "flex", gap: 10 }}>
                   <FormRow label="Car make">
-                    <input
+                    <SuggestInput
                       style={inputStyle}
-                      list="call-detail-car-make-options"
                       value={form.carMake ?? ""}
-                      onChange={(ev) => setForm((f) => ({ ...f, carMake: ev.target.value }))}
+                      onChange={(v) => setForm((f) => ({ ...f, carMake: v }))}
+                      options={knownCarMakes}
                       placeholder="Pick or type a new make"
                     />
-                    <datalist id="call-detail-car-make-options">
-                      {knownCarMakes.map((make) => (
-                        <option key={make} value={make} />
-                      ))}
-                    </datalist>
                   </FormRow>
                   <FormRow label="Car model">
-                    <input
+                    <SuggestInput
                       style={inputStyle}
-                      list="call-detail-car-model-options"
                       value={form.carModel ?? ""}
-                      onChange={(ev) => setForm((f) => ({ ...f, carModel: ev.target.value }))}
+                      onChange={(v) => setForm((f) => ({ ...f, carModel: v }))}
+                      options={knownCarModels}
                       placeholder="Pick or type a new model"
                     />
-                    <datalist id="call-detail-car-model-options">
-                      {knownCarModels.map((model) => (
-                        <option key={model} value={model} />
-                      ))}
-                    </datalist>
                   </FormRow>
                   <FormRow label="Variant">
                     <input style={inputStyle} value={form.carVariant ?? ""} onChange={(ev) => setForm((f) => ({ ...f, carVariant: ev.target.value }))} />
