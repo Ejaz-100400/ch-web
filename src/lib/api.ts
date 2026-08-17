@@ -100,6 +100,7 @@ export interface CallsQuery {
   sentiment?: SentimentType[];
   followUpRequired?: boolean;
   category?: string[];
+  status?: string[];
   dateFrom?: string;
   dateTo?: string;
   employeeId?: string[];

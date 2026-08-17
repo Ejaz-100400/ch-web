@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, ClipboardList, Phone, UserCog, Package, UsersRound, X } from "lucide-react";
+import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, PhoneMissed, ClipboardList, Phone, UserCog, Package, UsersRound, X } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
 import { Logo } from "../ui/Logo";
@@ -10,6 +10,7 @@ import { api } from "../../lib/api";
 const NAV_ITEMS = [
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/calls", label: "Calls", icon: PhoneIncoming },
+  { to: "/missed-calls", label: "Missed Calls", icon: PhoneMissed },
   { to: "/follow-ups", label: "Follow-ups", icon: ClipboardList },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/export", label: "Export", icon: Download },

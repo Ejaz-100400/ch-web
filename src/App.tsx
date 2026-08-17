@@ -8,6 +8,7 @@ import CustomerList from "./pages/CustomerList";
 import CustomerDetails from "./pages/CustomerDetails";
 import CallList from "./pages/CallList";
 import CallDetails from "./pages/CallDetails";
+import MissedCalls from "./pages/MissedCalls";
 import FollowUps from "./pages/FollowUps";
 import Reports from "./pages/Reports";
 import Export from "./pages/Export";
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/customers/:id" element={<CustomerDetails />} />
                 <Route path="/calls" element={<CallList />} />
                 <Route path="/calls/:id" element={<CallDetails />} />
+                <Route path="/missed-calls" element={<MissedCalls />} />
                 <Route path="/follow-ups" element={<FollowUps />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/export" element={<Export />} />
