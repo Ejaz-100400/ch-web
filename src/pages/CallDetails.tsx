@@ -490,7 +490,7 @@ export default function CallDetails() {
                     values={form.productsDiscussed ?? []}
                     onChange={(v) => setForm((f) => ({ ...f, productsDiscussed: v }))}
                     options={products
-                      .filter((p) => !call || p.category === call.businessCategory)
+                      .filter((p) => p.category === category)
                       .map((p) => ({ value: p.name, label: p.name }))}
                     triggerStyle={{ width: "100%" }}
                   />
