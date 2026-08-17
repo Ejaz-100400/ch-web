@@ -20,11 +20,12 @@ import { Avatar } from "../components/ui/Avatar";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Spinner } from "../components/ui/Spinner";
 import { DateInput } from "../components/ui/DateInput";
+import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatCurrency, formatDateTime, formatDuration } from "../lib/format";
-import type { BusinessCategory, Call, Employee, SentimentType } from "../types";
+import type { BusinessCategory, Call, Employee, Product, SentimentType } from "../types";
 
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "interested", label: "Interested" },
@@ -53,12 +54,18 @@ export default function CallDetails() {
   const [callDate, setCallDate] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [knownCarMakes, setKnownCarMakes] = useState<string[]>([]);
+  const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [actionPending, setActionPending] = useState<"reprocess" | "summary" | "delete" | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.products.list().then(setProducts).catch(() => setProducts([]));
+    api.calls.carMakes().then(setKnownCarMakes).catch(() => setKnownCarMakes([]));
+    api.calls.carModels().then(setKnownCarModels).catch(() => setKnownCarModels([]));
   }, []);
 
   async function load(silent = false) {
@@ -103,6 +110,7 @@ export default function CallDetails() {
       carModel: null,
       carVariant: null,
       location: null,
+      productsDiscussed: [],
       customerRequirements: null,
       budget: null,
       followUpRequired: false,
@@ -116,6 +124,7 @@ export default function CallDetails() {
       carModel: e.carModel ?? undefined,
       carVariant: e.carVariant ?? undefined,
       location: e.location ?? undefined,
+      productsDiscussed: e.productsDiscussed ?? [],
       customerRequirements: e.customerRequirements ?? undefined,
       // budget is a Postgres Decimal -- Prisma serializes those as a JSON
       // string (e.g. "13.00"), not a number, so this has to convert it
@@ -441,10 +450,32 @@ export default function CallDetails() {
                 </FormRow>
                 <div style={{ display: "flex", gap: 10 }}>
                   <FormRow label="Car make">
-                    <input style={inputStyle} value={form.carMake ?? ""} onChange={(ev) => setForm((f) => ({ ...f, carMake: ev.target.value }))} />
+                    <input
+                      style={inputStyle}
+                      list="call-detail-car-make-options"
+                      value={form.carMake ?? ""}
+                      onChange={(ev) => setForm((f) => ({ ...f, carMake: ev.target.value }))}
+                      placeholder="Pick or type a new make"
+                    />
+                    <datalist id="call-detail-car-make-options">
+                      {knownCarMakes.map((make) => (
+                        <option key={make} value={make} />
+                      ))}
+                    </datalist>
                   </FormRow>
                   <FormRow label="Car model">
-                    <input style={inputStyle} value={form.carModel ?? ""} onChange={(ev) => setForm((f) => ({ ...f, carModel: ev.target.value }))} />
+                    <input
+                      style={inputStyle}
+                      list="call-detail-car-model-options"
+                      value={form.carModel ?? ""}
+                      onChange={(ev) => setForm((f) => ({ ...f, carModel: ev.target.value }))}
+                      placeholder="Pick or type a new model"
+                    />
+                    <datalist id="call-detail-car-model-options">
+                      {knownCarModels.map((model) => (
+                        <option key={model} value={model} />
+                      ))}
+                    </datalist>
                   </FormRow>
                   <FormRow label="Variant">
                     <input style={inputStyle} value={form.carVariant ?? ""} onChange={(ev) => setForm((f) => ({ ...f, carVariant: ev.target.value }))} />
@@ -453,6 +484,17 @@ export default function CallDetails() {
                     <input style={inputStyle} value={form.location ?? ""} onChange={(ev) => setForm((f) => ({ ...f, location: ev.target.value }))} />
                   </FormRow>
                 </div>
+                <FormRow label="Products discussed">
+                  <MultiSelectFilter
+                    label="Select products"
+                    values={form.productsDiscussed ?? []}
+                    onChange={(v) => setForm((f) => ({ ...f, productsDiscussed: v }))}
+                    options={products
+                      .filter((p) => !call || p.category === call.businessCategory)
+                      .map((p) => ({ value: p.name, label: p.name }))}
+                    triggerStyle={{ width: "100%" }}
+                  />
+                </FormRow>
                 <FormRow label="Customer requirements">
                   <textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={form.customerRequirements ?? ""} onChange={(ev) => setForm((f) => ({ ...f, customerRequirements: ev.target.value }))} />
                 </FormRow>

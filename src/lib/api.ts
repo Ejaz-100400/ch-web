@@ -261,6 +261,7 @@ export interface UpdateExtractionInput {
   carModel?: string;
   carVariant?: string;
   location?: string;
+  productsDiscussed?: string[];
   customerRequirements?: string;
   budget?: number;
   followUpRequired?: boolean;
