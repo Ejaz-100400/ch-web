@@ -21,6 +21,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
 import { Skeleton } from "../components/ui/Skeleton";
+import { CalendarHeatmap } from "./reports/CalendarHeatmap";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { formatCurrency, formatDate, formatDuration } from "../lib/format";
@@ -73,6 +74,7 @@ const SENTIMENT_COLORS: Record<string, string> = {
 
 export default function Reports() {
   const toast = useToast();
+  const [activeTab, setActiveTab] = useState<"performance" | "calendar">("performance");
   const [filtersVisible, setFiltersVisible] = useState(true);
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
   const [category, setCategory] = useState<string[]>([]);
@@ -82,6 +84,7 @@ export default function Reports() {
   const [productId, setProductId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -209,8 +212,12 @@ export default function Reports() {
     <div>
       <PageHeader
         eyebrow="Reports"
-        title="Business performance"
-        description="Enquiry volume, follow-up outcomes, and what customers are actually asking for."
+        title={activeTab === "performance" ? "Business performance" : "Calendar"}
+        description={
+          activeTab === "performance"
+            ? "Enquiry volume, follow-up outcomes, and what customers are actually asking for."
+            : "Call volume by day, at a glance."
+        }
         actions={
           <button
             onClick={() => setFiltersVisible((v) => !v)}
@@ -234,7 +241,29 @@ export default function Reports() {
         }
       />
 
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 18 }}>
+        {(["performance", "calendar"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: "10px 16px",
+              background: "none",
+              border: "none",
+              borderBottom: `2px solid ${activeTab === tab ? "var(--brand)" : "transparent"}`,
+              fontSize: 13.5,
+              fontWeight: activeTab === tab ? 700 : 600,
+              color: activeTab === tab ? "var(--text)" : "var(--text-soft)",
+              cursor: "pointer",
+            }}
+          >
+            {tab === "performance" ? "Business performance" : "Calendar"}
+          </button>
+        ))}
+      </div>
+
       <div className="reports-layout" style={{ display: "grid", gridTemplateColumns: filtersVisible ? "1fr 260px" : "1fr", gap: 20, alignItems: "start" }}>
+        {activeTab === "performance" ? (
         <div style={{ minWidth: 0 }}>
           {/* Left-to-right, top-to-bottom = business priority: overall volume
               and reach first, then what's being called about, then how
@@ -468,6 +497,17 @@ export default function Reports() {
             />
           </div>
         </div>
+        ) : (
+          <CalendarHeatmap
+            month={selectedMonth}
+            category={category}
+            employeeId={employeeId}
+            carMake={carMake}
+            carModel={carModel}
+            sentiment={sentiment}
+            productId={productId}
+          />
+        )}
 
         {filtersVisible && (
         <div className="reports-filter-panel" style={{ ...cardStyle, position: "sticky", top: 20, padding: 16 }}>
@@ -478,6 +518,7 @@ export default function Reports() {
             </span>
           </div>
 
+          {activeTab === "performance" && (
           <FilterField label="Granularity">
             <select style={filterInputStyle} value={granularity} onChange={(e) => setGranularity(e.target.value as typeof granularity)}>
               {GRANULARITY_OPTIONS.map((o) => (
@@ -485,6 +526,7 @@ export default function Reports() {
               ))}
             </select>
           </FilterField>
+          )}
 
           <FilterField label="Category">
             <MultiSelectFilter
@@ -546,13 +588,26 @@ export default function Reports() {
             />
           </FilterField>
 
-          <FilterField label="From date">
-            <DateInput style={filterInputStyle} value={dateFrom} onChange={setDateFrom} />
-          </FilterField>
+          {activeTab === "performance" ? (
+            <>
+              <FilterField label="From date">
+                <DateInput style={filterInputStyle} value={dateFrom} onChange={setDateFrom} />
+              </FilterField>
 
-          <FilterField label="To date">
-            <DateInput style={filterInputStyle} value={dateTo} onChange={setDateTo} />
-          </FilterField>
+              <FilterField label="To date">
+                <DateInput style={filterInputStyle} value={dateTo} onChange={setDateTo} />
+              </FilterField>
+            </>
+          ) : (
+            <FilterField label="Month">
+              <input
+                type="month"
+                style={filterInputStyle}
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              />
+            </FilterField>
+          )}
 
           {hasActiveFilters && (
             <button onClick={clearFilters} style={clearFiltersButtonStyle}>
