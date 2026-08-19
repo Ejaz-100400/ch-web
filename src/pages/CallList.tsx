@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PhoneCall, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -52,7 +52,24 @@ export default function CallList() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [page, setPage] = useState(1);
+  // Kept in the URL (not plain useState) so that navigating to a call's
+  // detail page and then clicking the browser Back button restores the same
+  // page instead of resetting to page 1 -- the list remounts fresh on back
+  // navigation, and without this the page number it started on is gone.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Number(searchParams.get("page")) || 1;
+  function setPage(update: number | ((p: number) => number)) {
+    const next = typeof update === "function" ? update(page) : update;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next <= 1) params.delete("page");
+        else params.set("page", String(next));
+        return params;
+      },
+      { replace: true },
+    );
+  }
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
