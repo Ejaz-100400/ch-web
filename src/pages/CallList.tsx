@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { PhoneCall, Pencil, Save, X, Trash2, Copy } from "lucide-react";
+import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
@@ -429,6 +429,11 @@ export default function CallList() {
                   : <span style={{ color: "var(--text-faint)" }}>—</span>}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                {call.direction === "outbound" && (
+                  <span title="Outbound call (staff called this customer)" style={{ display: "flex", flexShrink: 0, color: "var(--text-faint)" }}>
+                    <PhoneOutgoing size={13} />
+                  </span>
+                )}
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {call.customer?.name ?? call.extraction?.customerName ?? (
                     <span style={{ color: "var(--text-faint)" }}>{call.customer?.phoneNumber ?? "Unknown"}</span>

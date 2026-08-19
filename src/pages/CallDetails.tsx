@@ -251,7 +251,10 @@ export default function CallDetails() {
       </button>
 
       <PageHeader
-        eyebrow={call.businessCategory === "car_glasses" ? "Car Glasses enquiry" : "Car Modifications enquiry"}
+        eyebrow={
+          (call.businessCategory === "car_glasses" ? "Car Glasses enquiry" : "Car Modifications enquiry") +
+          (call.direction === "outbound" ? " · Outbound call" : "")
+        }
         title={call.customer?.name ?? e?.customerName ?? "Unknown caller"}
         description={`${call.customer?.phoneNumber ?? e?.phoneNumber ?? "Unknown number"} · ${formatDateTime(call.callDate)}`}
         actions={

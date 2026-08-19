@@ -92,6 +92,7 @@ export interface CallExtraction {
 export interface Call {
   id: string;
   externalCallId: string | null;
+  direction: "inbound" | "outbound";
   businessCategory: BusinessCategory;
   employeeId: string | null;
   customerId: string | null;
