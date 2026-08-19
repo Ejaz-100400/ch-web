@@ -1,11 +1,12 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Phone, CalendarClock, StickyNote, Car } from "lucide-react";
+import { ArrowLeft, Phone, CalendarClock, StickyNote, Car, Trash2 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Avatar } from "../components/ui/Avatar";
 import { CategoryBadge, CallStatusBadge } from "../components/ui/StatusBadge";
 import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
+import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatDateTime, formatDuration, relativeDay } from "../lib/format";
 import type { Call, Customer } from "../types";
@@ -14,11 +15,28 @@ export default function CustomerDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === "admin";
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await api.customers.removeMany([id]);
+      toast.show("Customer deleted.", "success");
+      navigate("/customers");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to delete customer", "error");
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -87,6 +105,27 @@ export default function CustomerDetails() {
         eyebrow="Customer"
         title={customer.name ?? "Unnamed caller"}
         description={`${customer.phoneNumber} · Customer since ${relativeDay(customer.createdAt)}`}
+        actions={
+          isAdmin ? (
+            confirmingDelete ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12.5, color: "var(--coral)", fontWeight: 700 }}>
+                  Delete this customer? Their call history stays, just unassigned. This can't be undone.
+                </span>
+                <button onClick={handleDelete} disabled={deleting} style={deleteConfirmButtonStyle}>
+                  {deleting ? "Deleting…" : "Confirm delete"}
+                </button>
+                <button onClick={() => setConfirmingDelete(false)} disabled={deleting} style={cancelButtonStyle}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmingDelete(true)} style={deleteButtonStyle}>
+                <Trash2 size={14} /> Delete customer
+              </button>
+            )
+          ) : undefined
+        }
       />
 
       <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 20, alignItems: "start" }}>
@@ -203,4 +242,37 @@ const backLinkStyle: CSSProperties = {
   fontWeight: 600,
   marginBottom: 16,
   padding: 0,
+};
+
+const deleteButtonStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "9px 15px",
+  background: "var(--coral-soft)",
+  color: "var(--coral)",
+  border: "1px solid var(--coral)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const deleteConfirmButtonStyle: CSSProperties = {
+  padding: "9px 15px",
+  background: "var(--coral)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const cancelButtonStyle: CSSProperties = {
+  padding: "9px 15px",
+  background: "none",
+  color: "var(--text-soft)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13,
+  fontWeight: 600,
 };
