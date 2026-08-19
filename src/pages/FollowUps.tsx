@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ClipboardCheck } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { FollowUpStatusBadge, CategoryBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
+import { Pagination } from "../components/ui/Pagination";
 import { DateInput } from "../components/ui/DateInput";
 import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
@@ -58,7 +59,17 @@ export default function FollowUps() {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
   }, []);
 
+  // useEffect also fires on mount, which happens again every time this page
+  // is reached via browser Back navigation (the component remounts fresh).
+  // Without this guard, that mount-time fire would silently overwrite the
+  // page number just restored from the URL, permanently defeating the
+  // page-in-URL fix.
+  const isFirstFilterEffect = useRef(true);
   useEffect(() => {
+    if (isFirstFilterEffect.current) {
+      isFirstFilterEffect.current = false;
+      return;
+    }
     setPage(1);
   }, [status, assignedTo, dueBefore]);
 
@@ -220,32 +231,8 @@ export default function FollowUps() {
         )}
       </div>
 
-      {!loading && totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 18 }}>
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={pagerButtonStyle(page <= 1)}>
-            Previous
-          </button>
-          <span style={{ fontSize: 12.5, color: "var(--text-soft)" }}>
-            Page {page} of {totalPages}
-          </span>
-          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={pagerButtonStyle(page >= totalPages)}>
-            Next
-          </button>
-        </div>
-      )}
+      {!loading && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />}
     </div>
   );
 }
 
-function pagerButtonStyle(disabled: boolean) {
-  return {
-    padding: "7px 14px",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius-sm)",
-    background: "var(--paper-raised)",
-    fontSize: 12.5,
-    fontWeight: 600,
-    color: disabled ? "var(--text-faint)" : "var(--text)",
-    opacity: disabled ? 0.6 : 1,
-  } as const;
-}

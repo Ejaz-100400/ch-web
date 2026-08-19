@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -6,6 +6,7 @@ import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFilter
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { DateInput } from "../components/ui/DateInput";
+import { Pagination } from "../components/ui/Pagination";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -86,7 +87,18 @@ export default function CallList() {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
   }, []);
 
+  // Both effects below reset to page 1 whenever a filter actually changes --
+  // but useEffect also fires on mount, which happens again every time this
+  // page is reached via browser Back navigation (the component remounts
+  // fresh). Without the "skip the first run" guards, that mount-time fire
+  // would silently overwrite the page number just restored from the URL,
+  // permanently defeating the page-in-URL fix.
+  const isFirstSearchEffect = useRef(true);
   useEffect(() => {
+    if (isFirstSearchEffect.current) {
+      isFirstSearchEffect.current = false;
+      return;
+    }
     const t = setTimeout(() => {
       setDebouncedSearch(search);
       setDebouncedPhone(phone);
@@ -95,7 +107,12 @@ export default function CallList() {
     return () => clearTimeout(t);
   }, [search, phone]);
 
+  const isFirstFilterEffect = useRef(true);
   useEffect(() => {
+    if (isFirstFilterEffect.current) {
+      isFirstFilterEffect.current = false;
+      return;
+    }
     setPage(1);
   }, [carMake, carModel, sentiment, followUpRequired, category, employeeId, dateFrom, dateTo]);
 
@@ -473,19 +490,7 @@ export default function CallList() {
         )}
       </div>
 
-      {!loading && totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 18 }}>
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={pagerButtonStyle(page <= 1)}>
-            Previous
-          </button>
-          <span style={{ fontSize: 12.5, color: "var(--text-soft)" }}>
-            Page {page} of {totalPages}
-          </span>
-          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={pagerButtonStyle(page >= totalPages)}>
-            Next
-          </button>
-        </div>
-      )}
+      {!loading && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />}
     </div>
   );
 }
@@ -1049,15 +1054,3 @@ const bulkCancelButtonStyle = {
   fontWeight: 600,
 } as const;
 
-function pagerButtonStyle(disabled: boolean) {
-  return {
-    padding: "7px 14px",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius-sm)",
-    background: "var(--paper-raised)",
-    fontSize: 12.5,
-    fontWeight: 600,
-    color: disabled ? "var(--text-faint)" : "var(--text)",
-    opacity: disabled ? 0.6 : 1,
-  } as const;
-}
