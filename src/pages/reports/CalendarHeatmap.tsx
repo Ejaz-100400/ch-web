@@ -175,8 +175,7 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
                         justifyContent: "space-between",
                         textAlign: "left",
                         cursor: "pointer",
-                        outline: isSelected ? "2px solid var(--brand)" : "none",
-                        outlineOffset: -1,
+                        boxShadow: isSelected ? "0 0 0 2px var(--paper-raised), 0 0 0 4px var(--text)" : "none",
                         ...dayCellStyle(step),
                       }}
                     >

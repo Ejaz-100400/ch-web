@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { TrendingUp, Clock, PieChart as PieIcon } from "lucide-react";
+import { TrendingUp, Clock, PieChart as PieIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
@@ -14,6 +14,8 @@ const HOUR_LABELS = Array.from({ length: 24 }, (_, h) => {
 
 interface DayLineChartProps {
   day: string; // "YYYY-MM-DD"
+  onPrevDay: () => void;
+  onNextDay: () => void;
   category: string[];
   employeeId: string[];
   carMake: string[];
@@ -22,7 +24,7 @@ interface DayLineChartProps {
   productId: string[];
 }
 
-export function DayLineChart({ day, category, employeeId, carMake, carModel, sentiment, productId }: DayLineChartProps) {
+export function DayLineChart({ day, onPrevDay, onNextDay, category, employeeId, carMake, carModel, sentiment, productId }: DayLineChartProps) {
   const toast = useToast();
   const [points, setPoints] = useState<CallsByPeriodPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,27 +79,41 @@ export function DayLineChart({ day, category, employeeId, carMake, carModel, sen
   const activeHours = data.filter((d) => d.overall > 0).length;
 
   const dayLabel = new Date(`${day}T00:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  const isToday = day === new Date().toISOString().slice(0, 10);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isToday = day === todayIso;
+  const isFuture = day > todayIso;
 
   return (
-    <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-card)", padding: 18 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>{dayLabel}</div>
-        {isToday && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-strong)", background: "var(--brand-soft)", padding: "2px 8px", borderRadius: 999 }}>
-            Today
-          </span>
-        )}
+    <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-card)", padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={onPrevDay} aria-label="Previous day" style={navButtonStyle}>
+            <ChevronLeft size={16} />
+          </button>
+          <div style={{ minWidth: 200 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>{dayLabel}</span>
+              {isToday && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-strong)", background: "var(--brand-soft)", padding: "2px 8px", borderRadius: 999 }}>
+                  Today
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-faint)" }}>Hourly call volume, split by category</div>
+          </div>
+          <button onClick={onNextDay} disabled={isFuture} aria-label="Next day" style={{ ...navButtonStyle, opacity: isFuture ? 0.35 : 1, cursor: isFuture ? "default" : "pointer" }}>
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 16 }}>Hourly call volume, split by category</div>
 
       {loading ? (
-        <Skeleton height={280} />
+        <Skeleton height={340} />
       ) : totalCalls === 0 ? (
-        <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 }}>No calls on this day.</div>
+        <div style={{ padding: "56px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 }}>No calls on this day.</div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, margin: "18px 0" }}>
             <InsightTile
               icon={TrendingUp}
               label="Total calls"
@@ -118,15 +134,15 @@ export function DayLineChart({ day, category, employeeId, carMake, carModel, sen
             />
           </div>
 
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={data} margin={{ left: -20, right: 8, top: 8 }}>
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--text-faint)" }} axisLine={false} tickLine={false} interval={2} />
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={data} margin={{ left: -12, right: 12, top: 8 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--text-faint)" }} axisLine={false} tickLine={false} interval={1} />
               <YAxis tick={{ fontSize: 12, fill: "var(--text-faint)" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
               <Tooltip contentStyle={{ borderRadius: 8, borderColor: "var(--border)", fontSize: 13 }} />
               <Legend wrapperStyle={{ fontSize: 12 }} iconType="plainline" iconSize={16} />
               <Line type="monotone" name="Overall" dataKey="overall" stroke="var(--text)" strokeWidth={2} strokeDasharray="4 3" dot={false} />
-              <Line type="monotone" name="Glasses" dataKey="glasses" stroke="#17967f" strokeWidth={2.5} dot={{ r: 2 }} />
-              <Line type="monotone" name="Modifications" dataKey="modifications" stroke="#6a63d1" strokeWidth={2.5} dot={{ r: 2 }} />
+              <Line type="monotone" name="Glasses" dataKey="glasses" stroke="#17967f" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" name="Modifications" dataKey="modifications" stroke="#6a63d1" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
         </>
@@ -134,6 +150,20 @@ export function DayLineChart({ day, category, employeeId, carMake, carModel, sen
     </div>
   );
 }
+
+const navButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 30,
+  height: 30,
+  flexShrink: 0,
+  borderRadius: "var(--radius-sm)",
+  border: "1px solid var(--border)",
+  background: "var(--paper)",
+  color: "var(--text-soft)",
+  cursor: "pointer",
+} as const;
 
 function InsightTile({ icon: Icon, label, value, detail }: { icon: typeof TrendingUp; label: string; value: string; detail: string }) {
   return (
