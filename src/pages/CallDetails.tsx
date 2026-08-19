@@ -22,6 +22,7 @@ import { Spinner } from "../components/ui/Spinner";
 import { DateInput } from "../components/ui/DateInput";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { SuggestInput } from "../components/ui/SuggestInput";
+import { AudioPlayer } from "../components/ui/AudioPlayer";
 import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -572,7 +573,7 @@ function RecordingPlayer({ callId }: { callId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callId]);
 
-  if (loading) return <Skeleton height={36} />;
+  if (loading) return <Skeleton height={84} />;
 
   if (error || !url) {
     return (
@@ -583,8 +584,7 @@ function RecordingPlayer({ callId }: { callId: string }) {
     );
   }
 
-  // eslint-disable-next-line jsx-a11y/media-has-caption
-  return <audio controls src={url} style={{ width: "100%", height: 36 }} />;
+  return <AudioPlayer src={url} downloadFileName={`call-${callId}.mp3`} />;
 }
 
 function InfoPill({ icon: Icon, text }: { icon: typeof Car; text: string }) {
