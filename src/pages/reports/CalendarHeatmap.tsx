@@ -43,9 +43,11 @@ interface CalendarHeatmapProps {
   carModel: string[];
   sentiment: string[];
   productId: string[];
+  selectedDay: string; // "YYYY-MM-DD"
+  onSelectDay: (day: string) => void;
 }
 
-export function CalendarHeatmap({ month, category, employeeId, carMake, carModel, sentiment, productId }: CalendarHeatmapProps) {
+export function CalendarHeatmap({ month, category, employeeId, carMake, carModel, sentiment, productId, selectedDay, onSelectDay }: CalendarHeatmapProps) {
   const toast = useToast();
   const [metric, setMetric] = useState<Metric>("total");
   const [points, setPoints] = useState<CallsByPeriodPoint[]>([]);
@@ -156,9 +158,14 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
                   if (cell.day === null) return <div key={i} />;
                   const dayValue = byDay.get(cell.day)?.[metric] ?? 0;
                   const step = bucket(dayValue, max);
+                  const iso = `${month}-${String(cell.day).padStart(2, "0")}`;
+                  const isSelected = iso === selectedDay;
                   return (
-                    <div
+                    <button
                       key={i}
+                      onClick={() => onSelectDay(iso)}
+                      aria-pressed={isSelected}
+                      aria-label={`View ${iso}, ${dayValue} call${dayValue === 1 ? "" : "s"}`}
                       style={{
                         minHeight: 52,
                         borderRadius: 6,
@@ -166,12 +173,16 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "space-between",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        outline: isSelected ? "2px solid var(--brand)" : "none",
+                        outlineOffset: -1,
                         ...dayCellStyle(step),
                       }}
                     >
                       <span style={{ fontSize: 11, color: "var(--text-soft)" }}>{cell.day}</span>
                       {dayValue > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{dayValue}</span>}
-                    </div>
+                    </button>
                   );
                 })}
               </div>

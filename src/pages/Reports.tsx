@@ -21,7 +21,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
 import { Skeleton } from "../components/ui/Skeleton";
-import { CalendarHeatmap } from "./reports/CalendarHeatmap";
+import { CalendarTab } from "./reports/CalendarTab";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { formatCurrency, formatDate, formatDuration } from "../lib/format";
@@ -498,7 +498,7 @@ export default function Reports() {
           </div>
         </div>
         ) : (
-          <CalendarHeatmap
+          <CalendarTab
             month={selectedMonth}
             category={category}
             employeeId={employeeId}

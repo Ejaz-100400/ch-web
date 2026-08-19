@@ -357,7 +357,7 @@ export const api = {
 
   reports: {
     summary: (q: ReportsQuery = {}) => request<ReportsSummary>(`/reports/summary${query(q)}`),
-    callsByPeriod: (granularity: "daily" | "weekly" | "monthly" = "daily", q: ReportsQuery = {}) =>
+    callsByPeriod: (granularity: "hourly" | "daily" | "weekly" | "monthly" = "daily", q: ReportsQuery = {}) =>
       request<CallsByPeriodPoint[]>(`/reports/calls-by-period${query({ granularity, ...q })}`),
     customersByPeriod: (granularity: "daily" | "weekly" | "monthly" = "daily", q: ReportsQuery = {}) =>
       request<CustomersByPeriodPoint[]>(`/reports/customers-by-period${query({ granularity, ...q })}`),
