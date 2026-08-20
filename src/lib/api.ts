@@ -278,6 +278,7 @@ export const api = {
 
   calls: {
     list: (q: CallsQuery = {}) => request<Paginated<Call>>(`/calls${query(q)}`),
+    missed: (page?: number, pageSize?: number) => request<Paginated<Call>>(`/calls/missed${query({ page, pageSize })}`),
     get: (id: string) => request<Call>(`/calls/${id}`),
     recording: (id: string) => request<{ url: string; expiresAt: string }>(`/calls/${id}/recording`),
     update: (id: string, dto: UpdateCallInput) => request<Call>(`/calls/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),

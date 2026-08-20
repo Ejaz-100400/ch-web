@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Phone, PhoneMissed } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { CategoryBadge } from "../components/ui/StatusBadge";
@@ -9,38 +9,58 @@ import { relativeDay } from "../lib/format";
 import type { Call } from "../types";
 
 const PAGE_SIZE = 25;
+const POLL_INTERVAL_MS = 30_000;
 
 // Built for technicians on a phone, not a desk -- no filters, no columns to
-// read, just "here's the number, tap it to call." A missed call is any call
-// the processing pipeline marked "failed", which in practice means no
-// recording ever showed up -- the customer's real signal for that is the
-// call never got answered.
+// read, just "here's the number, tap it to call." A missed call here is one
+// that's still actionable: /calls/missed already drops anything past 24h old
+// or that's had an outbound callback placed to the same customer since, so
+// every entry on this page is genuinely still worth calling.
 export default function MissedCalls() {
   const toast = useToast();
   const [calls, setCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  // A ref, not state -- setInterval's callback closes over whatever `load`
+  // looked like the moment the effect ran, so reading `calls` state inside
+  // it would always see the stale first-render value. The ref stays current
+  // across every poll tick regardless.
+  const previous = useRef<Map<string, string> | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
+  function load(isPoll: boolean) {
     api.calls
-      .list({ status: ["failed"], page, pageSize: PAGE_SIZE })
+      .missed(page, PAGE_SIZE)
       .then((res) => {
-        if (!active) return;
+        // A call present on the previous load but missing now was resolved
+        // (a callback was placed) or aged past 24h -- either way, worth
+        // telling whoever's on this page so they don't waste a callback on
+        // someone a teammate already handled.
+        if (isPoll && previous.current) {
+          const newIds = new Set(res.items.map((c) => c.id));
+          for (const [callId, phone] of previous.current) {
+            if (!newIds.has(callId)) {
+              toast.show(`Missed call to ${phone} has been handled`, "alert");
+            }
+          }
+        }
+        previous.current = new Map(res.items.map((c) => [c.id, c.customer?.phoneNumber ?? "this customer"]));
         setCalls(res.items);
         setTotal(res.total);
       })
       .catch((err) => {
-        if (active) toast.show(err instanceof ApiError ? err.message : "Failed to load missed calls", "error");
+        if (!isPoll) toast.show(err instanceof ApiError ? err.message : "Failed to load missed calls", "error");
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (!isPoll) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+  }
+
+  useEffect(() => {
+    setLoading(true);
+    load(false);
+    const interval = setInterval(() => load(true), POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
