@@ -402,7 +402,17 @@ export default function CallList() {
         {loading && <SkeletonRows rows={8} />}
 
         {!loading &&
-          calls.map((call) => (
+          calls.map((call) => {
+            const isMissed = call.status === "failed";
+            const isResolvedOutbound = call.direction === "outbound" && call.status === "completed";
+            const restBackground = isMissed ? "var(--coral-soft)" : isResolvedOutbound ? "var(--success-soft)" : "transparent";
+            const hoverBackground = isMissed
+              ? "color-mix(in srgb, var(--coral-soft) 80%, var(--coral) 12%)"
+              : isResolvedOutbound
+                ? "color-mix(in srgb, var(--success-soft) 80%, var(--success) 12%)"
+                : "var(--paper)";
+            const accentColor = isMissed ? "var(--coral)" : isResolvedOutbound ? "var(--success)" : "transparent";
+            return (
             <div
               key={call.id}
               role="button"
@@ -415,7 +425,8 @@ export default function CallList() {
                 gridTemplateColumns: gridCols,
                 alignItems: "center",
                 padding: "12px 18px",
-                background: "transparent",
+                background: restBackground,
+                boxShadow: accentColor !== "transparent" ? `inset 3px 0 0 0 ${accentColor}` : "none",
                 border: "none",
                 borderBottom: "1px solid var(--border-soft)",
                 textAlign: "left",
@@ -423,8 +434,8 @@ export default function CallList() {
                 cursor: "pointer",
                 transition: "background 120ms ease",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--paper)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = hoverBackground)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = restBackground)}
             >
               {isAdmin && (
                 <input
@@ -446,11 +457,6 @@ export default function CallList() {
                   : <span style={{ color: "var(--text-faint)" }}>—</span>}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
-                {call.direction === "outbound" && (
-                  <span title="Outbound call (staff called this customer)" style={{ display: "flex", flexShrink: 0, color: "var(--text-faint)" }}>
-                    <PhoneOutgoing size={13} />
-                  </span>
-                )}
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {call.customer?.name ?? call.extraction?.customerName ?? (
                     <span style={{ color: "var(--text-faint)" }}>{call.customer?.phoneNumber ?? "Unknown"}</span>
@@ -458,6 +464,27 @@ export default function CallList() {
                 </span>
                 {call.extraction?.extractedByModel === "manual_import" && (
                   <ImportedBadge importedByName={call.importedBy?.name} />
+                )}
+                {isResolvedOutbound && (
+                  <span
+                    title="Outbound call, completed"
+                    style={{
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
+                      padding: "2px 7px",
+                      borderRadius: 999,
+                      background: "var(--success)",
+                      color: "#fff",
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
+                    <PhoneOutgoing size={10} /> Done
+                  </span>
                 )}
               </span>
               <span style={{ color: "var(--text-soft)" }}>{call.employee?.name ?? "Unassigned"}</span>
@@ -477,7 +504,8 @@ export default function CallList() {
                 </button>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
