@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Clock, PhoneMissed, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { FollowUpStatusBadge, CategoryBadge } from "../components/ui/StatusBadge";
@@ -22,12 +22,19 @@ const STATUS_OPTIONS: { value: FollowUpStatus; label: string }[] = [
   { value: "missed", label: "Missed" },
 ];
 
+const TABS: { value: FollowUpStatus; label: string; icon: typeof Clock }[] = [
+  { value: "pending", label: "Pending", icon: Clock },
+  { value: "missed", label: "Missed", icon: PhoneMissed },
+  { value: "completed", label: "Completed", icon: CheckCircle2 },
+];
+
 export default function FollowUps() {
   const navigate = useNavigate();
   const { appUser } = useAuth();
   const toast = useToast();
 
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<FollowUpStatus>("pending");
+  const [counts, setCounts] = useState<Record<FollowUpStatus, number>>({ pending: 0, missed: 0, completed: 0 });
   const [assignedTo, setAssignedTo] = useState("");
   const [dueBefore, setDueBefore] = useState("");
   // Kept in the URL (not plain useState) so that navigating to a call's
@@ -59,6 +66,24 @@ export default function FollowUps() {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
   }, []);
 
+  function loadCounts() {
+    // Deliberately unfiltered (independent of assignedTo/dueBefore/status) --
+    // these tiles are meant to read as a stable at-a-glance total, not shift
+    // around every time the list below gets filtered differently.
+    api.reports
+      .followUps()
+      .then((rows) => {
+        const next: Record<FollowUpStatus, number> = { pending: 0, missed: 0, completed: 0 };
+        for (const r of rows) next[r.status] = r.count;
+        setCounts(next);
+      })
+      .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadCounts();
+  }, []);
+
   // useEffect also fires on mount, which happens again every time this page
   // is reached via browser Back navigation (the component remounts fresh).
   // Without this guard, that mount-time fire would silently overwrite the
@@ -77,7 +102,7 @@ export default function FollowUps() {
     setLoading(true);
     api.followUps
       .list({
-        status: (status || undefined) as FollowUpStatus | undefined,
+        status,
         assignedTo: assignedTo || undefined,
         dueBefore: dueBefore || undefined,
         page,
@@ -102,6 +127,7 @@ export default function FollowUps() {
       const updated = await api.followUps.update(id, { status: newStatus });
       setFollowUps((prev) => prev.map((f) => (f.id === id ? { ...f, ...updated } : f)));
       toast.show("Follow-up updated.", "success");
+      loadCounts();
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Failed to update follow-up", "error");
     } finally {
@@ -110,8 +136,9 @@ export default function FollowUps() {
   }
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
-  const hasActiveFilters = Boolean(status || assignedTo || dueBefore);
+  const hasActiveFilters = Boolean(assignedTo || dueBefore);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalFollowUps = counts.pending + counts.missed + counts.completed;
 
   return (
     <div>
@@ -121,8 +148,59 @@ export default function FollowUps() {
         description="Enquiries the AI flagged as needing a callback, sorted by due date."
       />
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const active = status === tab.value;
+          const pct = totalFollowUps > 0 ? Math.round((counts[tab.value] / totalFollowUps) * 100) : 0;
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setStatus(tab.value)}
+              aria-pressed={active}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "14px 16px",
+                background: active ? "var(--brand-soft)" : "var(--paper-raised)",
+                border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-card)",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  flexShrink: 0,
+                  background: active ? "var(--brand)" : "var(--border-soft)",
+                  color: active ? "var(--on-brand)" : "var(--text-soft)",
+                }}
+              >
+                <Icon size={17} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {tab.label}
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{counts[tab.value]}</span>
+                  {totalFollowUps > 0 && <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{pct}%</span>}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       <FilterBar>
-        <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
         <FilterSelect label="Assigned to" value={assignedTo} onChange={setAssignedTo} options={employeeOptions} />
         <DateInput
           value={dueBefore}
@@ -130,7 +208,7 @@ export default function FollowUps() {
           aria-label="Due before"
           style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
         />
-        {hasActiveFilters && <ClearFiltersButton onClick={() => { setStatus(""); setAssignedTo(""); setDueBefore(""); }} />}
+        {hasActiveFilters && <ClearFiltersButton onClick={() => { setAssignedTo(""); setDueBefore(""); }} />}
       </FilterBar>
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
