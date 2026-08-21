@@ -6,6 +6,8 @@ export type BusinessCategory = "car_glasses" | "car_modifications" | "unknown";
 
 export type CallStatus = "pending" | "processing" | "completed" | "failed";
 
+export type Branch = "ambattur" | "kattankulathur" | "sithalapakkam" | "pondicherry";
+
 export type SentimentType = "interested" | "not_interested" | "needs_follow_up";
 
 export type FollowUpStatus = "pending" | "completed" | "missed";
@@ -94,6 +96,7 @@ export interface Call {
   externalCallId: string | null;
   direction: "inbound" | "outbound";
   businessCategory: BusinessCategory;
+  branch: Branch | null;
   employeeId: string | null;
   customerId: string | null;
   callDate: string;
@@ -192,6 +195,11 @@ export interface SentimentBreakdownPoint {
 
 export interface TopEmployeePoint {
   name: string;
+  count: number;
+}
+
+export interface BranchBreakdownPoint {
+  branch: Branch;
   count: number;
 }
 

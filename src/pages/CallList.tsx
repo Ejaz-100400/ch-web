@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { PhoneCall, PhoneOutgoing, CheckCircle2, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
-import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
+import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { DateInput } from "../components/ui/DateInput";
 import { Pagination } from "../components/ui/Pagination";
@@ -13,7 +13,7 @@ import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { formatDuration, formatDateTime, formatDate } from "../lib/format";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
-import type { BusinessCategory, Call, CallDuplicateEntry, CallDuplicateGroup, Employee, SentimentType } from "../types";
+import type { Branch, BusinessCategory, Call, CallDuplicateEntry, CallDuplicateGroup, Employee, SentimentType } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -21,6 +21,13 @@ const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
   { value: "unknown", label: "Unknown" },
+];
+
+const BRANCH_OPTIONS = [
+  { value: "ambattur", label: "Ambattur (HQ)" },
+  { value: "kattankulathur", label: "Kattankulathur" },
+  { value: "sithalapakkam", label: "Sithalapakkam" },
+  { value: "pondicherry", label: "Pondicherry" },
 ];
 
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
@@ -49,6 +56,7 @@ export default function CallList() {
   const [sentiment, setSentiment] = useState<string[]>([]);
   const [followUpRequired, setFollowUpRequired] = useState("");
   const [category, setCategory] = useState<string[]>([]);
+  const [branch, setBranch] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -114,7 +122,7 @@ export default function CallList() {
       return;
     }
     setPage(1);
-  }, [carMake, carModel, sentiment, followUpRequired, category, employeeId, dateFrom, dateTo]);
+  }, [carMake, carModel, sentiment, followUpRequired, category, branch, employeeId, dateFrom, dateTo]);
 
   useEffect(() => {
     let active = true;
@@ -128,6 +136,7 @@ export default function CallList() {
         sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
         followUpRequired: followUpRequired ? followUpRequired === "true" : undefined,
         category: category.length ? category : undefined,
+        branch: branch.length ? branch : undefined,
         employeeId: employeeId.length ? employeeId : undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
@@ -153,7 +162,7 @@ export default function CallList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, employeeId, dateFrom, dateTo, page, refreshToken]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, branch, employeeId, dateFrom, dateTo, page, refreshToken]);
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
   const hasActiveFilters = Boolean(
@@ -164,6 +173,7 @@ export default function CallList() {
       sentiment.length ||
       followUpRequired ||
       category.length ||
+      branch.length ||
       employeeId.length ||
       dateFrom ||
       dateTo,
@@ -177,6 +187,7 @@ export default function CallList() {
     setSentiment([]);
     setFollowUpRequired("");
     setCategory([]);
+    setBranch([]);
     setEmployeeId([]);
     setDateFrom("");
     setDateTo("");
@@ -187,8 +198,8 @@ export default function CallList() {
   // them enough fixed width for their longest label ("Car Modifications",
   // "Processing") so the badge never bleeds into the next column.
   const gridCols = isAdmin
-    ? "24px 120px 138px 1fr 1.2fr 1fr 76px 104px 1fr 36px"
-    : "120px 138px 1fr 1.2fr 1fr 76px 104px 1fr";
+    ? "24px 120px 138px 1fr 1.2fr 1fr 130px 76px 104px 1fr 36px"
+    : "120px 138px 1fr 1.2fr 1fr 130px 76px 104px 1fr";
 
   function refreshCall(updated: Call) {
     setCalls((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
@@ -274,6 +285,7 @@ export default function CallList() {
           style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 130 }}
         />
         <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+        <MultiSelectFilter label="Branch" values={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
         <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} />
         <DateInput
           value={dateFrom}
@@ -393,6 +405,7 @@ export default function CallList() {
           <span>Vehicle</span>
           <span>Customer</span>
           <span>Employee</span>
+          <span>Branch</span>
           <span>Duration</span>
           <span>Status</span>
           <span>Sentiment</span>
@@ -511,6 +524,7 @@ export default function CallList() {
                 )}
               </span>
               <span style={{ color: "var(--text-soft)" }}>{call.employee?.name ?? "Unassigned"}</span>
+              {call.branch ? <BranchBadge branch={call.branch} /> : <span style={{ color: "var(--text-faint)" }}>—</span>}
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12.5 }}>
                 {formatDuration(call.durationSeconds)}
               </span>
@@ -851,6 +865,7 @@ function CallEditForm({
   const [category, setCategory] = useState<BusinessCategory>(call.businessCategory);
   const [callDate, setCallDate] = useState(call.callDate.slice(0, 10));
   const [employeeId, setEmployeeId] = useState(call.employeeId ?? "");
+  const [branch, setBranch] = useState<Branch | "">(call.branch ?? "");
   const [customerName, setCustomerName] = useState(e?.customerName ?? "");
   const [carMake, setCarMake] = useState(e?.carMake ?? "");
   const [carModel, setCarModel] = useState(e?.carModel ?? "");
@@ -872,7 +887,7 @@ function CallEditForm({
       const original = new Date(call.callDate);
       const [year, month, day] = callDate.split("-").map(Number);
       original.setFullYear(year, month - 1, day);
-      const callDto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId };
+      const callDto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId, branch };
       const updatedCall = await api.calls.update(call.id, callDto);
 
       let updatedExtraction = call.extraction;
@@ -910,7 +925,7 @@ function CallEditForm({
           <X size={15} />
         </button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
         <label style={editFieldLabelStyle}>
           Category
           <select style={editInputStyle} value={category} onChange={(ev) => setCategory(ev.target.value as BusinessCategory)}>
@@ -932,11 +947,20 @@ function CallEditForm({
             ))}
           </select>
         </label>
+        <label style={editFieldLabelStyle}>
+          Branch
+          <select style={editInputStyle} value={branch} onChange={(ev) => setBranch(ev.target.value as Branch | "")}>
+            <option value="">Not set</option>
+            {BRANCH_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {!e && (
         <p style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 12 }}>
-          This call has no AI extraction yet -- only category, date, and employee can be edited until it does.
+          This call has no AI extraction yet -- only category, date, employee, and branch can be edited until it does.
         </p>
       )}
 

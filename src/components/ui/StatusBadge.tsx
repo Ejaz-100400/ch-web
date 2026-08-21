@@ -1,5 +1,5 @@
-import { Upload } from "lucide-react";
-import type { BusinessCategory, CallStatus, FollowUpStatus, SentimentType } from "../../types";
+import { Upload, MapPin } from "lucide-react";
+import type { Branch, BusinessCategory, CallStatus, FollowUpStatus, SentimentType } from "../../types";
 
 const CALL_STATUS_META: Record<CallStatus, { label: string; color: string; bg: string; live?: boolean }> = {
   pending: { label: "Pending", color: "var(--amber)", bg: "var(--amber-soft)", live: true },
@@ -24,6 +24,16 @@ const FOLLOWUP_STATUS_META: Record<FollowUpStatus, { label: string; color: strin
   pending: { label: "Pending", color: "var(--amber)", bg: "var(--amber-soft)" },
   completed: { label: "Completed", color: "var(--brand-strong)", bg: "var(--brand-soft)" },
   missed: { label: "Missed", color: "var(--coral)", bg: "var(--coral-soft)" },
+};
+
+// Tracked from when the branch field was introduced onward -- a call with
+// no branch set is simply older than that, not miscategorized, so callers
+// show a plain dash for null rather than routing it through this badge.
+const BRANCH_META: Record<Branch, { label: string; color: string; bg: string }> = {
+  ambattur: { label: "Ambattur (HQ)", color: "var(--brand-strong)", bg: "var(--brand-soft)" },
+  kattankulathur: { label: "Kattankulathur", color: "var(--violet)", bg: "var(--violet-soft)" },
+  sithalapakkam: { label: "Sithalapakkam", color: "var(--success)", bg: "var(--success-soft)" },
+  pondicherry: { label: "Pondicherry", color: "var(--amber)", bg: "var(--amber-soft)" },
 };
 
 function Badge({ label, color, bg, live }: { label: string; color: string; bg: string; live?: boolean }) {
@@ -72,6 +82,29 @@ export function CategoryBadge({ category }: { category: BusinessCategory }) {
 
 export function FollowUpStatusBadge({ status }: { status: FollowUpStatus }) {
   return <Badge {...FOLLOWUP_STATUS_META[status]} />;
+}
+
+export function BranchBadge({ branch }: { branch: Branch }) {
+  const meta = BRANCH_META[branch];
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "3px 9px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        color: meta.color,
+        background: meta.bg,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <MapPin size={10} />
+      {meta.label}
+    </span>
+  );
 }
 
 /**

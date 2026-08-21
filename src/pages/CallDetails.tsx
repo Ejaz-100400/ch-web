@@ -15,7 +15,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
+import { CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
 import { Avatar } from "../components/ui/Avatar";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Spinner } from "../components/ui/Spinner";
@@ -27,7 +27,7 @@ import { api, ApiError, type UpdateCallInput, type UpdateExtractionInput } from 
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatCurrency, formatDateTime, formatDuration } from "../lib/format";
-import type { BusinessCategory, Call, Employee, Product, SentimentType } from "../types";
+import type { Branch, BusinessCategory, Call, Employee, Product, SentimentType } from "../types";
 
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "interested", label: "Interested" },
@@ -39,6 +39,13 @@ const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
   { value: "unknown", label: "Unknown" },
+];
+
+const BRANCH_OPTIONS: { value: Branch; label: string }[] = [
+  { value: "ambattur", label: "Ambattur (HQ)" },
+  { value: "kattankulathur", label: "Kattankulathur" },
+  { value: "sithalapakkam", label: "Sithalapakkam" },
+  { value: "pondicherry", label: "Pondicherry" },
 ];
 
 export default function CallDetails() {
@@ -55,6 +62,7 @@ export default function CallDetails() {
   const [category, setCategory] = useState<BusinessCategory>("unknown");
   const [callDate, setCallDate] = useState("");
   const [employeeId, setEmployeeId] = useState("");
+  const [branch, setBranch] = useState<Branch | "">("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [knownCarMakes, setKnownCarMakes] = useState<string[]>([]);
@@ -141,6 +149,7 @@ export default function CallDetails() {
     setCategory(call.businessCategory);
     setCallDate(call.callDate.slice(0, 10));
     setEmployeeId(call.employeeId ?? "");
+    setBranch(call.branch ?? "");
     setEditing(true);
   }
 
@@ -154,7 +163,7 @@ export default function CallDetails() {
         const original = new Date(call.callDate);
         const [year, month, day] = callDate.split("-").map(Number);
         original.setFullYear(year, month - 1, day);
-        const callDto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId };
+        const callDto: UpdateCallInput = { businessCategory: category, callDate: original.toISOString(), employeeId, branch };
         await api.calls.update(id, callDto);
       }
       await api.calls.updateExtraction(id, form);
@@ -321,6 +330,9 @@ export default function CallDetails() {
             <Row label="Employee">
               <span style={{ fontSize: 13 }}>{call.employee?.name ?? "Unassigned"}</span>
             </Row>
+            <Row label="Branch">
+              {call.branch ? <BranchBadge branch={call.branch} /> : <span style={{ fontSize: 13, color: "var(--text-faint)" }}>Not set</span>}
+            </Row>
             <Row label="Duration">
               <span className="mono" style={{ fontSize: 12.5 }}>{formatDuration(call.durationSeconds)}</span>
             </Row>
@@ -445,6 +457,14 @@ export default function CallDetails() {
                         <option value="">Unassigned</option>
                         {employees.map((emp) => (
                           <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                      </select>
+                    </FormRow>
+                    <FormRow label="Branch">
+                      <select style={inputStyle} value={branch} onChange={(ev) => setBranch(ev.target.value as Branch | "")}>
+                        <option value="">Not set</option>
+                        {BRANCH_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
                     </FormRow>

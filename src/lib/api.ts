@@ -2,6 +2,8 @@ import { supabase } from "./supabase";
 import type {
   AppUser,
   AuditLogEntry,
+  Branch,
+  BranchBreakdownPoint,
   BusinessCategory,
   BusinessNumber,
   Call,
@@ -105,6 +107,7 @@ export interface CallsQuery {
   dateFrom?: string;
   dateTo?: string;
   employeeId?: string[];
+  branch?: string[];
   page?: number;
   pageSize?: number;
 }
@@ -122,6 +125,7 @@ export interface CustomersQuery {
 export interface ReportsQuery {
   category?: string[];
   employeeId?: string[];
+  branch?: string[];
   carMake?: string[];
   carModel?: string[];
   sentiment?: SentimentType[];
@@ -263,6 +267,7 @@ export interface UpdateCallInput {
   businessCategory?: BusinessCategory;
   callDate?: string;
   employeeId?: string;
+  branch?: Branch | "";
 }
 
 export interface UpdateExtractionInput {
@@ -379,6 +384,7 @@ export const api = {
       request<TopProductPoint[]>(`/reports/top-products${query({ limit, ...q })}`),
     topEmployees: (limit?: number, q: ReportsQuery = {}) =>
       request<TopEmployeePoint[]>(`/reports/top-employees${query({ limit, ...q })}`),
+    branches: (q: ReportsQuery = {}) => request<BranchBreakdownPoint[]>(`/reports/branches${query(q)}`),
     customerCallHistory: (page = 1, pageSize = 20, q: ReportsQuery = {}) =>
       request<Paginated<CustomerCallHistoryRow>>(`/reports/customer-call-history${query({ page, pageSize, ...q })}`),
   },

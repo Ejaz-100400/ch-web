@@ -27,6 +27,8 @@ import { useToast } from "../components/ui/Toast";
 import { formatCurrency, formatDate, formatDuration } from "../lib/format";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
 import type {
+  Branch,
+  BranchBreakdownPoint,
   CallsByPeriodPoint,
   CustomerCallHistoryRow,
   CustomersByPeriodPoint,
@@ -54,6 +56,15 @@ const CATEGORY_OPTIONS = [
   { value: "unknown", label: "Unknown" },
 ];
 
+const BRANCH_LABELS: Record<Branch, string> = {
+  ambattur: "Ambattur (HQ)",
+  kattankulathur: "Kattankulathur",
+  sithalapakkam: "Sithalapakkam",
+  pondicherry: "Pondicherry",
+};
+
+const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));
+
 const SENTIMENT_OPTIONS = [
   { value: "interested", label: "Interested" },
   { value: "not_interested", label: "Not interested" },
@@ -79,6 +90,7 @@ export default function Reports() {
   const [granularity, setGranularity] = useState<"daily" | "weekly" | "monthly">("daily");
   const [category, setCategory] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
+  const [branch, setBranch] = useState<string[]>([]);
   const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
   const [sentiment, setSentiment] = useState<string[]>([]);
   const [productId, setProductId] = useState<string[]>([]);
@@ -96,6 +108,7 @@ export default function Reports() {
   const [topCarModels, setTopCarModels] = useState<TopCarModelPoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProductPoint[]>([]);
   const [topEmployees, setTopEmployees] = useState<TopEmployeePoint[]>([]);
+  const [branchBreakdown, setBranchBreakdown] = useState<BranchBreakdownPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [customerHistory, setCustomerHistory] = useState<Paginated<CustomerCallHistoryRow> | null>(null);
@@ -107,6 +120,7 @@ export default function Reports() {
     () => ({
       category: category.length ? category : undefined,
       employeeId: employeeId.length ? employeeId : undefined,
+      branch: branch.length ? branch : undefined,
       carMake: carMake.length ? carMake : undefined,
       carModel: carModel.length ? carModel : undefined,
       sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
@@ -114,7 +128,7 @@ export default function Reports() {
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     }),
-    [category, employeeId, carMake, carModel, sentiment, productId, dateFrom, dateTo],
+    [category, employeeId, branch, carMake, carModel, sentiment, productId, dateFrom, dateTo],
   );
 
   useEffect(() => {
@@ -134,8 +148,9 @@ export default function Reports() {
       api.reports.topCarModels(8, filters),
       api.reports.topProducts(8, filters),
       api.reports.topEmployees(8, filters),
+      api.reports.branches(filters),
     ])
-      .then(([s, cbp, custp, f, sent, cm, p, emp]) => {
+      .then(([s, cbp, custp, f, sent, cm, p, emp, br]) => {
         if (!active) return;
         setSummary(s);
         setCallsByPeriod(cbp);
@@ -145,6 +160,7 @@ export default function Reports() {
         setTopCarModels(cm);
         setTopProducts(p);
         setTopEmployees(emp);
+        setBranchBreakdown(br);
       })
       .catch((err) => toast.show(err instanceof ApiError ? err.message : "Failed to load reports", "error"))
       .finally(() => {
@@ -194,13 +210,23 @@ export default function Reports() {
   const productData = topProducts.map((p) => ({ name: p.name, count: p.count }));
   const carModelData = topCarModels.map((c) => ({ name: c.car_model, count: c.count }));
   const employeeData = topEmployees.map((e) => ({ name: e.name, count: e.count }));
+  const branchData = branchBreakdown.map((b) => ({ name: BRANCH_LABELS[b.branch], count: b.count }));
 
   const hasActiveFilters = Boolean(
-    category.length || employeeId.length || carMake.length || carModel.length || sentiment.length || productId.length || dateFrom || dateTo,
+    category.length ||
+      employeeId.length ||
+      branch.length ||
+      carMake.length ||
+      carModel.length ||
+      sentiment.length ||
+      productId.length ||
+      dateFrom ||
+      dateTo,
   );
   function clearFilters() {
     setCategory([]);
     setEmployeeId([]);
+    setBranch([]);
     resetVehicleFilters();
     setSentiment([]);
     setProductId([]);
@@ -479,6 +505,26 @@ export default function Reports() {
           </div>
 
           <div style={{ ...cardStyle, marginTop: 14 }}>
+            <SectionLabel>Calls by branch</SectionLabel>
+            {loading ? (
+              <Skeleton height={180} />
+            ) : branchData.length === 0 ? (
+              <EmptyChart message="No branch assigned to any call yet -- tracked from now on, so older calls won't show here." />
+            ) : (
+              <ResponsiveContainer width="100%" height={Math.max(180, branchData.length * 34)}>
+                <BarChart data={branchData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
+                  <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
+                  <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
+                  <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
+                  <Bar dataKey="count" fill="#1e9e58" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
+                    <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div style={{ ...cardStyle, marginTop: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 }}>
               Customers &amp; call history
             </div>
@@ -538,6 +584,16 @@ export default function Reports() {
               values={employeeId}
               onChange={setEmployeeId}
               options={employees.map((emp) => ({ value: emp.id, label: emp.name }))}
+              triggerStyle={{ width: "100%" }}
+            />
+          </FilterField>
+
+          <FilterField label="Branch">
+            <MultiSelectFilter
+              label="All branches"
+              values={branch}
+              onChange={setBranch}
+              options={BRANCH_OPTIONS}
               triggerStyle={{ width: "100%" }}
             />
           </FilterField>
