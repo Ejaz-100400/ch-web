@@ -75,22 +75,23 @@ export function AppShell() {
     <div style={{ display: "flex", height: "100vh", background: "var(--paper)" }}>
       {mobileNavOpen && <div className="mobile-sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />}
       <Sidebar onLogout={handleLogout} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
-      <main style={{ flex: 1, overflowY: "auto", minWidth: 0 }}>
-        <div className="app-main-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "32px 40px 60px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <button
-              onClick={() => setMobileNavOpen(true)}
-              aria-label="Open menu"
-              className="mobile-topbar-btn"
-              style={{ alignItems: "center", justifyContent: "center", width: 36, height: 36, background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text)" }}
-            >
-              <Menu size={18} />
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <NotificationBell />
-              <ThemeToggle />
-            </div>
+      <main style={{ flex: 1, overflowY: "auto", minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <header className="app-topbar">
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open menu"
+            className="mobile-topbar-btn"
+            style={{ alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "var(--paper)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text)" }}
+          >
+            <Menu size={16} />
+          </button>
+          <div className="app-topbar-actions">
+            <NotificationBell />
+            <span className="app-topbar-divider" />
+            <ThemeToggle />
           </div>
+        </header>
+        <div className="app-main-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 40px 60px", width: "100%" }}>
           <FadeIn>
             <Outlet />
           </FadeIn>

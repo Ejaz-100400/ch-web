@@ -121,6 +121,7 @@ export function NotificationBell() {
       <button
         onClick={toggleOpen}
         aria-label="Notifications"
+        title="Notifications"
         aria-expanded={open}
         style={{
           position: "relative",

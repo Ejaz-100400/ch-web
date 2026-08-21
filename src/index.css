@@ -239,6 +239,47 @@ a {
   background: transparent;
 }
 
+/* ---- Global topbar ---- */
+/* Sticky within <main>'s own scroll container (not the viewport) --
+   position: sticky works against any scrolling ancestor, so this stays
+   pinned to the top of the content pane as the page scrolls underneath,
+   regardless of which route is active. */
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 40px;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.app-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.app-topbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-soft);
+  margin: 0 2px;
+}
+
+.app-topbar-actions button {
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.app-topbar-actions button:hover {
+  background: var(--border-soft);
+}
+
 /* ---- Responsive layout ---- */
 .app-sidebar-label,
 .app-sidebar-footer-text {
@@ -287,6 +328,9 @@ a {
   }
   .app-main-inner {
     padding: 24px 20px 48px !important;
+  }
+  .app-topbar {
+    padding: 0 20px;
   }
   .grid-responsive-4 {
     grid-template-columns: repeat(2, 1fr) !important;
