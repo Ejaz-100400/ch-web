@@ -101,6 +101,9 @@ export interface Call {
   recordingStorageKey: string | null;
   status: CallStatus;
   failureReason: string | null;
+  // Only ever set (true/false) for status "failed" -- true when this
+  // customer has since had any completed call, inbound or outbound.
+  resolved?: boolean;
   createdAt: string;
   updatedAt: string;
   customer?: Customer | null;
@@ -160,9 +163,9 @@ export interface ReportsSummary {
   followUpsPending: number;
   followUpsOverdue: number;
   avgCallDurationSeconds: number | null;
-  budgetPotentialPerCustomer: number;
   interestedRate: number | null;
   totalCustomers: number;
+  returningCustomers: number;
 }
 
 export interface CallsByPeriodPoint {

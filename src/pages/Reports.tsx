@@ -16,7 +16,7 @@ import {
   Cell,
   ReferenceDot,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Wallet, Smile, AlertTriangle, HelpCircle, Users, Eye, EyeOff } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Smile, AlertTriangle, HelpCircle, Users, Repeat2, Eye, EyeOff } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
@@ -272,6 +272,7 @@ export default function Reports() {
           <div className="grid-responsive-4" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 14 }}>
             <KpiCard icon={PhoneCall} label="Total calls" value={summary?.totalCalls} tint="var(--brand)" loading={loading} />
             <KpiCard icon={Users} label="Total customers" value={summary?.totalCustomers} tint="var(--violet)" loading={loading} />
+            <KpiCard icon={Repeat2} label="Returning customers" value={summary?.returningCustomers} tint="var(--violet)" loading={loading} />
             <KpiCard icon={Glasses} label="Car Glasses" value={summary?.carGlassesEnquiries} tint="var(--brand)" loading={loading} />
             <KpiCard icon={Wrench} label="Car Modifications" value={summary?.carModificationEnquiries} tint="var(--violet)" loading={loading} />
             <KpiCard icon={HelpCircle} label="Unknown category" value={summary?.unknownCategoryEnquiries} tint="var(--text-faint)" loading={loading} />
@@ -279,13 +280,6 @@ export default function Reports() {
               icon={Smile}
               label="Interested rate"
               value={summary?.interestedRate != null ? `${summary.interestedRate}%` : "—"}
-              tint="var(--brand)"
-              loading={loading}
-            />
-            <KpiCard
-              icon={Wallet}
-              label="Budget potential / customer"
-              value={summary ? formatCurrency(summary.budgetPotentialPerCustomer) : undefined}
               tint="var(--brand)"
               loading={loading}
             />

@@ -14,7 +14,8 @@ const POLL_INTERVAL_MS = 30_000;
 // Built for technicians on a phone, not a desk -- no filters, no columns to
 // read, just "here's the number, tap it to call." A missed call here is one
 // that's still actionable: /calls/missed already drops anything past 24h old
-// or that's had an outbound callback placed to the same customer since, so
+// or where the customer has since been reached -- an outbound callback or
+// the customer simply getting through on a later call of their own -- so
 // every entry on this page is genuinely still worth calling.
 export default function MissedCalls() {
   const toast = useToast();
@@ -33,9 +34,9 @@ export default function MissedCalls() {
       .missed(page, PAGE_SIZE)
       .then((res) => {
         // A call present on the previous load but missing now was resolved
-        // (a callback was placed) or aged past 24h -- either way, worth
-        // telling whoever's on this page so they don't waste a callback on
-        // someone a teammate already handled.
+        // (the customer was reached, by callback or on their own) or aged
+        // past 24h -- either way, worth telling whoever's on this page so
+        // they don't waste a callback on someone already handled.
         if (isPoll && previous.current) {
           const newIds = new Set(res.items.map((c) => c.id));
           for (const [callId, phone] of previous.current) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy } from "lucide-react";
+import { PhoneCall, PhoneOutgoing, CheckCircle2, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge } from "../components/ui/StatusBadge";
@@ -403,15 +403,17 @@ export default function CallList() {
 
         {!loading &&
           calls.map((call) => {
-            const isMissed = call.status === "failed";
+            const isResolvedFailed = call.status === "failed" && call.resolved === true;
+            const isMissed = call.status === "failed" && !isResolvedFailed;
             const isResolvedOutbound = call.direction === "outbound" && call.status === "completed";
-            const restBackground = isMissed ? "var(--coral-soft)" : isResolvedOutbound ? "var(--success-soft)" : "transparent";
+            const isGreen = isResolvedOutbound || isResolvedFailed;
+            const restBackground = isMissed ? "var(--coral-soft)" : isGreen ? "var(--success-soft)" : "transparent";
             const hoverBackground = isMissed
               ? "color-mix(in srgb, var(--coral-soft) 80%, var(--coral) 12%)"
-              : isResolvedOutbound
+              : isGreen
                 ? "color-mix(in srgb, var(--success-soft) 80%, var(--success) 12%)"
                 : "var(--paper)";
-            const accentColor = isMissed ? "var(--coral)" : isResolvedOutbound ? "var(--success)" : "transparent";
+            const accentColor = isMissed ? "var(--coral)" : isGreen ? "var(--success)" : "transparent";
             return (
             <div
               key={call.id}
@@ -484,6 +486,27 @@ export default function CallList() {
                     }}
                   >
                     <PhoneOutgoing size={10} /> Done
+                  </span>
+                )}
+                {isResolvedFailed && (
+                  <span
+                    title="Customer was reached on a later call"
+                    style={{
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
+                      padding: "2px 7px",
+                      borderRadius: 999,
+                      background: "var(--success)",
+                      color: "#fff",
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
+                    <CheckCircle2 size={10} /> Resolved
                   </span>
                 )}
               </span>
