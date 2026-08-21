@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Menu, ShieldOff } from "lucide-react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { NotificationBell } from "./NotificationBell";
 import { FadeIn } from "../ui/FadeIn";
 import { ThemeToggle } from "../ui/ThemeToggle";
 import { Spinner } from "../ui/Spinner";
@@ -85,7 +86,10 @@ export function AppShell() {
             >
               <Menu size={18} />
             </button>
-            <ThemeToggle />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <NotificationBell />
+              <ThemeToggle />
+            </div>
           </div>
           <FadeIn>
             <Outlet />

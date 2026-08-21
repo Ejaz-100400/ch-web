@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ClipboardCheck, Clock, PhoneMissed, CheckCircle2 } from "lucide-react";
+import { ClipboardCheck, Clock, PhoneMissed, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { FollowUpStatusBadge, CategoryBadge } from "../components/ui/StatusBadge";
@@ -266,12 +266,19 @@ export default function FollowUps() {
             >
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>{formatDate(f.dueDate)}</span>
               <span>{f.call && <CategoryBadge category={f.call.businessCategory} />}</span>
-              <button
-                onClick={() => navigate(`/calls/${f.callId}`)}
-                style={{ background: "none", border: "none", textAlign: "left", padding: 0, fontSize: 13, color: "var(--brand-strong)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              >
-                {f.call?.customer?.name ?? f.call?.customer?.phoneNumber ?? "View call"}
-              </button>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+                <button
+                  onClick={() => navigate(`/calls/${f.callId}`)}
+                  style={{ background: "none", border: "none", textAlign: "left", padding: 0, fontSize: 13, color: "var(--brand-strong)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {f.call?.customer?.name ?? f.call?.customer?.phoneNumber ?? "View call"}
+                </button>
+                {f.call?.customer && !f.call.customer.name && (
+                  <span title="Customer name not recorded — check car model & product too when you call" style={{ display: "flex", flexShrink: 0 }}>
+                    <AlertTriangle size={12} color="var(--amber)" />
+                  </span>
+                )}
+              </span>
               <span style={{ color: "var(--text-soft)" }}>{f.employee?.name ?? "Unassigned"}</span>
               <span style={{ color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.notes ?? "—"}</span>
               {canManage(appUser?.role) ? (

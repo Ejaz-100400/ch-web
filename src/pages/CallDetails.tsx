@@ -13,6 +13,7 @@ import {
   Wallet,
   CalendarClock,
   MapPin,
+  AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
@@ -391,6 +392,35 @@ export default function CallDetails() {
                 No extraction yet — it will appear here once processing completes, or click Edit to fill it in by hand.
               </p>
             )}
+
+            {e && !editing && (() => {
+              const missing = [
+                !e.customerName && "the customer's name",
+                !(e.carMake || e.carModel) && "their car model",
+                !e.productsDiscussed?.length && "which product(s) they asked about",
+              ].filter(Boolean) as string[];
+              if (missing.length === 0) return null;
+              return (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 9,
+                    alignItems: "flex-start",
+                    background: "var(--amber-soft)",
+                    border: "1px solid var(--amber)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "10px 12px",
+                    marginBottom: 14,
+                  }}
+                >
+                  <AlertTriangle size={15} color="var(--amber)" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--text)" }}>
+                    <strong>Before you move on:</strong> confirm {missing.join(", ")} with the customer and add it via Edit —
+                    the next teammate to speak with them relies on this.
+                  </p>
+                </div>
+              );
+            })()}
 
             {e && !editing && (
               <div className="fade-in-up" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
