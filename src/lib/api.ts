@@ -15,6 +15,7 @@ import type {
   FollowUp,
   FollowUpBreakdownPoint,
   FollowUpStatus,
+  NumberCoverage,
   Paginated,
   PhotoExtractResult,
   Product,
@@ -156,6 +157,14 @@ export interface BusinessNumberInput {
   exophoneNumber?: string;
   category: "car_glasses" | "car_modifications";
   label: string;
+}
+
+export interface CoverageInput {
+  phoneNumber: string;
+  employeeId: string;
+  startHour?: number;
+  endHour?: number;
+  isBackup?: boolean;
 }
 
 export interface InviteTeamMemberInput {
@@ -380,6 +389,14 @@ export const api = {
     update: (id: string, dto: Partial<BusinessNumberInput>) =>
       request<BusinessNumber>(`/business-numbers/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
     remove: (id: string) => request<{ deleted: true }>(`/business-numbers/${id}`, { method: "DELETE" }),
+  },
+
+  coverage: {
+    list: () => request<NumberCoverage[]>("/coverage"),
+    create: (dto: CoverageInput) => request<NumberCoverage>("/coverage", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: Partial<CoverageInput>) =>
+      request<NumberCoverage>(`/coverage/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    remove: (id: string) => request<{ deleted: true }>(`/coverage/${id}`, { method: "DELETE" }),
   },
 
   export: {

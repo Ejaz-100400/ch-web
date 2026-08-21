@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, PhoneMissed, ClipboardList, Phone, UserCog, Package, UsersRound, X } from "lucide-react";
+import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, PhoneMissed, ClipboardList, Phone, UserCog, Package, UsersRound, CalendarClock, X } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
 import { Logo } from "../ui/Logo";
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { to: "/export", label: "Export", icon: Download },
   { to: "/import", label: "Import", icon: Upload },
   { to: "/business-numbers", label: "Business Numbers", icon: Phone },
+  { to: "/team-coverage", label: "Team Coverage", icon: CalendarClock },
 ];
 
 const MANAGER_NAV_ITEMS = [{ to: "/products", label: "Products", icon: Package }];

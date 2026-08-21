@@ -258,3 +258,14 @@ export interface BusinessNumber {
   category: BusinessCategory;
   label: string;
 }
+
+export interface NumberCoverage {
+  id: string;
+  phoneNumber: string;
+  employeeId: string;
+  startHour: number | null;
+  endHour: number | null;
+  isBackup: boolean;
+  createdAt: string;
+  employee: Employee;
+}

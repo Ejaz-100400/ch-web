@@ -16,6 +16,7 @@ import Import from "./pages/Import";
 import Employees from "./pages/Employees";
 import Products from "./pages/Products";
 import BusinessNumbers from "./pages/BusinessNumbers";
+import TeamCoverage from "./pages/TeamCoverage";
 import Team from "./pages/Team";
 import SetPassword from "./pages/SetPassword";
 
@@ -42,6 +43,7 @@ export default function App() {
                 <Route path="/team" element={<Team />} />
                 <Route path="/products" element={<Products />} />
                 <Route path="/business-numbers" element={<BusinessNumbers />} />
+                <Route path="/team-coverage" element={<TeamCoverage />} />
               </Route>
               <Route path="/" element={<Navigate to="/customers" replace />} />
               <Route path="*" element={<Navigate to="/customers" replace />} />
