@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Phone, CalendarClock, StickyNote, Car, Trash2 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Avatar } from "../components/ui/Avatar";
@@ -183,9 +183,9 @@ export default function CustomerDetails() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {calls.map((call) => (
-                <button
+                <Link
                   key={call.id}
-                  onClick={() => navigate(`/calls/${call.id}`)}
+                  to={`/calls/${call.id}`}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "130px auto 1fr auto",
@@ -197,6 +197,8 @@ export default function CustomerDetails() {
                     borderRadius: "var(--radius-sm)",
                     textAlign: "left",
                     fontSize: 13,
+                    color: "inherit",
+                    textDecoration: "none",
                   }}
                 >
                   <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>
@@ -213,7 +215,7 @@ export default function CustomerDetails() {
                     </span>
                     <CallStatusBadge status={call.status} />
                   </span>
-                </button>
+                </Link>
               ))}
             </div>
           )}

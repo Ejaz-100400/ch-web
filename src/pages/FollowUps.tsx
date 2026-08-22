@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ClipboardCheck, Clock, PhoneMissed, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -29,7 +29,6 @@ const TABS: { value: FollowUpStatus; label: string; icon: typeof Clock }[] = [
 ];
 
 export default function FollowUps() {
-  const navigate = useNavigate();
   const { appUser } = useAuth();
   const toast = useToast();
 
@@ -267,12 +266,12 @@ export default function FollowUps() {
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>{formatDate(f.dueDate)}</span>
               <span>{f.call && <CategoryBadge category={f.call.businessCategory} />}</span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
-                <button
-                  onClick={() => navigate(`/calls/${f.callId}`)}
-                  style={{ background: "none", border: "none", textAlign: "left", padding: 0, fontSize: 13, color: "var(--brand-strong)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                <Link
+                  to={`/calls/${f.callId}`}
+                  style={{ textAlign: "left", fontSize: 13, color: "var(--brand-strong)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}
                 >
                   {f.call?.customer?.name ?? f.call?.customer?.phoneNumber ?? "View call"}
-                </button>
+                </Link>
                 {f.call?.customer && !f.call.customer.name && (
                   <span title="Customer name not recorded — check car model & product too when you call" style={{ display: "flex", flexShrink: 0 }}>
                     <AlertTriangle size={12} color="var(--amber)" />

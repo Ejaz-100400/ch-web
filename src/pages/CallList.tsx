@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { PhoneCall, PhoneOutgoing, CheckCircle2, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -42,7 +42,6 @@ const FOLLOW_UP_OPTIONS = [
 ];
 
 export default function CallList() {
-  const navigate = useNavigate();
   const toast = useToast();
   const { appUser } = useAuth();
   const isAdmin = appUser?.role === "admin";
@@ -428,12 +427,9 @@ export default function CallList() {
                 : "var(--paper)";
             const accentColor = isMissed ? "var(--coral)" : isGreen ? "var(--success)" : "transparent";
             return (
-            <div
+            <Link
               key={call.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`/calls/${call.id}`)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate(`/calls/${call.id}`); }}
+              to={`/calls/${call.id}`}
               style={{
                 width: "100%",
                 display: "grid",
@@ -446,6 +442,8 @@ export default function CallList() {
                 borderBottom: "1px solid var(--border-soft)",
                 textAlign: "left",
                 fontSize: 13,
+                color: "inherit",
+                textDecoration: "none",
                 cursor: "pointer",
                 transition: "background 120ms ease",
               }}
@@ -456,7 +454,7 @@ export default function CallList() {
                 <input
                   type="checkbox"
                   checked={selectedIds.has(call.id)}
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onChange={() => toggleSelect(call.id)}
                   aria-label={`Select call from ${formatDateTime(call.callDate)}`}
                   style={{ accentColor: "var(--brand)" }}
@@ -543,7 +541,7 @@ export default function CallList() {
               )}
               {isAdmin && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setEditingCall(call); }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingCall(call); }}
                   aria-label="Edit call"
                   title="Edit"
                   style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex", padding: 6, justifySelf: "start" }}
@@ -551,7 +549,7 @@ export default function CallList() {
                   <Pencil size={14} />
                 </button>
               )}
-            </div>
+            </Link>
             );
           })}
         </div>
@@ -573,7 +571,6 @@ export default function CallList() {
 
 function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onResolved: () => void }) {
   const toast = useToast();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<CallDuplicateGroup[]>([]);
   const [confirming, setConfirming] = useState<{ id: string; action: "merge" | "delete" } | null>(null);
@@ -751,12 +748,12 @@ function DuplicateCallsPanel({ onClose, onResolved }: { onClose: () => void; onR
                           flexWrap: "wrap",
                         }}
                       >
-                        <button
-                          onClick={() => navigate(`/calls/${c.id}`)}
-                          style={{ background: "none", border: "none", color: "var(--brand-strong)", fontWeight: 700, textDecoration: "underline", padding: 0 }}
+                        <Link
+                          to={`/calls/${c.id}`}
+                          style={{ color: "var(--brand-strong)", fontWeight: 700, textDecoration: "underline", padding: 0 }}
                         >
                           View
-                        </button>
+                        </Link>
                         {isPrimary && (
                           <span style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-strong)", background: "var(--brand-soft)", padding: "2px 8px", borderRadius: 999 }}>
                             Primary

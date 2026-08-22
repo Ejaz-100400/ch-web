@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ChevronDown, ChevronRight, Copy, Merge, Pencil, Save, Trash2, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -24,7 +24,6 @@ const CATEGORY_OPTIONS = [
 ];
 
 export default function CustomerList() {
-  const navigate = useNavigate();
   const { appUser } = useAuth();
   const toast = useToast();
 
@@ -437,9 +436,10 @@ export default function CustomerList() {
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {calls.map((call) => (
-                          <button
+                          <Link
                             key={call.id}
-                            onClick={() => navigate(`/calls/${call.id}`)}
+                            to={`/calls/${call.id}`}
+                            onClick={(e) => e.stopPropagation()}
                             style={{
                               display: "grid",
                               gridTemplateColumns: "110px auto 1fr auto",
@@ -451,6 +451,8 @@ export default function CustomerList() {
                               borderRadius: "var(--radius-sm)",
                               textAlign: "left",
                               fontSize: 13,
+                              color: "inherit",
+                              textDecoration: "none",
                               transition: "border-color 120ms ease",
                             }}
                           >
@@ -468,7 +470,7 @@ export default function CustomerList() {
                               </span>
                               <CallStatusBadge status={call.status} />
                             </span>
-                          </button>
+                          </Link>
                         ))}
                       </div>
                     )}
