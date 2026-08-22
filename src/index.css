@@ -42,6 +42,8 @@
   --violet-soft: #ecebfa;
   --success: #1e9e58;
   --success-soft: #e7f6ec;
+  --info: #2e7dd1;
+  --info-soft: #e6f0fb;
 
   /* ---- Type ---- */
   --font-display: "Space Grotesk", "Manrope", sans-serif;
@@ -75,6 +77,8 @@
   --violet-soft: #232145;
   --success: #3ecf78;
   --success-soft: #16311f;
+  --info: #5b9fe8;
+  --info-soft: #152740;
 
   color-scheme: dark;
 }
