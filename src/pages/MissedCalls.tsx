@@ -138,6 +138,9 @@ export default function MissedCalls() {
                       <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>· {call.employee.name}</span>
                     )}
                   </div>
+                  {call.failureReason && (
+                    <div style={{ fontSize: 12, color: "var(--coral)", marginTop: 3, fontWeight: 600 }}>{call.failureReason}</div>
+                  )}
                 </div>
 
                 {phone && (

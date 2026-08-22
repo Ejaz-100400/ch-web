@@ -529,7 +529,18 @@ export default function CallList() {
                 {formatDuration(call.durationSeconds)}
               </span>
               <CallStatusBadge status={call.status} />
-              {call.extraction?.sentiment ? <SentimentBadge sentiment={call.extraction.sentiment} /> : <span style={{ color: "var(--text-faint)" }}>—</span>}
+              {call.extraction?.sentiment ? (
+                <SentimentBadge sentiment={call.extraction.sentiment} />
+              ) : call.status === "failed" && call.failureReason ? (
+                <span
+                  title={call.failureReason}
+                  style={{ color: "var(--coral)", fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {call.failureReason}
+                </span>
+              ) : (
+                <span style={{ color: "var(--text-faint)" }}>—</span>
+              )}
               {isAdmin && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setEditingCall(call); }}
