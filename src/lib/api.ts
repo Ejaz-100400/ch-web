@@ -14,6 +14,7 @@ import type {
   CustomerCallHistoryRow,
   CustomersByPeriodPoint,
   Employee,
+  EmployeePerformanceReport,
   FollowUp,
   FollowUpBreakdownPoint,
   FollowUpStatus,
@@ -403,6 +404,10 @@ export const api = {
     update: (id: string, dto: Partial<CoverageInput>) =>
       request<NumberCoverage>(`/coverage/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
     remove: (id: string) => request<{ deleted: true }>(`/coverage/${id}`, { method: "DELETE" }),
+  },
+
+  performance: {
+    employees: (month?: string) => request<EmployeePerformanceReport>(`/performance/employees${query({ month })}`),
   },
 
   export: {

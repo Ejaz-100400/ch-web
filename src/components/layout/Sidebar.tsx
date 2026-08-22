@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, PhoneMissed, ClipboardList, Phone, UserCog, Package, UsersRound, CalendarClock, X } from "lucide-react";
+import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, PhoneMissed, ClipboardList, Phone, UserCog, Package, UsersRound, CalendarClock, TrendingUp, X } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
 import { Logo } from "../ui/Logo";
@@ -24,6 +24,9 @@ const ADMIN_NAV_ITEMS = [
   { to: "/employees", label: "Employees", icon: UserCog },
   { to: "/team", label: "Team", icon: UsersRound },
 ];
+// Gated on the isOwner flag specifically, not the admin role -- this stays
+// hidden from other admins too, not just managers/viewers.
+const OWNER_NAV_ITEMS = [{ to: "/employee-performance", label: "Employee Performance", icon: TrendingUp }];
 
 const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager", viewer: "Viewer" };
 
@@ -112,6 +115,7 @@ export function Sidebar({
           ...NAV_ITEMS,
           ...(canManage(appUser?.role) ? MANAGER_NAV_ITEMS : []),
           ...(appUser?.role === "admin" ? ADMIN_NAV_ITEMS : []),
+          ...(appUser?.isOwner ? OWNER_NAV_ITEMS : []),
         ].map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}

@@ -19,6 +19,7 @@ export interface AppUser {
   name: string;
   email: string;
   role: UserRole;
+  isOwner: boolean;
   active: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -265,6 +266,43 @@ export interface BusinessNumber {
   exophoneNumber: string | null;
   category: BusinessCategory;
   label: string;
+}
+
+export interface EmployeePerformanceCoverage {
+  type: "backup" | "scheduled";
+  label?: string;
+  lines?: { phoneNumber: string; window: { startHour: number; endHour: number } | null }[];
+}
+
+export interface EmployeePerformanceMetrics {
+  totalCalls: number;
+  completedCalls: number;
+  failedCalls: number;
+  completionRate: number | null;
+  avgDurationSeconds: number | null;
+  interestedRate: number | null;
+  notInterestedRate: number | null;
+  needsFollowUpCount: number;
+  sentimentSampleSize: number;
+  dataCaptureRate: number | null;
+  followUpTotal: number;
+  followUpCompleted: number;
+  followUpRate: number | null;
+  followUpOverdue: number;
+}
+
+export interface EmployeePerformanceRow {
+  employee: { id: string; name: string; role: string | null };
+  coverage: EmployeePerformanceCoverage;
+  score: number | null;
+  metrics: EmployeePerformanceMetrics;
+  pros: string[];
+  cons: string[];
+}
+
+export interface EmployeePerformanceReport {
+  month: string;
+  employees: EmployeePerformanceRow[];
 }
 
 export interface NumberCoverage {
