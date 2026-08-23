@@ -11,6 +11,36 @@ const WHATS_NEW_SEEN_KEY = "ch-whats-new-seen";
 // strings work well since they also show in the panel.
 const WHATS_NEW: { id: string; date: string; title: string; description: string }[] = [
   {
+    id: "2026-08-23-performance",
+    date: "2026-08-23",
+    title: "Employee Performance page",
+    description: "Owner-only monthly dashboard scoring each employee's calls out of 10, with pros/cons and handling-number coverage. Backup lines are excluded from scoring.",
+  },
+  {
+    id: "2026-08-23-status-filter",
+    date: "2026-08-23",
+    title: "Status filter added",
+    description: "Filter by call status (pending/processing/completed/failed) on Customers, Call Log, Reports, and Export.",
+  },
+  {
+    id: "2026-08-23-export-time",
+    date: "2026-08-23",
+    title: "Time-of-day filter on Export",
+    description: "Export now lets you narrow a date range down to specific hours and minutes, in addition to the existing date filters.",
+  },
+  {
+    id: "2026-08-23-new-tab",
+    date: "2026-08-23",
+    title: "Open calls in a new tab",
+    description: "Call rows and follow-ups can now be opened in a new tab (ctrl/cmd-click or middle-click), same as any link.",
+  },
+  {
+    id: "2026-08-21-topbar",
+    date: "2026-08-21",
+    title: "Notification bell & top bar",
+    description: "A global bell up top now surfaces missed calls and overdue follow-ups at a glance, plus what's new -- like this.",
+  },
+  {
     id: "2026-08-21-branch",
     date: "2026-08-21",
     title: "Branch tracking",
@@ -26,7 +56,7 @@ const WHATS_NEW: { id: string; date: string; title: string; description: string 
     id: "2026-08-21-resolved",
     date: "2026-08-21",
     title: "Resolved calls turn green",
-    description: "A missed/failed call now highlights green once that customer has any completed call on record.",
+    description: "A missed/failed call now highlights green once that same customer has a later completed call -- so a fresh miss after an old success stays flagged.",
   },
   {
     id: "2026-08-21-returning",
