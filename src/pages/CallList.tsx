@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { PhoneCall, PhoneOutgoing, CheckCircle2, Pencil, Save, X, Trash2, Copy } from "lucide-react";
+import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
@@ -427,10 +427,9 @@ export default function CallList() {
 
         {!loading &&
           calls.map((call) => {
-            const isResolvedFailed = call.status === "failed" && call.resolved === true;
-            const isMissed = call.status === "failed" && !isResolvedFailed;
+            const isMissed = call.status === "failed";
             const isResolvedOutbound = call.direction === "outbound" && call.status === "completed";
-            const isGreen = isResolvedOutbound || isResolvedFailed;
+            const isGreen = isResolvedOutbound;
             const restBackground = isMissed ? "var(--coral-soft)" : isGreen ? "var(--success-soft)" : "transparent";
             const hoverBackground = isMissed
               ? "color-mix(in srgb, var(--coral-soft) 80%, var(--coral) 12%)"
@@ -509,27 +508,6 @@ export default function CallList() {
                     }}
                   >
                     <PhoneOutgoing size={10} /> Done
-                  </span>
-                )}
-                {isResolvedFailed && (
-                  <span
-                    title="Customer was reached on a later call"
-                    style={{
-                      flexShrink: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 3,
-                      padding: "2px 7px",
-                      borderRadius: 999,
-                      background: "var(--success)",
-                      color: "#fff",
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.03em",
-                    }}
-                  >
-                    <CheckCircle2 size={10} /> Resolved
                   </span>
                 )}
               </span>

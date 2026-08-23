@@ -105,9 +105,6 @@ export interface Call {
   recordingStorageKey: string | null;
   status: CallStatus;
   failureReason: string | null;
-  // Only ever set (true/false) for status "failed" -- true when this
-  // customer has since had any completed call, inbound or outbound.
-  resolved?: boolean;
   createdAt: string;
   updatedAt: string;
   customer?: Customer | null;

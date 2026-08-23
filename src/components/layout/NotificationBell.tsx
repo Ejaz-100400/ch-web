@@ -53,12 +53,6 @@ const WHATS_NEW: { id: string; date: string; title: string; description: string 
     description: "See who's covering each phone line and when, and calls now auto-assign to the right employee based on shift.",
   },
   {
-    id: "2026-08-21-resolved",
-    date: "2026-08-21",
-    title: "Resolved calls turn green",
-    description: "A missed/failed call now highlights green once that same customer has a later completed call -- so a fresh miss after an old success stays flagged.",
-  },
-  {
     id: "2026-08-21-returning",
     date: "2026-08-21",
     title: "Returning customers metric",

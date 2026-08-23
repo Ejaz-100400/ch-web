@@ -12,11 +12,10 @@ const PAGE_SIZE = 25;
 const POLL_INTERVAL_MS = 30_000;
 
 // Built for technicians on a phone, not a desk -- no filters, no columns to
-// read, just "here's the number, tap it to call." A missed call here is one
-// that's still actionable: /calls/missed already drops anything past 24h old
-// or where the customer has since been reached -- an outbound callback or
-// the customer simply getting through on a later call of their own -- so
-// every entry on this page is genuinely still worth calling.
+// read, just "here's the number, tap it to call." A missed call stays here
+// for a full 24h regardless of whether the customer was later reached on
+// some other call -- a miss is a real event that happened, not something a
+// later success should quietly erase.
 export default function MissedCalls() {
   const toast = useToast();
   const [calls, setCalls] = useState<Call[]>([]);
@@ -33,15 +32,14 @@ export default function MissedCalls() {
     api.calls
       .missed(page, PAGE_SIZE)
       .then((res) => {
-        // A call present on the previous load but missing now was resolved
-        // (the customer was reached, by callback or on their own) or aged
-        // past 24h -- either way, worth telling whoever's on this page so
-        // they don't waste a callback on someone already handled.
+        // A call present on the previous load but missing now aged past 24h
+        // -- worth telling whoever's on this page so they know why it's
+        // gone rather than assuming it's a bug.
         if (isPoll && previous.current) {
           const newIds = new Set(res.items.map((c) => c.id));
           for (const [callId, phone] of previous.current) {
             if (!newIds.has(callId)) {
-              toast.show(`Missed call to ${phone} has been handled`, "alert");
+              toast.show(`Missed call to ${phone} is now over 24h old and has dropped off this list`, "alert");
             }
           }
         }
