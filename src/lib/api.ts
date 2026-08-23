@@ -107,6 +107,8 @@ export interface CallsQuery {
   status?: string[];
   dateFrom?: string;
   dateTo?: string;
+  timeFrom?: string;
+  timeTo?: string;
   employeeId?: string[];
   branch?: string[];
   page?: number;
@@ -119,6 +121,7 @@ export interface CustomersQuery {
   carMake?: string[];
   carModel?: string[];
   category?: string[];
+  status?: string[];
   page?: number;
   pageSize?: number;
 }
@@ -127,6 +130,7 @@ export interface ReportsQuery {
   category?: string[];
   employeeId?: string[];
   branch?: string[];
+  status?: string[];
   carMake?: string[];
   carModel?: string[];
   sentiment?: SentimentType[];

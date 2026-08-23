@@ -30,6 +30,13 @@ const BRANCH_OPTIONS = [
   { value: "pondicherry", label: "Pondicherry" },
 ];
 
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "processing", label: "Processing" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+];
+
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "interested", label: "Interested" },
   { value: "not_interested", label: "Not interested" },
@@ -56,6 +63,7 @@ export default function CallList() {
   const [followUpRequired, setFollowUpRequired] = useState("");
   const [category, setCategory] = useState<string[]>([]);
   const [branch, setBranch] = useState<string[]>([]);
+  const [status, setStatus] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -121,7 +129,7 @@ export default function CallList() {
       return;
     }
     setPage(1);
-  }, [carMake, carModel, sentiment, followUpRequired, category, branch, employeeId, dateFrom, dateTo]);
+  }, [carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, dateFrom, dateTo]);
 
   useEffect(() => {
     let active = true;
@@ -136,6 +144,7 @@ export default function CallList() {
         followUpRequired: followUpRequired ? followUpRequired === "true" : undefined,
         category: category.length ? category : undefined,
         branch: branch.length ? branch : undefined,
+        status: status.length ? status : undefined,
         employeeId: employeeId.length ? employeeId : undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
@@ -161,7 +170,7 @@ export default function CallList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, branch, employeeId, dateFrom, dateTo, page, refreshToken]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, dateFrom, dateTo, page, refreshToken]);
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
   const hasActiveFilters = Boolean(
@@ -173,6 +182,7 @@ export default function CallList() {
       followUpRequired ||
       category.length ||
       branch.length ||
+      status.length ||
       employeeId.length ||
       dateFrom ||
       dateTo,
@@ -187,6 +197,7 @@ export default function CallList() {
     setFollowUpRequired("");
     setCategory([]);
     setBranch([]);
+    setStatus([]);
     setEmployeeId([]);
     setDateFrom("");
     setDateTo("");
@@ -285,6 +296,7 @@ export default function CallList() {
         />
         <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
         <MultiSelectFilter label="Branch" values={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
+        <MultiSelectFilter label="Status" values={status} onChange={setStatus} options={STATUS_OPTIONS} />
         <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} />
         <DateInput
           value={dateFrom}

@@ -65,6 +65,13 @@ const BRANCH_LABELS: Record<Branch, string> = {
 
 const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));
 
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "processing", label: "Processing" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+];
+
 const SENTIMENT_OPTIONS = [
   { value: "interested", label: "Interested" },
   { value: "not_interested", label: "Not interested" },
@@ -91,6 +98,7 @@ export default function Reports() {
   const [category, setCategory] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
   const [branch, setBranch] = useState<string[]>([]);
+  const [status, setStatus] = useState<string[]>([]);
   const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
   const [sentiment, setSentiment] = useState<string[]>([]);
   const [productId, setProductId] = useState<string[]>([]);
@@ -121,6 +129,7 @@ export default function Reports() {
       category: category.length ? category : undefined,
       employeeId: employeeId.length ? employeeId : undefined,
       branch: branch.length ? branch : undefined,
+      status: status.length ? status : undefined,
       carMake: carMake.length ? carMake : undefined,
       carModel: carModel.length ? carModel : undefined,
       sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
@@ -128,7 +137,7 @@ export default function Reports() {
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     }),
-    [category, employeeId, branch, carMake, carModel, sentiment, productId, dateFrom, dateTo],
+    [category, employeeId, branch, status, carMake, carModel, sentiment, productId, dateFrom, dateTo],
   );
 
   useEffect(() => {
@@ -216,6 +225,7 @@ export default function Reports() {
     category.length ||
       employeeId.length ||
       branch.length ||
+      status.length ||
       carMake.length ||
       carModel.length ||
       sentiment.length ||
@@ -227,6 +237,7 @@ export default function Reports() {
     setCategory([]);
     setEmployeeId([]);
     setBranch([]);
+    setStatus([]);
     resetVehicleFilters();
     setSentiment([]);
     setProductId([]);
@@ -594,6 +605,16 @@ export default function Reports() {
               values={branch}
               onChange={setBranch}
               options={BRANCH_OPTIONS}
+              triggerStyle={{ width: "100%" }}
+            />
+          </FilterField>
+
+          <FilterField label="Status">
+            <MultiSelectFilter
+              label="All statuses"
+              values={status}
+              onChange={setStatus}
+              options={STATUS_OPTIONS}
               triggerStyle={{ width: "100%" }}
             />
           </FilterField>

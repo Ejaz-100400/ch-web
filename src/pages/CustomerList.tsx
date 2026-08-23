@@ -23,6 +23,13 @@ const CATEGORY_OPTIONS = [
   { value: "unknown", label: "Unknown" },
 ];
 
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "processing", label: "Processing" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+];
+
 export default function CustomerList() {
   const { appUser } = useAuth();
   const toast = useToast();
@@ -33,6 +40,7 @@ export default function CustomerList() {
   const [debouncedPhone, setDebouncedPhone] = useState("");
   const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
   const [category, setCategory] = useState<string[]>([]);
+  const [status, setStatus] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   // Kept in the URL (not plain useState) so that navigating to a customer's
   // detail page and then clicking the browser Back button restores the same
@@ -100,7 +108,7 @@ export default function CustomerList() {
       return;
     }
     setPage(1);
-  }, [carMake, carModel, category]);
+  }, [carMake, carModel, category, status]);
 
   useEffect(() => {
     let active = true;
@@ -112,6 +120,7 @@ export default function CustomerList() {
         carMake: carMake.length ? carMake : undefined,
         carModel: carModel.length ? carModel : undefined,
         category: category.length ? category : undefined,
+        status: status.length ? status : undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -134,7 +143,7 @@ export default function CustomerList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carMake, carModel, category, page, refreshToken]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, category, status, page, refreshToken]);
 
   async function toggleExpand(customer: Customer) {
     const isOpen = expanded === customer.id;
@@ -152,8 +161,8 @@ export default function CustomerList() {
     }
   }
 
-  const hasActiveFilters = Boolean(search || phone || carMake.length || carModel.length || category.length);
-  const advancedFilterCount = [carMake, carModel, category].filter((v) => v.length > 0).length;
+  const hasActiveFilters = Boolean(search || phone || carMake.length || carModel.length || category.length || status.length);
+  const advancedFilterCount = [carMake, carModel, category, status].filter((v) => v.length > 0).length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const gridCols = isAdmin ? "24px 28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr 40px" : "28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr";
 
@@ -256,6 +265,7 @@ export default function CustomerList() {
               setPhone("");
               resetVehicleFilters();
               setCategory([]);
+              setStatus([]);
             }}
           />
         )}
@@ -276,6 +286,7 @@ export default function CustomerList() {
             options={carModelOptions.map((model) => ({ value: model, label: model }))}
           />
           <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+          <MultiSelectFilter label="Status" values={status} onChange={setStatus} options={STATUS_OPTIONS} />
         </FilterBar>
       )}
 

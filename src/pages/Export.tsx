@@ -46,6 +46,13 @@ const CATEGORY_OPTIONS = [
   { value: "unknown", label: "Unknown" },
 ];
 
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "processing", label: "Processing" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+];
+
 const FORMATS: { value: ExportFormat; label: string; icon: typeof FileText; description: string }[] = [
   { value: "xlsx", label: "Excel", icon: FileSpreadsheet, description: "Spreadsheet with one row per call" },
   { value: "pdf", label: "PDF", icon: FileText, description: "Formatted report table" },
@@ -56,9 +63,12 @@ export default function Export() {
   const toast = useToast();
 
   const [category, setCategory] = useState<string[]>([]);
+  const [status, setStatus] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
   const [format, setFormat] = useState<ExportFormat>("xlsx");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -97,9 +107,12 @@ export default function Export() {
     setGenerating(true);
     const query: CallsQuery = {
       category: category.length ? category : undefined,
+      status: status.length ? status : undefined,
       employeeId: employeeId.length ? employeeId : undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
+      timeFrom: dateFrom && timeFrom ? timeFrom : undefined,
+      timeTo: dateTo && timeTo ? timeTo : undefined,
     };
     try {
       const blob = await api.export.calls(format, query);
@@ -130,6 +143,7 @@ export default function Export() {
           <SectionLabel>1. Filter which calls</SectionLabel>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 22 }}>
             <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} triggerStyle={{ width: "100%" }} />
+            <MultiSelectFilter label="Status" values={status} onChange={setStatus} options={STATUS_OPTIONS} triggerStyle={{ width: "100%" }} />
             <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} triggerStyle={{ width: "100%" }} />
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1 }}>
@@ -139,6 +153,28 @@ export default function Export() {
               <div style={{ flex: 1 }}>
                 <label style={fieldLabelStyle}>To</label>
                 <DateInput value={dateTo} onChange={setDateTo} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={fieldLabelStyle}>From time</label>
+                <input
+                  type="time"
+                  value={timeFrom}
+                  onChange={(e) => setTimeFrom(e.target.value)}
+                  disabled={!dateFrom}
+                  style={{ ...inputStyle, opacity: dateFrom ? 1 : 0.5 }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={fieldLabelStyle}>To time</label>
+                <input
+                  type="time"
+                  value={timeTo}
+                  onChange={(e) => setTimeTo(e.target.value)}
+                  disabled={!dateTo}
+                  style={{ ...inputStyle, opacity: dateTo ? 1 : 0.5 }}
+                />
               </div>
             </div>
           </div>
