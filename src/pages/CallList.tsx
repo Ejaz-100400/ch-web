@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy, Wrench } from "lucide-react";
+import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
@@ -446,7 +446,7 @@ export default function CallList() {
                 display: "grid",
                 gridTemplateColumns: gridCols,
                 alignItems: "center",
-                padding: "12px 18px",
+                padding: "16px 18px",
                 background: restBackground,
                 boxShadow: accentColor !== "transparent" ? `inset 3px 0 0 0 ${accentColor}` : "none",
                 border: "none",
@@ -475,7 +475,7 @@ export default function CallList() {
                 {formatDateTime(call.callDate)}
               </span>
               <CategoryBadge category={call.businessCategory} />
-              <span style={{ display: "flex", alignItems: "center", overflow: "hidden", gap: 6 }}>
+              <span style={{ display: "flex", flexDirection: "column", gap: 3, overflow: "hidden" }}>
                 <span
                   style={{
                     color: "var(--text-soft)",
@@ -483,35 +483,20 @@ export default function CallList() {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
-                    flexShrink: 1,
                   }}
                 >
                   {call.extraction?.carMake || call.extraction?.carModel
                     ? [call.extraction?.carMake, call.extraction?.carModel].filter(Boolean).join(" ")
                     : <span style={{ color: "var(--text-faint)" }}>—</span>}
                 </span>
-                {!!call.extraction?.productsDiscussed?.length && (
-                  <>
-                    <span style={{ width: 1, alignSelf: "stretch", background: "var(--border-soft)", flexShrink: 0 }} />
-                    <span
-                      title={call.extraction.productsDiscussed.join(", ")}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 3,
-                        marginLeft: "auto",
-                        fontSize: 11.5,
-                        color: "var(--text-faint)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        flexShrink: 3,
-                      }}
-                    >
-                      <Wrench size={10} style={{ flexShrink: 0 }} />
-                      {call.extraction.productsDiscussed.join(", ")}
-                    </span>
-                  </>
+                {!!call.products?.length && (
+                  <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 7px" }}>
+                    {[...new Set(call.products.map((p) => p.product.name))].map((name) => (
+                      <span key={name} style={{ fontSize: 11, fontWeight: 700, color: "var(--brand-strong)", whiteSpace: "nowrap" }}>
+                        {name}
+                      </span>
+                    ))}
+                  </span>
                 )}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
