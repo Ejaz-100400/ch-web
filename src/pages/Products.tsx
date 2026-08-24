@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Package, Pencil, Plus, ShieldAlert, Trash2, X } from "lucide-react";
+import { Package, Pencil, Plus, ShieldAlert, Trash2, X, History } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge } from "../components/ui/StatusBadge";
@@ -8,7 +8,14 @@ import { api, ApiError, type ProductInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
-import type { Product } from "../types";
+import { formatDateTime } from "../lib/format";
+import type { Product, AuditLogEntry } from "../types";
+
+const HISTORY_ACTION_LABELS: Record<string, string> = {
+  create_product: "Added",
+  update_product: "Edited",
+  delete_product: "Deleted",
+};
 
 const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
@@ -31,6 +38,20 @@ export default function Products() {
   const [form, setForm] = useState<ProductInput>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [historyFor, setHistoryFor] = useState<Product | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<AuditLogEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  function openHistory(product: Product) {
+    setHistoryFor(product);
+    setHistoryLoading(true);
+    api.products
+      .history(product.id)
+      .then(setHistoryEntries)
+      .catch((err) => toast.show(err instanceof ApiError ? err.message : "Failed to load history", "error"))
+      .finally(() => setHistoryLoading(false));
+  }
 
   function load() {
     setLoading(true);
@@ -158,7 +179,7 @@ export default function Products() {
           className="mono"
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1.2fr 90px 80px",
+            gridTemplateColumns: "2fr 1.2fr 90px 108px",
             padding: "10px 18px",
             fontSize: 11,
             fontFamily: "var(--font-body)",
@@ -183,7 +204,7 @@ export default function Products() {
               key={p.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: "2fr 1.2fr 90px 80px",
+                gridTemplateColumns: "2fr 1.2fr 90px 108px",
                 alignItems: "center",
                 padding: "12px 18px",
                 borderBottom: "1px solid var(--border-soft)",
@@ -198,6 +219,9 @@ export default function Products() {
                 {p.active ? "Active" : "Inactive"}
               </span>
               <span style={{ display: "flex", gap: 4 }}>
+                <button onClick={() => openHistory(p)} aria-label={`View history for ${p.name}`} title="History" style={iconButtonStyle}>
+                  <History size={14} />
+                </button>
                 <button onClick={() => openEdit(p)} aria-label={`Edit ${p.name}`} title="Edit" style={iconButtonStyle}>
                   <Pencil size={14} />
                 </button>
@@ -225,6 +249,90 @@ export default function Products() {
             <p style={{ fontSize: 13 }}>Try different filters, or add a new product.</p>
           </div>
         )}
+      </div>
+
+      {historyFor && (
+        <ProductHistoryModal
+          product={historyFor}
+          entries={historyEntries}
+          loading={historyLoading}
+          onClose={() => setHistoryFor(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProductHistoryModal({
+  product,
+  entries,
+  loading,
+  onClose,
+}: {
+  product: Product;
+  entries: AuditLogEntry[];
+  loading: boolean;
+  onClose: () => void;
+}) {
+  // A product created before this logging shipped has no "create_product"
+  // entry -- fall back to its own createdAt so there's still a baseline
+  // "Added" line instead of the history looking empty/broken.
+  const hasCreateEntry = entries.some((e) => e.action === "create_product");
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...cardStyle, width: "100%", maxWidth: 440, maxHeight: "70vh", display: "flex", flexDirection: "column", padding: 16 }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{product.name}</div>
+            <div style={{ fontSize: 11.5, color: "var(--text-faint)" }}>History</div>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
+            <X size={15} />
+          </button>
+        </div>
+
+        <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+          {loading ? (
+            <div style={{ fontSize: 13, color: "var(--text-faint)" }}>
+              <LoadingText />
+            </div>
+          ) : (
+            <>
+              {entries.map((entry) => (
+                <div key={entry.id} style={{ padding: "8px 10px", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>
+                    {HISTORY_ACTION_LABELS[entry.action] ?? entry.action} by {entry.user?.name ?? entry.user?.email ?? "Unknown user"}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>{formatDateTime(entry.createdAt)}</div>
+                </div>
+              ))}
+              {!hasCreateEntry && (
+                <div style={{ padding: "8px 10px", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-sm)" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>Added</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
+                    {formatDateTime(product.createdAt)} · before edit history was tracked
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

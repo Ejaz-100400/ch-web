@@ -367,6 +367,7 @@ export const api = {
     update: (id: string, dto: Partial<ProductInput>) =>
       request<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
     remove: (id: string) => request<{ deleted: true }>(`/products/${id}`, { method: "DELETE" }),
+    history: (id: string) => request<AuditLogEntry[]>(`/products/${id}/history`),
   },
 
   followUps: {
