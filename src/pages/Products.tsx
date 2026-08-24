@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Package, Pencil, Plus, ShieldAlert, Trash2, X, History } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -9,6 +10,7 @@ import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { formatDateTime } from "../lib/format";
+import { listContainerVariants, listItemVariants } from "../lib/motion";
 import type { Product, AuditLogEntry } from "../types";
 
 const HISTORY_ACTION_LABELS: Record<string, string> = {
@@ -198,10 +200,15 @@ export default function Products() {
 
         {loading && <SkeletonRows rows={5} />}
 
-        {!loading &&
-          filtered.map((p) => (
-            <div
+        {!loading && (
+        <motion.div variants={listContainerVariants} initial="hidden" animate="visible">
+        <AnimatePresence initial={false}>
+          {filtered.map((p) => (
+            <motion.div
               key={p.id}
+              layout="position"
+              variants={listItemVariants}
+              exit="exit"
               style={{
                 display: "grid",
                 gridTemplateColumns: "2fr 1.2fr 90px 108px",
@@ -237,8 +244,11 @@ export default function Products() {
                   </button>
                 )}
               </span>
-            </div>
+            </motion.div>
           ))}
+        </AnimatePresence>
+        </motion.div>
+        )}
         </div>
       </div>
 

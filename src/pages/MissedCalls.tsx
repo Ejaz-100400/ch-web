@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Phone, PhoneMissed } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { CategoryBadge } from "../components/ui/StatusBadge";
@@ -6,6 +7,7 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../components/ui/Toast";
 import { relativeDay } from "../lib/format";
+import { listContainerVariants, listItemVariants } from "../lib/motion";
 import type { Call } from "../types";
 
 const PAGE_SIZE = 25;
@@ -84,13 +86,17 @@ export default function MissedCalls() {
           </div>
         )}
 
-        {!loading &&
-          calls.map((call) => {
+        {!loading && (
+        <motion.div variants={listContainerVariants} initial="hidden" animate="visible" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <AnimatePresence initial={false}>
+          {calls.map((call) => {
             const phone = call.customer?.phoneNumber;
             return (
-              <div
+              <motion.div
                 key={call.id}
-                className="fade-in-up"
+                layout="position"
+                variants={listItemVariants}
+                exit="exit"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -160,9 +166,12 @@ export default function MissedCalls() {
                     <Phone size={19} />
                   </a>
                 )}
-              </div>
+              </motion.div>
             );
           })}
+        </AnimatePresence>
+        </motion.div>
+        )}
       </div>
 
       {!loading && totalPages > 1 && (

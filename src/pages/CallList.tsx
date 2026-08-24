@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -13,6 +14,7 @@ import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { formatDuration, formatDateTime, formatDate } from "../lib/format";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
+import { listContainerVariants, listItemVariants } from "../lib/motion";
 import type { Branch, BusinessCategory, Call, CallDuplicateEntry, CallDuplicateGroup, Employee, Product, SentimentType } from "../types";
 
 const PAGE_SIZE = 20;
@@ -47,6 +49,11 @@ const FOLLOW_UP_OPTIONS = [
   { value: "true", label: "Follow-up needed" },
   { value: "false", label: "No follow-up" },
 ];
+
+// Wraps react-router's Link (not a plain <a>) so rows stay real navigation
+// links while getting a subtle staggered entrance and an exit animation
+// when one drops out of the result set (deleted, or filtered away).
+const MotionRow = motion(Link);
 
 export default function CallList() {
   const toast = useToast();
@@ -438,8 +445,10 @@ export default function CallList() {
 
         {loading && <SkeletonRows rows={8} />}
 
-        {!loading &&
-          calls.map((call) => {
+        {!loading && (
+        <motion.div variants={listContainerVariants} initial="hidden" animate="visible">
+        <AnimatePresence initial={false}>
+          {calls.map((call) => {
             const isMissed = call.status === "failed";
             const isResolvedOutbound = call.direction === "outbound" && call.status === "completed";
             const isGreen = isResolvedOutbound;
@@ -451,9 +460,12 @@ export default function CallList() {
                 : "var(--paper)";
             const accentColor = isMissed ? "var(--coral)" : isGreen ? "var(--success)" : "transparent";
             return (
-            <Link
+            <MotionRow
               key={call.id}
               to={`/calls/${call.id}`}
+              layout="position"
+              variants={listItemVariants}
+              exit="exit"
               style={{
                 width: "100%",
                 display: "grid",
@@ -571,9 +583,12 @@ export default function CallList() {
                   <Pencil size={14} />
                 </button>
               )}
-            </Link>
+            </MotionRow>
             );
           })}
+        </AnimatePresence>
+        </motion.div>
+        )}
         </div>
       </div>
 

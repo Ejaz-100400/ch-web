@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronRight, Copy, Merge, Pencil, Save, Trash2, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -13,6 +14,7 @@ import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
 import { formatDuration, relativeDay, formatDateTime } from "../lib/format";
+import { listContainerVariants, listItemVariants } from "../lib/motion";
 import type { Call, Customer, Product } from "../types";
 
 const PAGE_SIZE = 20;
@@ -386,13 +388,15 @@ export default function CustomerList() {
 
         {loading && <SkeletonRows rows={6} />}
 
-        {!loading &&
-          customers.map((c) => {
+        {!loading && (
+        <motion.div variants={listContainerVariants} initial="hidden" animate="visible">
+        <AnimatePresence initial={false}>
+          {customers.map((c) => {
             const isOpen = expanded === c.id;
             const calls = callsByCustomer[c.id] ?? [];
 
             return (
-              <div key={c.id} style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <motion.div key={c.id} layout="position" variants={listItemVariants} exit="exit" style={{ borderBottom: "1px solid var(--border-soft)" }}>
                 <div
                   role="button"
                   tabIndex={0}
@@ -503,9 +507,12 @@ export default function CustomerList() {
                     )}
                   </div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
+        </AnimatePresence>
+        </motion.div>
+        )}
         </div>
       </div>
 
