@@ -157,9 +157,9 @@ export default function Reports() {
       api.reports.customersByPeriod(granularity, filters),
       api.reports.followUps(filters),
       api.reports.sentiment(filters),
-      api.reports.topCarModels(8, filters),
-      api.reports.topCarMakes(8, filters),
-      api.reports.topProducts(8, filters),
+      api.reports.topCarModels(10, filters),
+      api.reports.topCarMakes(10, filters),
+      api.reports.topProducts(10, filters),
       api.reports.topEmployees(8, filters),
       api.reports.branches(filters),
     ])
