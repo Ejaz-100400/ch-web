@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   RefreshCw,
@@ -102,13 +103,20 @@ export default function CallDetails() {
 
   // Powers the call-tracking timeline -- the full history of this customer's
   // other calls, so it can show where the call currently open falls among
-  // them (see CallTrackingTimeline below).
+  // them (see CallTrackingTimeline below). customerCallsLoading is tracked
+  // separately from the main page `loading` state -- it starts as soon as
+  // we know the customerId (before the main call finishes rendering) so a
+  // skeleton reserves the timeline's space immediately instead of the real
+  // one popping in a beat later and shoving the buttons below it down.
+  const [customerCallsLoading, setCustomerCallsLoading] = useState(false);
   useEffect(() => {
     if (!call?.customerId) {
       setCustomerCalls([]);
+      setCustomerCallsLoading(false);
       return;
     }
     let active = true;
+    setCustomerCallsLoading(true);
     api.customers
       .calls(call.customerId)
       .then((res) => {
@@ -116,6 +124,9 @@ export default function CallDetails() {
       })
       .catch(() => {
         if (active) setCustomerCalls([]);
+      })
+      .finally(() => {
+        if (active) setCustomerCallsLoading(false);
       });
     return () => {
       active = false;
@@ -294,7 +305,9 @@ export default function CallDetails() {
         alignActions="flex-start"
         actions={
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
-            {customerCalls.length > 0 && <CallTrackingTimeline calls={customerCalls} activeCallId={call.id} />}
+            {call.customerId && (
+              <CallTrackingTimeline calls={customerCalls} activeCallId={call.id} loading={customerCallsLoading} />
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               {canEdit && (
                 <button onClick={handleReprocess} disabled={actionPending !== null} style={secondaryButtonStyle}>
@@ -621,8 +634,17 @@ export default function CallDetails() {
 
 const TIMELINE_ITEM_WIDTH = 148;
 const TIMELINE_CONNECTOR_WIDTH = 28;
+const TIMELINE_WIDTH = TIMELINE_ITEM_WIDTH * 3 + TIMELINE_CONNECTOR_WIDTH * 2;
+
+// Framer Motion's `motion()` factory has to wrap the actual react-router
+// Link (not a plain <a>) so animated timeline entries stay real client-side
+// navigation links -- created once at module scope, not per-render.
+const MotionLink = motion(Link);
 
 function timelineSentimentColor(call: Call): string {
+  // A failed/missed call has no sentiment (nothing was ever extracted from
+  // it) but should still read as a miss, not a neutral "no data yet" gray.
+  if (call.status === "failed") return "var(--coral)";
   const sentiment = call.extraction?.sentiment;
   if (sentiment === "interested") return "var(--success)";
   if (sentiment === "needs_follow_up") return "var(--amber)";
@@ -636,15 +658,21 @@ function timelineSentimentColor(call: Call): string {
  * call currently open highlighted. Fixed to 3 visible items; more scroll
  * into view rather than shrinking, and the active call auto-scrolls into
  * view on load in case it isn't one of the first 3.
+ *
+ * Renders a same-sized skeleton the instant a customerId is known (before
+ * the call-history fetch resolves) so the box's footprint claims its space
+ * immediately -- the previous version only rendered once data arrived,
+ * which meant the tracker (and the buttons below it) visibly popped in and
+ * shifted the layout a beat after the rest of the page had already settled.
  */
-function CallTrackingTimeline({ calls, activeCallId }: { calls: Call[]; activeCallId: string }) {
+function CallTrackingTimeline({ calls, activeCallId, loading }: { calls: Call[]; activeCallId: string; loading: boolean }) {
   const sorted = [...calls].sort((a, b) => new Date(a.callDate).getTime() - new Date(b.callDate).getTime());
   const activeIndex = sorted.findIndex((c) => c.id === activeCallId);
   const activeItemRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
-    activeItemRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [activeCallId]);
+    if (!loading) activeItemRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [activeCallId, loading]);
 
   return (
     <div
@@ -654,60 +682,115 @@ function CallTrackingTimeline({ calls, activeCallId }: { calls: Call[]; activeCa
         borderRadius: "var(--radius-md)",
         padding: "10px 14px 8px",
         boxShadow: "var(--shadow-card)",
+        width: TIMELINE_WIDTH + 28,
       }}
     >
       <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-        Call history{activeIndex >= 0 && ` · ${activeIndex + 1} of ${sorted.length}`}
+        Call history{!loading && activeIndex >= 0 && ` · ${activeIndex + 1} of ${sorted.length}`}
       </div>
-      <div style={{ display: "flex", overflowX: "auto", width: TIMELINE_ITEM_WIDTH * 3 + TIMELINE_CONNECTOR_WIDTH * 2, paddingBottom: 4 }}>
-        {sorted.map((c, i) => {
-          const isActive = c.id === activeCallId;
-          const color = timelineSentimentColor(c);
-          const vehicle = [c.extraction?.carMake, c.extraction?.carModel].filter(Boolean).join(" ");
-          const product = c.extraction?.productsDiscussed?.[0];
-          return (
-            <div key={c.id} style={{ display: "flex", alignItems: "flex-start", flexShrink: 0 }}>
-              {i > 0 && (
-                <div style={{ width: TIMELINE_CONNECTOR_WIDTH, height: 2, background: timelineSentimentColor(sorted[i - 1]), marginTop: 7, flexShrink: 0 }} />
-              )}
-              <Link
-                ref={isActive ? activeItemRef : undefined}
-                to={`/calls/${c.id}`}
-                style={{
-                  width: TIMELINE_ITEM_WIDTH,
-                  flexShrink: 0,
-                  textDecoration: "none",
-                  color: "inherit",
-                  display: "block",
-                  padding: "5px 8px",
-                  borderRadius: "var(--radius-sm)",
-                  background: isActive ? "var(--brand-soft)" : "transparent",
-                  border: `1px solid ${isActive ? "var(--brand)" : "transparent"}`,
-                }}
-              >
-                <span
-                  style={{
-                    display: "block",
-                    width: isActive ? 13 : 10,
-                    height: isActive ? 13 : 10,
-                    borderRadius: "50%",
-                    background: color,
-                    boxShadow: isActive ? `0 0 0 2px color-mix(in srgb, ${color} 35%, transparent)` : "none",
-                    marginBottom: 6,
-                  }}
-                />
-                <div style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.employee?.name ?? "Unassigned"}
+
+      <AnimatePresence mode="wait" initial={false}>
+        {loading ? (
+          <motion.div
+            key="skeleton"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            style={{ display: "flex", gap: TIMELINE_CONNECTOR_WIDTH, width: TIMELINE_WIDTH, paddingBottom: 4 }}
+          >
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{ width: TIMELINE_ITEM_WIDTH, flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                <Skeleton width={10} height={10} radius={999} />
+                <Skeleton width={90} height={11} />
+                <Skeleton width={70} height={10} />
+                <Skeleton width={60} height={9} />
+              </div>
+            ))}
+          </motion.div>
+        ) : sorted.length > 0 ? (
+          <motion.div
+            key="content"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            style={{ display: "flex", overflowX: "auto", width: TIMELINE_WIDTH, paddingBottom: 4 }}
+          >
+            {sorted.map((c, i) => {
+              const isActive = c.id === activeCallId;
+              const color = timelineSentimentColor(c);
+              const vehicle = [c.extraction?.carMake, c.extraction?.carModel].filter(Boolean).join(" ");
+              const product = c.extraction?.productsDiscussed?.[0];
+              return (
+                <div key={c.id} style={{ display: "flex", alignItems: "flex-start", flexShrink: 0 }}>
+                  {i > 0 && (
+                    <motion.div
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
+                      transition={{ duration: 0.3, delay: i * 0.07, ease: "easeOut" }}
+                      style={{
+                        width: TIMELINE_CONNECTOR_WIDTH,
+                        height: 2,
+                        background: timelineSentimentColor(sorted[i - 1]),
+                        marginTop: 7,
+                        flexShrink: 0,
+                        transformOrigin: "left",
+                      }}
+                    />
+                  )}
+                  <MotionLink
+                    ref={isActive ? activeItemRef : undefined}
+                    to={`/calls/${c.id}`}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, delay: i * 0.07, ease: "easeOut" }}
+                    whileHover={{ y: -2 }}
+                    style={{
+                      width: TIMELINE_ITEM_WIDTH,
+                      flexShrink: 0,
+                      textDecoration: "none",
+                      color: "inherit",
+                      display: "block",
+                      padding: "5px 8px",
+                      borderRadius: "var(--radius-sm)",
+                      background: isActive ? "var(--brand-soft)" : "transparent",
+                      border: `1px solid ${isActive ? "var(--brand)" : "transparent"}`,
+                    }}
+                  >
+                    <span style={{ position: "relative", display: "inline-block", width: 13, height: 13, marginBottom: 6 }}>
+                      {isActive && (
+                        <motion.span
+                          animate={{ scale: [1, 1.7, 1], opacity: [0.55, 0, 0.55] }}
+                          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                          style={{ position: "absolute", inset: 0, borderRadius: "50%", background: color }}
+                        />
+                      )}
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: isActive ? 0 : 1.5,
+                          left: isActive ? 0 : 1.5,
+                          width: isActive ? 13 : 10,
+                          height: isActive ? 13 : 10,
+                          borderRadius: "50%",
+                          background: color,
+                        }}
+                      />
+                    </span>
+                    <div style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.employee?.name ?? "Unassigned"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {vehicle || product || "—"}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "var(--text-faint)" }}>{formatDateTime(c.callDate)}</div>
+                  </MotionLink>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {vehicle || product || "—"}
-                </div>
-                <div style={{ fontSize: 10.5, color: "var(--text-faint)" }}>{formatDateTime(c.callDate)}</div>
-              </Link>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
