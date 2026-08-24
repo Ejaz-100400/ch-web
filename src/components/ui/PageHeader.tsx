@@ -5,18 +5,21 @@ export function PageHeader({
   title,
   description,
   actions,
+  alignActions = "flex-end",
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
+  /** "flex-start" lines the actions block up with the top of the title instead of the bottom -- for tall actions content (e.g. a widget stacked above the usual buttons) that should start level with the eyebrow, not hang below it. */
+  alignActions?: "flex-start" | "flex-end";
 }) {
   return (
     <div
       style={{
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "flex-end",
+        alignItems: alignActions,
         gap: 24,
         marginBottom: 28,
         flexWrap: "wrap",

@@ -70,6 +70,7 @@ export default function CallDetails() {
   const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [actionPending, setActionPending] = useState<"reprocess" | "summary" | "delete" | null>(null);
+  const [customerCalls, setCustomerCalls] = useState<Call[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -98,6 +99,28 @@ export default function CallDetails() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Powers the call-tracking timeline -- the full history of this customer's
+  // other calls, so it can show where the call currently open falls among
+  // them (see CallTrackingTimeline below).
+  useEffect(() => {
+    if (!call?.customerId) {
+      setCustomerCalls([]);
+      return;
+    }
+    let active = true;
+    api.customers
+      .calls(call.customerId)
+      .then((res) => {
+        if (active) setCustomerCalls(res);
+      })
+      .catch(() => {
+        if (active) setCustomerCalls([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [call?.customerId]);
 
   // Auto-refresh while the worker is still processing this call.
   useEffect(() => {
@@ -268,23 +291,27 @@ export default function CallDetails() {
         }
         title={call.customer?.name ?? e?.customerName ?? "Unknown caller"}
         description={`${call.customer?.phoneNumber ?? e?.phoneNumber ?? "Unknown number"} · ${formatDateTime(call.callDate)}`}
+        alignActions="flex-start"
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
-            {canEdit && (
-              <button onClick={handleReprocess} disabled={actionPending !== null} style={secondaryButtonStyle}>
-                {actionPending === "reprocess" ? <Spinner size={14} /> : <RefreshCw size={14} />} Reprocess
-              </button>
-            )}
-            {canEdit && call.transcript && (
-              <button onClick={handleRegenerateSummary} disabled={actionPending !== null} style={secondaryButtonStyle}>
-                <Sparkles size={14} /> Regenerate summary
-              </button>
-            )}
-            {isAdmin && (
-              <button onClick={handleDelete} disabled={actionPending !== null} style={{ ...secondaryButtonStyle, color: "var(--coral)", borderColor: "var(--coral)" }}>
-                <Trash2 size={14} /> Delete
-              </button>
-            )}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+            {customerCalls.length > 0 && <CallTrackingTimeline calls={customerCalls} activeCallId={call.id} />}
+            <div style={{ display: "flex", gap: 8 }}>
+              {canEdit && (
+                <button onClick={handleReprocess} disabled={actionPending !== null} style={secondaryButtonStyle}>
+                  {actionPending === "reprocess" ? <Spinner size={14} /> : <RefreshCw size={14} />} Reprocess
+                </button>
+              )}
+              {canEdit && call.transcript && (
+                <button onClick={handleRegenerateSummary} disabled={actionPending !== null} style={secondaryButtonStyle}>
+                  <Sparkles size={14} /> Regenerate summary
+                </button>
+              )}
+              {isAdmin && (
+                <button onClick={handleDelete} disabled={actionPending !== null} style={{ ...secondaryButtonStyle, color: "var(--coral)", borderColor: "var(--coral)" }}>
+                  <Trash2 size={14} /> Delete
+                </button>
+              )}
+            </div>
           </div>
         }
       />
@@ -587,6 +614,99 @@ export default function CallDetails() {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const TIMELINE_ITEM_WIDTH = 148;
+const TIMELINE_CONNECTOR_WIDTH = 28;
+
+function timelineSentimentColor(call: Call): string {
+  const sentiment = call.extraction?.sentiment;
+  if (sentiment === "interested") return "var(--success)";
+  if (sentiment === "needs_follow_up") return "var(--amber)";
+  if (sentiment === "not_interested") return "var(--coral)";
+  return "var(--border)";
+}
+
+/**
+ * Horizontal call-history tracker for this customer, styled after a package-
+ * tracking timeline -- oldest call on the left, newest on the right, the
+ * call currently open highlighted. Fixed to 3 visible items; more scroll
+ * into view rather than shrinking, and the active call auto-scrolls into
+ * view on load in case it isn't one of the first 3.
+ */
+function CallTrackingTimeline({ calls, activeCallId }: { calls: Call[]; activeCallId: string }) {
+  const sorted = [...calls].sort((a, b) => new Date(a.callDate).getTime() - new Date(b.callDate).getTime());
+  const activeIndex = sorted.findIndex((c) => c.id === activeCallId);
+  const activeItemRef = useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [activeCallId]);
+
+  return (
+    <div
+      style={{
+        background: "var(--paper-raised)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-md)",
+        padding: "10px 14px 8px",
+        boxShadow: "var(--shadow-card)",
+      }}
+    >
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+        Call history{activeIndex >= 0 && ` · ${activeIndex + 1} of ${sorted.length}`}
+      </div>
+      <div style={{ display: "flex", overflowX: "auto", width: TIMELINE_ITEM_WIDTH * 3 + TIMELINE_CONNECTOR_WIDTH * 2, paddingBottom: 4 }}>
+        {sorted.map((c, i) => {
+          const isActive = c.id === activeCallId;
+          const color = timelineSentimentColor(c);
+          const vehicle = [c.extraction?.carMake, c.extraction?.carModel].filter(Boolean).join(" ");
+          const product = c.extraction?.productsDiscussed?.[0];
+          return (
+            <div key={c.id} style={{ display: "flex", alignItems: "flex-start", flexShrink: 0 }}>
+              {i > 0 && (
+                <div style={{ width: TIMELINE_CONNECTOR_WIDTH, height: 2, background: timelineSentimentColor(sorted[i - 1]), marginTop: 7, flexShrink: 0 }} />
+              )}
+              <Link
+                ref={isActive ? activeItemRef : undefined}
+                to={`/calls/${c.id}`}
+                style={{
+                  width: TIMELINE_ITEM_WIDTH,
+                  flexShrink: 0,
+                  textDecoration: "none",
+                  color: "inherit",
+                  display: "block",
+                  padding: "5px 8px",
+                  borderRadius: "var(--radius-sm)",
+                  background: isActive ? "var(--brand-soft)" : "transparent",
+                  border: `1px solid ${isActive ? "var(--brand)" : "transparent"}`,
+                }}
+              >
+                <span
+                  style={{
+                    display: "block",
+                    width: isActive ? 13 : 10,
+                    height: isActive ? 13 : 10,
+                    borderRadius: "50%",
+                    background: color,
+                    boxShadow: isActive ? `0 0 0 2px color-mix(in srgb, ${color} 35%, transparent)` : "none",
+                    marginBottom: 6,
+                  }}
+                />
+                <div style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.employee?.name ?? "Unassigned"}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {vehicle || product || "—"}
+                </div>
+                <div style={{ fontSize: 10.5, color: "var(--text-faint)" }}>{formatDateTime(c.callDate)}</div>
+              </Link>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
