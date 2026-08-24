@@ -111,6 +111,7 @@ export interface CallsQuery {
   timeTo?: string;
   employeeId?: string[];
   branch?: string[];
+  productId?: string[];
   page?: number;
   pageSize?: number;
 }
@@ -122,6 +123,7 @@ export interface CustomersQuery {
   carModel?: string[];
   category?: string[];
   status?: string[];
+  productId?: string[];
   page?: number;
   pageSize?: number;
 }

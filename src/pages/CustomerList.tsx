@@ -13,7 +13,7 @@ import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
 import { formatDuration, relativeDay, formatDateTime } from "../lib/format";
-import type { Call, Customer } from "../types";
+import type { Call, Customer, Product } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -41,6 +41,8 @@ export default function CustomerList() {
   const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
   const [category, setCategory] = useState<string[]>([]);
   const [status, setStatus] = useState<string[]>([]);
+  const [productId, setProductId] = useState<string[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   // Kept in the URL (not plain useState) so that navigating to a customer's
   // detail page and then clicking the browser Back button restores the same
@@ -81,6 +83,10 @@ export default function CustomerList() {
     setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
+  useEffect(() => {
+    api.products.list().then(setProducts).catch(() => setProducts([]));
+  }, []);
+
   // Both effects below reset to page 1 whenever a filter actually changes --
   // but useEffect also fires on mount, which happens again every time this
   // page is reached via browser Back navigation (the component remounts
@@ -108,7 +114,7 @@ export default function CustomerList() {
       return;
     }
     setPage(1);
-  }, [carMake, carModel, category, status]);
+  }, [carMake, carModel, category, status, productId]);
 
   useEffect(() => {
     let active = true;
@@ -121,6 +127,7 @@ export default function CustomerList() {
         carModel: carModel.length ? carModel : undefined,
         category: category.length ? category : undefined,
         status: status.length ? status : undefined,
+        productId: productId.length ? productId : undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -143,7 +150,7 @@ export default function CustomerList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carMake, carModel, category, status, page, refreshToken]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, category, status, productId, page, refreshToken]);
 
   async function toggleExpand(customer: Customer) {
     const isOpen = expanded === customer.id;
@@ -161,8 +168,10 @@ export default function CustomerList() {
     }
   }
 
-  const hasActiveFilters = Boolean(search || phone || carMake.length || carModel.length || category.length || status.length);
-  const advancedFilterCount = [carMake, carModel, category, status].filter((v) => v.length > 0).length;
+  const hasActiveFilters = Boolean(
+    search || phone || carMake.length || carModel.length || category.length || status.length || productId.length,
+  );
+  const advancedFilterCount = [carMake, carModel, category, status, productId].filter((v) => v.length > 0).length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const gridCols = isAdmin ? "24px 28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr 40px" : "28px 1.8fr 1.2fr 1.2fr 1.3fr 1fr";
 
@@ -266,6 +275,7 @@ export default function CustomerList() {
               resetVehicleFilters();
               setCategory([]);
               setStatus([]);
+              setProductId([]);
             }}
           />
         )}
@@ -287,6 +297,12 @@ export default function CustomerList() {
           />
           <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
           <MultiSelectFilter label="Status" values={status} onChange={setStatus} options={STATUS_OPTIONS} />
+          <MultiSelectFilter
+            label="Product"
+            values={productId}
+            onChange={setProductId}
+            options={products.map((p) => ({ value: p.id, label: p.name }))}
+          />
         </FilterBar>
       )}
 

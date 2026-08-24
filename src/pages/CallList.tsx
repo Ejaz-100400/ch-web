@@ -13,7 +13,7 @@ import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { formatDuration, formatDateTime, formatDate } from "../lib/format";
 import { useVehicleFilters } from "../lib/useVehicleFilters";
-import type { Branch, BusinessCategory, Call, CallDuplicateEntry, CallDuplicateGroup, Employee, SentimentType } from "../types";
+import type { Branch, BusinessCategory, Call, CallDuplicateEntry, CallDuplicateGroup, Employee, Product, SentimentType } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -65,6 +65,7 @@ export default function CallList() {
   const [branch, setBranch] = useState<string[]>([]);
   const [status, setStatus] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
+  const [productId, setProductId] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -88,6 +89,7 @@ export default function CallList() {
   }
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [calls, setCalls] = useState<Call[]>([]);
   const [total, setTotal] = useState(0);
@@ -100,6 +102,7 @@ export default function CallList() {
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.products.list().then(setProducts).catch(() => setProducts([]));
   }, []);
 
   // Both effects below reset to page 1 whenever a filter actually changes --
@@ -129,7 +132,7 @@ export default function CallList() {
       return;
     }
     setPage(1);
-  }, [carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, dateFrom, dateTo]);
+  }, [carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, productId, dateFrom, dateTo]);
 
   useEffect(() => {
     let active = true;
@@ -146,6 +149,7 @@ export default function CallList() {
         branch: branch.length ? branch : undefined,
         status: status.length ? status : undefined,
         employeeId: employeeId.length ? employeeId : undefined,
+        productId: productId.length ? productId : undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         page,
@@ -170,7 +174,7 @@ export default function CallList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, dateFrom, dateTo, page, refreshToken]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, productId, dateFrom, dateTo, page, refreshToken]);
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
   const hasActiveFilters = Boolean(
@@ -184,10 +188,12 @@ export default function CallList() {
       branch.length ||
       status.length ||
       employeeId.length ||
+      productId.length ||
       dateFrom ||
       dateTo,
   );
-  const advancedFilterCount = [carMake, carModel, sentiment].filter((v) => v.length > 0).length + (followUpRequired ? 1 : 0);
+  const advancedFilterCount =
+    [carMake, carModel, sentiment, productId].filter((v) => v.length > 0).length + (followUpRequired ? 1 : 0);
 
   function clearFilters() {
     setSearch("");
@@ -199,6 +205,7 @@ export default function CallList() {
     setBranch([]);
     setStatus([]);
     setEmployeeId([]);
+    setProductId([]);
     setDateFrom("");
     setDateTo("");
   }
@@ -329,6 +336,12 @@ export default function CallList() {
             options={carModelOptions.map((model) => ({ value: model, label: model }))}
           />
           <MultiSelectFilter label="Sentiment" values={sentiment} onChange={setSentiment} options={SENTIMENT_OPTIONS} />
+          <MultiSelectFilter
+            label="Product"
+            values={productId}
+            onChange={setProductId}
+            options={products.map((p) => ({ value: p.id, label: p.name }))}
+          />
           <FilterSelect label="Follow-up" value={followUpRequired} onChange={setFollowUpRequired} options={FOLLOW_UP_OPTIONS} />
         </FilterBar>
       )}
