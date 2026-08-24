@@ -206,6 +206,11 @@ export interface TopCarModelPoint {
   count: number;
 }
 
+export interface TopCarMakePoint {
+  car_make: string;
+  count: number;
+}
+
 export interface TopProductPoint {
   name: string;
   category: BusinessCategory;

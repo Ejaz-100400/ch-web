@@ -39,6 +39,7 @@ import type {
   ReportsSummary,
   SentimentBreakdownPoint,
   SentimentType,
+  TopCarMakePoint,
   TopCarModelPoint,
   TopEmployeePoint,
   TopProductPoint,
@@ -114,6 +115,8 @@ export default function Reports() {
   const [followUpBreakdown, setFollowUpBreakdown] = useState<FollowUpBreakdownPoint[]>([]);
   const [sentimentBreakdown, setSentimentBreakdown] = useState<SentimentBreakdownPoint[]>([]);
   const [topCarModels, setTopCarModels] = useState<TopCarModelPoint[]>([]);
+  const [topCarMakes, setTopCarMakes] = useState<TopCarMakePoint[]>([]);
+  const [carVizMode, setCarVizMode] = useState<"model" | "make">("model");
   const [topProducts, setTopProducts] = useState<TopProductPoint[]>([]);
   const [topEmployees, setTopEmployees] = useState<TopEmployeePoint[]>([]);
   const [branchBreakdown, setBranchBreakdown] = useState<BranchBreakdownPoint[]>([]);
@@ -155,11 +158,12 @@ export default function Reports() {
       api.reports.followUps(filters),
       api.reports.sentiment(filters),
       api.reports.topCarModels(8, filters),
+      api.reports.topCarMakes(8, filters),
       api.reports.topProducts(8, filters),
       api.reports.topEmployees(8, filters),
       api.reports.branches(filters),
     ])
-      .then(([s, cbp, custp, f, sent, cm, p, emp, br]) => {
+      .then(([s, cbp, custp, f, sent, cm, ck, p, emp, br]) => {
         if (!active) return;
         setSummary(s);
         setCallsByPeriod(cbp);
@@ -167,6 +171,7 @@ export default function Reports() {
         setFollowUpBreakdown(f);
         setSentimentBreakdown(sent);
         setTopCarModels(cm);
+        setTopCarMakes(ck);
         setTopProducts(p);
         setTopEmployees(emp);
         setBranchBreakdown(br);
@@ -218,6 +223,8 @@ export default function Reports() {
   // tallest bar ends up at the bottom instead of the top.
   const productData = topProducts.map((p) => ({ name: p.name, count: p.count }));
   const carModelData = topCarModels.map((c) => ({ name: c.car_model, count: c.count }));
+  const carMakeData = topCarMakes.map((c) => ({ name: c.car_make, count: c.count }));
+  const carVizData = carVizMode === "model" ? carModelData : carMakeData;
   const employeeData = topEmployees.map((e) => ({ name: e.name, count: e.count }));
   const branchData = branchBreakdown.map((b) => ({ name: BRANCH_LABELS[b.branch], count: b.count }));
 
@@ -455,14 +462,39 @@ export default function Reports() {
 
           <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
             <div style={cardStyle}>
-              <SectionLabel>Top car models mentioned</SectionLabel>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Top car {carVizMode === "model" ? "models" : "makes"} mentioned
+                </div>
+                <div style={{ display: "flex", background: "var(--paper)", border: "1px solid var(--border)", borderRadius: 999, padding: 2, gap: 2, flexShrink: 0 }}>
+                  {(["model", "make"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setCarVizMode(mode)}
+                      style={{
+                        padding: "4px 11px",
+                        border: "none",
+                        borderRadius: 999,
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        textTransform: "capitalize",
+                        background: carVizMode === mode ? "var(--brand)" : "transparent",
+                        color: carVizMode === mode ? "var(--on-brand)" : "var(--text-soft)",
+                        transition: "background 120ms ease, color 120ms ease",
+                      }}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {loading ? (
                 <Skeleton height={240} />
-              ) : carModelData.length === 0 ? (
-                <EmptyChart message="No car models extracted yet." />
+              ) : carVizData.length === 0 ? (
+                <EmptyChart message={`No car ${carVizMode === "model" ? "models" : "makes"} extracted yet.`} />
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(240, carModelData.length * 30)}>
-                  <BarChart data={carModelData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
+                <ResponsiveContainer width="100%" height={Math.max(240, carVizData.length * 30)}>
+                  <BarChart data={carVizData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
                     <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
                     <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={90} />
                     <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />

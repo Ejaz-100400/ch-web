@@ -25,6 +25,7 @@ import type {
   ReportsSummary,
   SentimentBreakdownPoint,
   SentimentType,
+  TopCarMakePoint,
   TopCarModelPoint,
   TopEmployeePoint,
   TopProductPoint,
@@ -388,6 +389,8 @@ export const api = {
     sentiment: (q: ReportsQuery = {}) => request<SentimentBreakdownPoint[]>(`/reports/sentiment${query(q)}`),
     topCarModels: (limit?: number, q: ReportsQuery = {}) =>
       request<TopCarModelPoint[]>(`/reports/top-car-models${query({ limit, ...q })}`),
+    topCarMakes: (limit?: number, q: ReportsQuery = {}) =>
+      request<TopCarMakePoint[]>(`/reports/top-car-makes${query({ limit, ...q })}`),
     topProducts: (limit?: number, q: ReportsQuery = {}) =>
       request<TopProductPoint[]>(`/reports/top-products${query({ limit, ...q })}`),
     topEmployees: (limit?: number, q: ReportsQuery = {}) =>
