@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ClipboardCheck, Clock, PhoneMissed, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { FilterBar, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
+import { FilterBar, FilterSelect, SearchInput, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { FollowUpStatusBadge, CategoryBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { Pagination } from "../components/ui/Pagination";
@@ -11,8 +11,9 @@ import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
+import { useVehicleFilters } from "../lib/useVehicleFilters";
 import { formatDate } from "../lib/format";
-import type { Employee, FollowUp, FollowUpStatus } from "../types";
+import type { Employee, FollowUp, FollowUpStatus, Product, SentimentType } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -20,6 +21,25 @@ const STATUS_OPTIONS: { value: FollowUpStatus; label: string }[] = [
   { value: "pending", label: "Pending" },
   { value: "completed", label: "Completed" },
   { value: "missed", label: "Missed" },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: "car_glasses", label: "Car Glasses" },
+  { value: "car_modifications", label: "Car Modifications" },
+  { value: "unknown", label: "Unknown" },
+];
+
+const BRANCH_OPTIONS = [
+  { value: "ambattur", label: "Ambattur (HQ)" },
+  { value: "kattankulathur", label: "Kattankulathur" },
+  { value: "sithalapakkam", label: "Sithalapakkam" },
+  { value: "pondicherry", label: "Pondicherry" },
+];
+
+const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
+  { value: "interested", label: "Interested" },
+  { value: "not_interested", label: "Not interested" },
+  { value: "needs_follow_up", label: "Needs follow-up" },
 ];
 
 const TABS: { value: FollowUpStatus; label: string; icon: typeof Clock }[] = [
@@ -36,6 +56,20 @@ export default function FollowUps() {
   const [counts, setCounts] = useState<Record<FollowUpStatus, number>>({ pending: 0, missed: 0, completed: 0 });
   const [assignedTo, setAssignedTo] = useState("");
   const [dueBefore, setDueBefore] = useState("");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [phone, setPhone] = useState("");
+  const [debouncedPhone, setDebouncedPhone] = useState("");
+  const [category, setCategory] = useState<string[]>([]);
+  const [branch, setBranch] = useState<string[]>([]);
+  const [sentiment, setSentiment] = useState<string[]>([]);
+  const [productId, setProductId] = useState<string[]>([]);
+  const [callEmployeeId, setCallEmployeeId] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const { carMake, setCarMake, carModel, setCarModel, carMakeOptions, carModelOptions, reset: resetVehicleFilters } = useVehicleFilters();
+  const [products, setProducts] = useState<Product[]>([]);
   // Kept in the URL (not plain useState) so that navigating to a call's
   // detail page and then clicking the browser Back button restores the same
   // page instead of resetting to page 1 -- the list remounts fresh on back
@@ -63,7 +97,23 @@ export default function FollowUps() {
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
+    api.products.list().then(setProducts).catch(() => setProducts([]));
   }, []);
+
+  const isFirstSearchEffect = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchEffect.current) {
+      isFirstSearchEffect.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setDebouncedPhone(phone);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, phone]);
 
   function loadCounts() {
     // Deliberately unfiltered (independent of assignedTo/dueBefore/status) --
@@ -95,7 +145,7 @@ export default function FollowUps() {
       return;
     }
     setPage(1);
-  }, [status, assignedTo, dueBefore]);
+  }, [status, assignedTo, dueBefore, category, branch, sentiment, productId, callEmployeeId, carMake, carModel, dateFrom, dateTo]);
 
   function load() {
     setLoading(true);
@@ -104,6 +154,17 @@ export default function FollowUps() {
         status,
         assignedTo: assignedTo || undefined,
         dueBefore: dueBefore || undefined,
+        search: debouncedSearch || undefined,
+        phone: debouncedPhone || undefined,
+        category: category.length ? category : undefined,
+        branch: branch.length ? branch : undefined,
+        sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
+        productId: productId.length ? productId : undefined,
+        employeeId: callEmployeeId.length ? callEmployeeId : undefined,
+        carMake: carMake.length ? carMake : undefined,
+        carModel: carModel.length ? carModel : undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -118,7 +179,23 @@ export default function FollowUps() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, assignedTo, dueBefore, page]);
+  }, [
+    status,
+    assignedTo,
+    dueBefore,
+    debouncedSearch,
+    debouncedPhone,
+    category,
+    branch,
+    sentiment,
+    productId,
+    callEmployeeId,
+    carMake,
+    carModel,
+    dateFrom,
+    dateTo,
+    page,
+  ]);
 
   async function updateStatus(id: string, newStatus: FollowUpStatus) {
     setUpdating(id);
@@ -135,7 +212,38 @@ export default function FollowUps() {
   }
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
-  const hasActiveFilters = Boolean(assignedTo || dueBefore);
+  const hasActiveFilters = Boolean(
+    assignedTo ||
+      dueBefore ||
+      search ||
+      phone ||
+      category.length ||
+      branch.length ||
+      sentiment.length ||
+      productId.length ||
+      callEmployeeId.length ||
+      carMake.length ||
+      carModel.length ||
+      dateFrom ||
+      dateTo,
+  );
+  const advancedFilterCount = [sentiment, productId, callEmployeeId, carMake, carModel].filter((v) => v.length > 0).length;
+
+  function clearFilters() {
+    setAssignedTo("");
+    setDueBefore("");
+    setSearch("");
+    setPhone("");
+    setCategory([]);
+    setBranch([]);
+    setSentiment([]);
+    setProductId([]);
+    setCallEmployeeId([]);
+    resetVehicleFilters();
+    setDateFrom("");
+    setDateTo("");
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const totalFollowUps = counts.pending + counts.missed + counts.completed;
 
@@ -200,6 +308,16 @@ export default function FollowUps() {
       </div>
 
       <FilterBar>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search customer name or summary" />
+        <input
+          type="text"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Phone number"
+          style={{ padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13.5, width: 130 }}
+        />
+        <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+        <MultiSelectFilter label="Branch" values={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
         <FilterSelect label="Assigned to" value={assignedTo} onChange={setAssignedTo} options={employeeOptions} />
         <DateInput
           value={dueBefore}
@@ -207,8 +325,46 @@ export default function FollowUps() {
           aria-label="Due before"
           style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
         />
-        {hasActiveFilters && <ClearFiltersButton onClick={() => { setAssignedTo(""); setDueBefore(""); }} />}
+        <AdvancedFiltersToggle open={showAdvanced} count={advancedFilterCount} onClick={() => setShowAdvanced((v) => !v)} />
+        {hasActiveFilters && <ClearFiltersButton onClick={clearFilters} />}
       </FilterBar>
+
+      {showAdvanced && (
+        <FilterBar>
+          <MultiSelectFilter
+            label="Car make"
+            values={carMake}
+            onChange={setCarMake}
+            options={carMakeOptions.map((make) => ({ value: make, label: make }))}
+          />
+          <MultiSelectFilter
+            label="Car model"
+            values={carModel}
+            onChange={setCarModel}
+            options={carModelOptions.map((model) => ({ value: model, label: model }))}
+          />
+          <MultiSelectFilter label="Sentiment" values={sentiment} onChange={setSentiment} options={SENTIMENT_OPTIONS} />
+          <MultiSelectFilter
+            label="Product"
+            values={productId}
+            onChange={setProductId}
+            options={products.map((p) => ({ value: p.id, label: p.name }))}
+          />
+          <MultiSelectFilter label="Call employee" values={callEmployeeId} onChange={setCallEmployeeId} options={employeeOptions} />
+          <DateInput
+            value={dateFrom}
+            onChange={setDateFrom}
+            aria-label="Call date from"
+            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
+          />
+          <DateInput
+            value={dateTo}
+            onChange={setDateTo}
+            aria-label="Call date to"
+            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--paper)", fontSize: 13 }}
+          />
+        </FilterBar>
+      )}
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
         {loading ? <LoadingText /> : `${total} follow-up${total === 1 ? "" : "s"}`}

@@ -146,6 +146,17 @@ export interface FollowUpsQuery {
   status?: FollowUpStatus;
   assignedTo?: string;
   dueBefore?: string;
+  search?: string;
+  phone?: string;
+  category?: string[];
+  branch?: string[];
+  carMake?: string[];
+  carModel?: string[];
+  sentiment?: SentimentType[];
+  productId?: string[];
+  employeeId?: string[];
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   pageSize?: number;
 }
