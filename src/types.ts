@@ -166,6 +166,7 @@ export interface ReportsSummary {
   followUpsOverdue: number;
   avgCallDurationSeconds: number | null;
   interestedRate: number | null;
+  followUpCompletionRate: number | null;
   totalCustomers: number;
   returningCustomers: number;
 }
