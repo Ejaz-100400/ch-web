@@ -113,6 +113,7 @@ export interface CallsQuery {
   employeeId?: string[];
   branch?: string[];
   productId?: string[];
+  channel?: string[];
   page?: number;
   pageSize?: number;
 }
@@ -178,6 +179,7 @@ export interface ProductInput {
 export interface BusinessNumberInput {
   phoneNumber: string;
   exophoneNumber?: string;
+  whatsappPhoneNumberId?: string;
   category: "car_glasses" | "car_modifications";
   label: string;
 }

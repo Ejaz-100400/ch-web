@@ -13,7 +13,7 @@ const CATEGORY_OPTIONS = [
   { value: "car_modifications", label: "Car Modifications" },
 ];
 
-const EMPTY_FORM: BusinessNumberInput = { phoneNumber: "", exophoneNumber: "", category: "car_glasses", label: "" };
+const EMPTY_FORM: BusinessNumberInput = { phoneNumber: "", exophoneNumber: "", whatsappPhoneNumberId: "", category: "car_glasses", label: "" };
 
 export default function BusinessNumbers() {
   const { appUser } = useAuth();
@@ -50,6 +50,7 @@ export default function BusinessNumbers() {
     setForm({
       phoneNumber: n.number,
       exophoneNumber: n.exophoneNumber ?? "",
+      whatsappPhoneNumberId: n.whatsappPhoneNumberId ?? "",
       category: n.category === "unknown" ? "car_glasses" : n.category,
       label: n.label,
     });
@@ -65,6 +66,7 @@ export default function BusinessNumbers() {
     const dto: BusinessNumberInput = {
       phoneNumber: form.phoneNumber.trim(),
       exophoneNumber: form.exophoneNumber?.trim() || undefined,
+      whatsappPhoneNumberId: form.whatsappPhoneNumberId?.trim() || undefined,
       category: form.category,
       label: form.label.trim(),
     };
@@ -159,6 +161,11 @@ export default function BusinessNumbers() {
                   ExoPhone: {n.exophoneNumber}
                 </div>
               )}
+              {n.whatsappPhoneNumberId && (
+                <div className="mono" style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>
+                  WhatsApp Phone Number ID: {n.whatsappPhoneNumberId}
+                </div>
+              )}
             </div>
             <CategoryBadge category={n.category} />
             {isAdmin && (
@@ -243,6 +250,15 @@ function BusinessNumberForm({
           value={form.exophoneNumber ?? ""}
           onChange={(e) => setForm((f) => ({ ...f, exophoneNumber: e.target.value }))}
           placeholder="04447614996"
+        />
+      </label>
+      <label style={{ ...fieldLabelStyle, marginBottom: 16 }}>
+        WhatsApp Phone Number ID (from WhatsApp Manager &gt; API Setup, for tracking WhatsApp calls)
+        <input
+          style={inputStyle}
+          value={form.whatsappPhoneNumberId ?? ""}
+          onChange={(e) => setForm((f) => ({ ...f, whatsappPhoneNumberId: e.target.value }))}
+          placeholder="123456789012345"
         />
       </label>
       <div style={{ display: "flex", gap: 8 }}>

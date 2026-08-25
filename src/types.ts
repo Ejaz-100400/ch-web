@@ -96,6 +96,7 @@ export interface Call {
   id: string;
   externalCallId: string | null;
   direction: "inbound" | "outbound";
+  channel: "phone" | "whatsapp";
   businessCategory: BusinessCategory;
   branch: Branch | null;
   employeeId: string | null;
@@ -266,6 +267,7 @@ export interface BusinessNumber {
   id: string;
   number: string;
   exophoneNumber: string | null;
+  whatsappPhoneNumberId: string | null;
   category: BusinessCategory;
   label: string;
 }

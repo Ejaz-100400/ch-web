@@ -383,6 +383,8 @@ export default function CallDetails() {
             <SectionLabel>Recording</SectionLabel>
             {call.recordingStorageKey ? (
               <RecordingPlayer callId={call.id} />
+            ) : call.channel === "whatsapp" ? (
+              <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>WhatsApp calls aren't recorded — this one's tracked by number, time, and duration only.</p>
             ) : isImported ? (
               <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>
                 No recording — this call was added from a historical data import
@@ -400,6 +402,8 @@ export default function CallDetails() {
             <SectionLabel>Transcript</SectionLabel>
             {call.transcript ? (
               <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--text)", whiteSpace: "pre-wrap" }}>{call.transcript.rawText}</p>
+            ) : call.channel === "whatsapp" ? (
+              <p style={{ fontSize: 13, color: "var(--text-faint)" }}>WhatsApp calls aren't recorded, so there's nothing to transcribe.</p>
             ) : (
               <p style={{ fontSize: 13, color: "var(--text-faint)" }}>
                 No transcript yet — this call is {call.status}.

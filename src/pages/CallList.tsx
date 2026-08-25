@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy } from "lucide-react";
+import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy, MessageCircle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
@@ -39,6 +39,11 @@ const STATUS_OPTIONS = [
   { value: "failed", label: "Failed" },
 ];
 
+const CHANNEL_OPTIONS = [
+  { value: "phone", label: "Phone" },
+  { value: "whatsapp", label: "WhatsApp" },
+];
+
 const SENTIMENT_OPTIONS: { value: SentimentType; label: string }[] = [
   { value: "interested", label: "Interested" },
   { value: "not_interested", label: "Not interested" },
@@ -73,6 +78,7 @@ export default function CallList() {
   const [status, setStatus] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState<string[]>([]);
   const [productId, setProductId] = useState<string[]>([]);
+  const [channel, setChannel] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -139,7 +145,7 @@ export default function CallList() {
       return;
     }
     setPage(1);
-  }, [carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, productId, dateFrom, dateTo]);
+  }, [carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, productId, channel, dateFrom, dateTo]);
 
   useEffect(() => {
     let active = true;
@@ -157,6 +163,7 @@ export default function CallList() {
         status: status.length ? status : undefined,
         employeeId: employeeId.length ? employeeId : undefined,
         productId: productId.length ? productId : undefined,
+        channel: channel.length ? channel : undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         page,
@@ -181,7 +188,7 @@ export default function CallList() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, productId, dateFrom, dateTo, page, refreshToken]);
+  }, [debouncedSearch, debouncedPhone, carMake, carModel, sentiment, followUpRequired, category, branch, status, employeeId, productId, channel, dateFrom, dateTo, page, refreshToken]);
 
   const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
   const hasActiveFilters = Boolean(
@@ -196,6 +203,7 @@ export default function CallList() {
       status.length ||
       employeeId.length ||
       productId.length ||
+      channel.length ||
       dateFrom ||
       dateTo,
   );
@@ -213,6 +221,7 @@ export default function CallList() {
     setStatus([]);
     setEmployeeId([]);
     setProductId([]);
+    setChannel([]);
     setDateFrom("");
     setDateTo("");
   }
@@ -311,6 +320,7 @@ export default function CallList() {
         <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
         <MultiSelectFilter label="Branch" values={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
         <MultiSelectFilter label="Status" values={status} onChange={setStatus} options={STATUS_OPTIONS} />
+        <MultiSelectFilter label="Channel" values={channel} onChange={setChannel} options={CHANNEL_OPTIONS} />
         <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} />
         <DateInput
           value={dateFrom}
@@ -496,7 +506,12 @@ export default function CallList() {
                   style={{ accentColor: "var(--brand)" }}
                 />
               )}
-              <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>
+              <span className="mono" style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--text-soft)", fontSize: 12 }}>
+                {call.channel === "whatsapp" && (
+                  <span title="WhatsApp call" style={{ display: "flex", flexShrink: 0 }}>
+                    <MessageCircle size={12} color="#25D366" />
+                  </span>
+                )}
                 {formatDateTime(call.callDate)}
               </span>
               <CategoryBadge category={call.businessCategory} />
