@@ -164,6 +164,8 @@ export interface ReportsSummary {
   unknownCategoryEnquiries: number;
   followUpsPending: number;
   followUpsOverdue: number;
+  followUpsCompleted: number;
+  followUpsMissed: number;
   avgCallDurationSeconds: number | null;
   interestedRate: number | null;
   followUpCompletionRate: number | null;

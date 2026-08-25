@@ -16,7 +16,7 @@ import {
   Cell,
   ReferenceDot,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Smile, AlertTriangle, HelpCircle, Users, Repeat2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Smile, AlertTriangle, HelpCircle, Users, Repeat2, Eye, EyeOff, CheckCircle2, PhoneMissed } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
@@ -342,6 +342,8 @@ export default function Reports() {
               tint="var(--brand)"
               loading={loading}
             />
+            <KpiCard icon={CheckCircle2} label="Follow-ups completed" value={summary?.followUpsCompleted} tint="var(--brand)" loading={loading} />
+            <KpiCard icon={PhoneMissed} label="Follow-ups missed" value={summary?.followUpsMissed} tint="var(--coral)" loading={loading} />
             <KpiCard
               icon={Timer}
               label="Avg. call duration"
