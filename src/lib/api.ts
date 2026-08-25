@@ -388,6 +388,7 @@ export const api = {
 
   followUps: {
     list: (q: FollowUpsQuery = {}) => request<Paginated<FollowUp>>(`/follow-ups${query(q)}`),
+    counts: (q: FollowUpsQuery = {}) => request<FollowUpBreakdownPoint[]>(`/follow-ups/counts${query(q)}`),
     update: (id: string, dto: { status?: FollowUpStatus; assignedTo?: string; notes?: string }) =>
       request<FollowUp>(`/follow-ups/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
   },

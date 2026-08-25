@@ -115,12 +115,27 @@ export default function FollowUps() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, phone]);
 
+  // Respects every filter except status itself (grouping BY status while
+  // also filtering ON it wouldn't mean anything) and page (pagination
+  // doesn't change the totals) -- so the tiles always match what the list
+  // below actually shows instead of reading as a separate, unfiltered total.
   function loadCounts() {
-    // Deliberately unfiltered (independent of assignedTo/dueBefore/status) --
-    // these tiles are meant to read as a stable at-a-glance total, not shift
-    // around every time the list below gets filtered differently.
-    api.reports
-      .followUps()
+    api.followUps
+      .counts({
+        assignedTo: assignedTo || undefined,
+        dueBefore: dueBefore || undefined,
+        search: debouncedSearch || undefined,
+        phone: debouncedPhone || undefined,
+        category: category.length ? category : undefined,
+        branch: branch.length ? branch : undefined,
+        sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
+        productId: productId.length ? productId : undefined,
+        employeeId: callEmployeeId.length ? callEmployeeId : undefined,
+        carMake: carMake.length ? carMake : undefined,
+        carModel: carModel.length ? carModel : undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      })
       .then((rows) => {
         const next: Record<FollowUpStatus, number> = { pending: 0, missed: 0, completed: 0 };
         for (const r of rows) next[r.status] = r.count;
@@ -131,7 +146,22 @@ export default function FollowUps() {
 
   useEffect(() => {
     loadCounts();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    assignedTo,
+    dueBefore,
+    debouncedSearch,
+    debouncedPhone,
+    category,
+    branch,
+    sentiment,
+    productId,
+    callEmployeeId,
+    carMake,
+    carModel,
+    dateFrom,
+    dateTo,
+  ]);
 
   // useEffect also fires on mount, which happens again every time this page
   // is reached via browser Back navigation (the component remounts fresh).
