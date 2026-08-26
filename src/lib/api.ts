@@ -393,6 +393,15 @@ export interface CreateStockMovementInput {
   notes?: string;
 }
 
+export interface CreateStockTransferInput {
+  stockItemId: string;
+  fromLocation: StockLocation;
+  toLocation: StockLocation;
+  quantity: number;
+  movementDate: string;
+  notes?: string;
+}
+
 export interface UpdateStockMovementInput {
   quantity?: number;
   movementDate?: string;
@@ -594,6 +603,7 @@ export const api = {
     deleteItem: (id: string) => request<{ deleted: true }>(`/stock/items/${id}`, { method: "DELETE" }),
     movements: (q: StockMovementsQuery = {}) => request<Paginated<StockMovement>>(`/stock/movements${query(q)}`),
     createMovement: (dto: CreateStockMovementInput) => request<StockMovement>("/stock/movements", { method: "POST", body: JSON.stringify(dto) }),
+    createTransfer: (dto: CreateStockTransferInput) => request<StockMovement>("/stock/movements/transfer", { method: "POST", body: JSON.stringify(dto) }),
     updateMovement: (id: string, dto: UpdateStockMovementInput) =>
       request<StockMovement>(`/stock/movements/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
     deleteMovement: (id: string) => request<{ deleted: true }>(`/stock/movements/${id}`, { method: "DELETE" }),

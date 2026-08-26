@@ -386,6 +386,8 @@ export interface StockMovement {
   type: StockMovementType;
   quantity: number;
   reason: string | null;
+  transferId: string | null;
+  relatedLocation: StockLocation | null;
   movementDate: string;
   notes: string | null;
   enteredByUserId: string;

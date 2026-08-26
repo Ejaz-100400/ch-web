@@ -1,13 +1,13 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert, Trash2, Pencil } from "lucide-react";
+import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert, Trash2, Pencil, ArrowRightLeft } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { Pagination } from "../components/ui/Pagination";
-import { api, ApiError, type CreateStockMovementInput, type UpdateStockMovementInput } from "../lib/api";
+import { api, ApiError, type UpdateStockMovementInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
@@ -23,6 +23,9 @@ const BRANCH_LABELS: Record<Branch, string> = {
 };
 const LOCATION_LABELS: Record<StockLocation, string> = { ...BRANCH_LABELS, warehouse: "Warehouse" };
 const LOCATION_OPTIONS = (Object.keys(LOCATION_LABELS) as StockLocation[]).map((value) => ({ value, label: LOCATION_LABELS[value] }));
+// A transfer's "to" side is always a real branch -- warehouse never
+// receives stock through Movements, only through the Stock Items screen.
+const TRANSFER_TO_OPTIONS = LOCATION_OPTIONS.filter((o) => o.value !== "warehouse");
 
 const TYPE_OPTIONS: { value: StockMovementType; label: string }[] = [
   { value: "in", label: "Stock in" },
@@ -35,11 +38,27 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function emptyForm(defaultItemId: string, defaultLocation: StockLocation): CreateStockMovementInput {
+interface MovementFormState {
+  stockItemId: string;
+  mode: "single" | "transfer";
+  location: StockLocation;
+  type: StockMovementType;
+  fromLocation: StockLocation;
+  toLocation: Branch;
+  quantity: number;
+  movementDate: string;
+  reason: string;
+  notes: string;
+}
+
+function emptyForm(defaultItemId: string, defaultLocation: StockLocation): MovementFormState {
   return {
     stockItemId: defaultItemId,
+    mode: "single",
     location: defaultLocation,
     type: defaultLocation === "warehouse" ? "out" : "in",
+    fromLocation: defaultLocation,
+    toLocation: defaultLocation === "ambattur" ? "kattankulathur" : "ambattur",
     quantity: 1,
     movementDate: todayIso(),
     reason: "",
@@ -67,7 +86,7 @@ export default function StockMovements() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<StockMovement | null>(null);
-  const [form, setForm] = useState<CreateStockMovementInput>(emptyForm("", "ambattur"));
+  const [form, setForm] = useState<MovementFormState>(emptyForm("", "ambattur"));
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -130,7 +149,9 @@ export default function StockMovements() {
   function openEdit(m: StockMovement) {
     setEditingMovement(m);
     setForm({
+      ...emptyForm(m.stockItemId, m.location),
       stockItemId: m.stockItemId,
+      mode: "single",
       location: m.location,
       type: m.type,
       quantity: m.quantity,
@@ -184,6 +205,26 @@ export default function StockMovements() {
         };
         await api.stock.updateMovement(editingMovement.id, dto);
         toast.show("Movement updated.", "success");
+      } else if (form.mode === "transfer") {
+        if (!form.stockItemId) {
+          toast.show("Pick a stock item first.", "error");
+          setSaving(false);
+          return;
+        }
+        if (form.fromLocation === form.toLocation) {
+          toast.show("Pick two different locations to transfer between.", "error");
+          setSaving(false);
+          return;
+        }
+        await api.stock.createTransfer({
+          stockItemId: form.stockItemId,
+          fromLocation: form.fromLocation,
+          toLocation: form.toLocation,
+          quantity: form.quantity,
+          movementDate: form.movementDate,
+          notes: form.notes?.trim() || undefined,
+        });
+        toast.show(`Transferred to ${LOCATION_LABELS[form.toLocation]}.`, "success");
       } else {
         if (!form.stockItemId) {
           toast.show("Pick a stock item first.", "error");
@@ -211,7 +252,9 @@ export default function StockMovements() {
   }
 
   async function handleDelete(m: StockMovement) {
-    if (!window.confirm(`Delete this ${m.type === "in" ? "stock in" : "stock out"} entry for "${m.stockItem?.name ?? "this item"}"?`)) return;
+    const base = `Delete this ${m.type === "in" ? "stock in" : "stock out"} entry for "${m.stockItem?.name ?? "this item"}"?`;
+    const transferNote = m.transferId ? " This is one side of a branch transfer -- the other side won't be deleted automatically." : "";
+    if (!window.confirm(base + transferNote)) return;
     setDeletingId(m.id);
     try {
       await api.stock.deleteMovement(m.id);
@@ -263,81 +306,156 @@ export default function StockMovements() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <label style={fieldLabelStyle}>
-              Item
-              <select
-                style={inputStyle}
-                value={form.stockItemId}
-                disabled={Boolean(editingMovement)}
-                onChange={(e) => setForm((f) => ({ ...f, stockItemId: e.target.value }))}
-              >
-                <option value="">Select an item</option>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id}>{i.name}</option>
-                ))}
-              </select>
-            </label>
-            <label style={fieldLabelStyle}>
-              Location
-              <select
-                style={inputStyle}
-                value={form.location}
-                disabled={Boolean(editingMovement)}
-                onChange={(e) => {
-                  const nextLocation = e.target.value as StockLocation;
-                  setForm((f) => ({ ...f, location: nextLocation, type: nextLocation === "warehouse" ? "out" : f.type }));
-                }}
-              >
-                {LOCATION_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
-            <label style={fieldLabelStyle}>
-              Date
-              <DateInput value={form.movementDate} onChange={(v) => setForm((f) => ({ ...f, movementDate: v }))} style={inputStyle} />
-            </label>
-          </div>
+          {!editingMovement && (
+            <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
+              {(["single", "transfer"] as const).map((m) => {
+                const active = form.mode === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, mode: m }))}
+                    style={{
+                      padding: "7px 14px",
+                      border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
+                      borderRadius: "var(--radius-sm)",
+                      background: active ? "var(--brand-soft)" : "var(--paper)",
+                      color: active ? "var(--brand-strong)" : "var(--text-soft)",
+                      fontSize: 13,
+                      fontWeight: active ? 700 : 600,
+                    }}
+                  >
+                    {m === "single" ? "Stock in / out" : "Transfer between branches"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-          <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
-            {TYPE_OPTIONS.filter((o) => form.location !== "warehouse" || o.value === "out").map((o) => {
-              const active = form.type === o.value;
-              const Icon = o.value === "in" ? ArrowDownToLine : ArrowUpFromLine;
-              const disabled = Boolean(editingMovement);
-              return (
-                <button
-                  key={o.value}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => setForm((f) => ({ ...f, type: o.value }))}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "8px 14px",
-                    border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
-                    borderRadius: "var(--radius-sm)",
-                    background: active ? "var(--brand-soft)" : "var(--paper)",
-                    color: active ? "var(--brand-strong)" : "var(--text-soft)",
-                    fontSize: 13,
-                    fontWeight: active ? 700 : 600,
-                    opacity: disabled && !active ? 0.5 : 1,
+          {form.mode === "transfer" && !editingMovement ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr 0.9fr 0.9fr", gap: 12, marginBottom: 12 }}>
+              <label style={fieldLabelStyle}>
+                Item
+                <select style={inputStyle} value={form.stockItemId} onChange={(e) => setForm((f) => ({ ...f, stockItemId: e.target.value }))}>
+                  <option value="">Select an item</option>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                From
+                <select
+                  style={inputStyle}
+                  value={form.fromLocation}
+                  onChange={(e) => {
+                    const next = e.target.value as StockLocation;
+                    setForm((f) => ({ ...f, fromLocation: next, toLocation: next === f.toLocation ? (next === "ambattur" ? "kattankulathur" : "ambattur") : f.toLocation }));
                   }}
                 >
-                  <Icon size={14} /> {o.label}
-                </button>
-              );
-            })}
-          </div>
-          {form.location === "warehouse" && !editingMovement && (
-            <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: -6, marginBottom: 12 }}>
-              Warehouse only tracks stock going out here -- add warehouse stock from the Stock Items screen.
+                  {LOCATION_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                To
+                <select style={inputStyle} value={form.toLocation} onChange={(e) => setForm((f) => ({ ...f, toLocation: e.target.value as Branch }))}>
+                  {TRANSFER_TO_OPTIONS.filter((o) => o.value !== form.fromLocation).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                Date
+                <DateInput value={form.movementDate} onChange={(v) => setForm((f) => ({ ...f, movementDate: v }))} style={inputStyle} />
+              </label>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <label style={fieldLabelStyle}>
+                Item
+                <select
+                  style={inputStyle}
+                  value={form.stockItemId}
+                  disabled={Boolean(editingMovement)}
+                  onChange={(e) => setForm((f) => ({ ...f, stockItemId: e.target.value }))}
+                >
+                  <option value="">Select an item</option>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                Location
+                <select
+                  style={inputStyle}
+                  value={form.location}
+                  disabled={Boolean(editingMovement)}
+                  onChange={(e) => {
+                    const nextLocation = e.target.value as StockLocation;
+                    setForm((f) => ({ ...f, location: nextLocation, type: nextLocation === "warehouse" ? "out" : f.type }));
+                  }}
+                >
+                  {LOCATION_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                Date
+                <DateInput value={form.movementDate} onChange={(v) => setForm((f) => ({ ...f, movementDate: v }))} style={inputStyle} />
+              </label>
+            </div>
+          )}
+
+          {form.mode === "single" || editingMovement ? (
+            <>
+              <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+                {TYPE_OPTIONS.filter((o) => form.location !== "warehouse" || o.value === "out").map((o) => {
+                  const active = form.type === o.value;
+                  const Icon = o.value === "in" ? ArrowDownToLine : ArrowUpFromLine;
+                  const disabled = Boolean(editingMovement);
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setForm((f) => ({ ...f, type: o.value }))}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 14px",
+                        border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
+                        borderRadius: "var(--radius-sm)",
+                        background: active ? "var(--brand-soft)" : "var(--paper)",
+                        color: active ? "var(--brand-strong)" : "var(--text-soft)",
+                        fontSize: 13,
+                        fontWeight: active ? 700 : 600,
+                        opacity: disabled && !active ? 0.5 : 1,
+                      }}
+                    >
+                      <Icon size={14} /> {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.location === "warehouse" && !editingMovement && (
+                <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: -6, marginBottom: 12 }}>
+                  Warehouse only tracks stock going out here -- add warehouse stock from the Stock Items screen.
+                </p>
+              )}
+            </>
+          ) : (
+            <p style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <ArrowRightLeft size={13} /> This logs a stock-out at {LOCATION_LABELS[form.fromLocation]} and a matching stock-in at {LOCATION_LABELS[form.toLocation]}.
             </p>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "0.6fr 1.4fr", gap: 12, marginBottom: 12 }}>
-            <label style={fieldLabelStyle}>
+          {form.mode === "transfer" && !editingMovement ? (
+            <label style={{ ...fieldLabelStyle, marginBottom: 12, maxWidth: 160 }}>
               Quantity
               <input
                 type="number"
@@ -347,16 +465,29 @@ export default function StockMovements() {
                 onChange={(e) => setForm((f) => ({ ...f, quantity: Number(e.target.value) }))}
               />
             </label>
-            <label style={fieldLabelStyle}>
-              Reason <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional)</span>
-              <input
-                style={inputStyle}
-                value={form.reason}
-                onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-                placeholder={form.type === "in" ? "e.g. Restock from supplier" : "e.g. Used on customer install"}
-              />
-            </label>
-          </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "0.6fr 1.4fr", gap: 12, marginBottom: 12 }}>
+              <label style={fieldLabelStyle}>
+                Quantity
+                <input
+                  type="number"
+                  min={1}
+                  style={inputStyle}
+                  value={form.quantity}
+                  onChange={(e) => setForm((f) => ({ ...f, quantity: Number(e.target.value) }))}
+                />
+              </label>
+              <label style={fieldLabelStyle}>
+                Reason <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional)</span>
+                <input
+                  style={inputStyle}
+                  value={form.reason}
+                  onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                  placeholder={form.type === "in" ? "e.g. Restock from supplier" : "e.g. Used on customer install"}
+                />
+              </label>
+            </div>
+          )}
 
           <label style={{ ...fieldLabelStyle, marginBottom: 16 }}>
             Notes
@@ -365,7 +496,7 @@ export default function StockMovements() {
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleSave} disabled={saving} style={primaryButtonStyle}>
-              {saving ? "Saving…" : editingMovement ? "Save changes" : "Log movement"}
+              {saving ? "Saving…" : editingMovement ? "Save changes" : form.mode === "transfer" ? "Transfer stock" : "Log movement"}
             </button>
             <button onClick={closeForm} style={secondaryButtonStyle}>
               Cancel
@@ -423,25 +554,53 @@ export default function StockMovements() {
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{m.stockItem?.name ?? "—"}</span>
                       <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{LOCATION_LABELS[m.location]}</span>
                       <span>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            padding: "3px 8px",
-                            borderRadius: 999,
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            color: m.type === "in" ? "var(--brand-strong)" : "var(--coral)",
-                            background: m.type === "in" ? "var(--brand-soft)" : "var(--coral-soft)",
-                          }}
-                        >
-                          {m.type === "in" ? <ArrowDownToLine size={11} /> : <ArrowUpFromLine size={11} />}
-                          {m.type === "in" ? "In" : "Out"}
-                        </span>
+                        {m.transferId ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              color: "var(--violet)",
+                              background: "var(--violet-soft)",
+                            }}
+                          >
+                            <ArrowRightLeft size={11} />
+                            Transfer
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              color: m.type === "in" ? "var(--brand-strong)" : "var(--coral)",
+                              background: m.type === "in" ? "var(--brand-soft)" : "var(--coral-soft)",
+                            }}
+                          >
+                            {m.type === "in" ? <ArrowDownToLine size={11} /> : <ArrowUpFromLine size={11} />}
+                            {m.type === "in" ? "In" : "Out"}
+                          </span>
+                        )}
                       </span>
                       <span className="mono" style={{ fontWeight: 700 }}>{m.quantity}</span>
-                      <span style={{ color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.reason ?? "—"}</span>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {m.transferId && m.relatedLocation ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, color: "var(--violet)", fontWeight: 600 }}>
+                            <ArrowRightLeft size={11} />
+                            {m.type === "out" ? `To ${LOCATION_LABELS[m.relatedLocation]}` : `From ${LOCATION_LABELS[m.relatedLocation]}`}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-soft)" }}>{m.reason ?? "—"}</span>
+                        )}
+                      </span>
                       <span style={{ color: "var(--text-faint)", fontSize: 12.5 }}>{m.enteredBy?.name ?? "—"}</span>
                       <span style={{ display: "flex", gap: 4 }}>
                         <button
