@@ -19,6 +19,7 @@ import BusinessNumbers from "./pages/BusinessNumbers";
 import CustomerTracker from "./pages/CustomerTracker";
 import StockOverview from "./pages/StockOverview";
 import StockItems from "./pages/StockItems";
+import StockItemsByLocation from "./pages/StockItemsByLocation";
 import StockMovements from "./pages/StockMovements";
 import TeamCoverage from "./pages/TeamCoverage";
 import Team from "./pages/Team";
@@ -51,6 +52,7 @@ export default function App() {
                 <Route path="/customer-tracker" element={<CustomerTracker />} />
                 <Route path="/stock" element={<StockOverview />} />
                 <Route path="/stock/items" element={<StockItems />} />
+                <Route path="/stock/items/:location" element={<StockItemsByLocation />} />
                 <Route path="/stock/movements" element={<StockMovements />} />
               </Route>
               <Route path="/" element={<Navigate to="/customers" replace />} />

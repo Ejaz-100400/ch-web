@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Plus, X, Pencil, Trash2, ArrowLeftRight, ShieldAlert, MapPin, Boxes, AlertTriangle } from "lucide-react";
+import { Package, Plus, X, Pencil, Trash2, ShieldAlert, MapPin, Boxes, AlertTriangle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge } from "../components/ui/StatusBadge";
@@ -60,13 +60,13 @@ function emptyForm(): ItemForm {
 export default function StockItems() {
   const { appUser } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<StockItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [activeLocation, setActiveLocation] = useState<StockLocation>("ambattur");
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StockItem | null>(null);
@@ -358,29 +358,32 @@ export default function StockItems() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+        Browse by location
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 26 }}>
         {ALL_LOCATIONS.map((loc) => {
-          const active = activeLocation === loc;
           const stat = locationStats.get(loc);
           const Icon = loc === "warehouse" ? Boxes : MapPin;
           return (
             <button
               key={loc}
-              onClick={() => setActiveLocation(loc)}
-              aria-pressed={active}
+              onClick={() => navigate(`/stock/items/${loc}`)}
               style={{
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
                 padding: "16px 16px 14px",
-                background: active ? "var(--brand-soft)" : "var(--paper-raised)",
-                border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
+                background: "var(--paper-raised)",
+                border: "1px solid var(--border)",
                 borderRadius: "var(--radius-md)",
                 boxShadow: "var(--shadow-card)",
                 textAlign: "left",
                 cursor: "pointer",
                 transition: "background 120ms ease, border-color 120ms ease",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--brand)")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             >
               <span
                 style={{
@@ -390,15 +393,15 @@ export default function StockItems() {
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: active ? "var(--brand)" : "var(--border-soft)",
-                  color: active ? "var(--on-brand)" : "var(--text-soft)",
+                  background: "var(--border-soft)",
+                  color: "var(--text-soft)",
                   flexShrink: 0,
                 }}
               >
                 <Icon size={15} />
               </span>
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: active ? "var(--brand-strong)" : "var(--text-soft)" }}>{LOCATION_LABELS[loc]}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-soft)" }}>{LOCATION_LABELS[loc]}</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
                   <span className="mono" style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{stat?.totalQty ?? 0}</span>
                   <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>on hand</span>
@@ -414,6 +417,10 @@ export default function StockItems() {
         })}
       </div>
 
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+        Manage catalog
+      </div>
+
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name" />
         <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
@@ -421,7 +428,7 @@ export default function StockItems() {
       </FilterBar>
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? <LoadingText /> : `${items.length} item${items.length === 1 ? "" : "s"} · showing ${LOCATION_LABELS[activeLocation]}`}
+        {loading ? <LoadingText /> : `${items.length} item${items.length === 1 ? "" : "s"}`}
       </div>
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
@@ -430,7 +437,7 @@ export default function StockItems() {
             <div className="mono" style={theadStyle}>
               <span>Name</span>
               <span>Category</span>
-              <span>On hand</span>
+              <span>Unit</span>
               <span>Reorder at</span>
               <span>Actions</span>
             </div>
@@ -441,7 +448,6 @@ export default function StockItems() {
               <motion.div variants={listContainerVariants} initial="hidden" animate="visible">
                 <AnimatePresence initial={false}>
                   {items.map((item) => {
-                    const q = item.quantities.find((x) => x.location === activeLocation);
                     return (
                     <motion.div key={item.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle}>
                       <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.active ? 1 : 0.5 }}>
@@ -449,14 +455,9 @@ export default function StockItems() {
                         {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
                       </span>
                       <span><CategoryBadge category={item.category} /></span>
-                      <span className="mono" style={{ fontWeight: q?.lowStock ? 700 : 400, color: q?.lowStock ? "var(--coral)" : "var(--text)" }}>
-                        {q?.quantity ?? 0} {item.unit}
-                      </span>
+                      <span style={{ color: "var(--text-soft)" }}>{item.unit}</span>
                       <span className="mono" style={{ color: "var(--text-faint)" }}>{item.reorderThreshold}</span>
                       <span style={{ display: "flex", gap: 4 }}>
-                        <Link to={`/stock/movements?item=${item.id}`} aria-label={`Log movement for ${item.name}`} title="Log movement" style={iconButtonStyle}>
-                          <ArrowLeftRight size={14} />
-                        </Link>
                         <button onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`} title="Edit" style={iconButtonStyle}>
                           <Pencil size={14} />
                         </button>
@@ -500,7 +501,7 @@ const cardStyle: CSSProperties = {
   boxShadow: "var(--shadow-card)",
 };
 
-const gridColumns = "1.8fr 1.2fr 1fr 0.9fr 104px";
+const gridColumns = "1.8fr 1.2fr 0.8fr 0.9fr 80px";
 
 const theadStyle: CSSProperties = {
   display: "grid",

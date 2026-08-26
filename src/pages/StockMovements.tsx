@@ -1,13 +1,13 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert, Trash2, Pencil } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { Pagination } from "../components/ui/Pagination";
-import { api, ApiError, type CreateStockMovementInput } from "../lib/api";
+import { api, ApiError, type CreateStockMovementInput, type UpdateStockMovementInput } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
@@ -35,8 +35,16 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function emptyForm(defaultItemId: string): CreateStockMovementInput {
-  return { stockItemId: defaultItemId, location: "ambattur", type: "in", quantity: 1, movementDate: todayIso(), reason: "", notes: "" };
+function emptyForm(defaultItemId: string, defaultLocation: StockLocation): CreateStockMovementInput {
+  return {
+    stockItemId: defaultItemId,
+    location: defaultLocation,
+    type: defaultLocation === "warehouse" ? "out" : "in",
+    quantity: 1,
+    movementDate: todayIso(),
+    reason: "",
+    notes: "",
+  };
 }
 
 export default function StockMovements() {
@@ -44,9 +52,10 @@ export default function StockMovements() {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilter = searchParams.get("item") ?? "";
+  const locationParam = searchParams.get("location");
 
   const [items, setItems] = useState<StockItem[]>([]);
-  const [location, setLocation] = useState<string[]>([]);
+  const [location, setLocation] = useState<string[]>(() => (locationParam ? [locationParam] : []));
   const [type, setType] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -57,7 +66,8 @@ export default function StockMovements() {
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState<CreateStockMovementInput>(emptyForm(""));
+  const [editingMovement, setEditingMovement] = useState<StockMovement | null>(null);
+  const [form, setForm] = useState<CreateStockMovementInput>(emptyForm("", "ambattur"));
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -112,8 +122,28 @@ export default function StockMovements() {
   }
 
   function openForm() {
-    setForm(emptyForm(itemFilter || items[0]?.id || ""));
+    setEditingMovement(null);
+    setForm(emptyForm(itemFilter || items[0]?.id || "", (locationParam as StockLocation) || "ambattur"));
     setFormOpen(true);
+  }
+
+  function openEdit(m: StockMovement) {
+    setEditingMovement(m);
+    setForm({
+      stockItemId: m.stockItemId,
+      location: m.location,
+      type: m.type,
+      quantity: m.quantity,
+      movementDate: m.movementDate.slice(0, 10),
+      reason: m.reason ?? "",
+      notes: m.notes ?? "",
+    });
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    setEditingMovement(null);
   }
 
   function clearItemFilter() {
@@ -124,40 +154,57 @@ export default function StockMovements() {
     });
   }
 
+  function reloadAfterSave() {
+    setPage(1);
+    // Re-fetch items too -- their per-location quantities just changed.
+    api.stock.items().then(setItems).catch(() => {});
+    api.stock
+      .movements({ stockItemId: itemFilter || undefined, location: location.length ? (location as StockLocation[]) : undefined, type: type.length ? (type as StockMovementType[]) : undefined, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, page: 1, pageSize: PAGE_SIZE })
+      .then((res) => {
+        setMovements(res.items);
+        setTotal(res.total);
+      })
+      .catch(() => {});
+  }
+
   async function handleSave() {
-    if (!form.stockItemId) {
-      toast.show("Pick a stock item first.", "error");
-      return;
-    }
     if (!form.quantity || form.quantity < 1) {
       toast.show("Quantity must be at least 1.", "error");
       return;
     }
+
     setSaving(true);
     try {
-      await api.stock.createMovement({
-        stockItemId: form.stockItemId,
-        location: form.location,
-        type: form.type,
-        quantity: form.quantity,
-        movementDate: form.movementDate,
-        reason: form.reason?.trim() || undefined,
-        notes: form.notes?.trim() || undefined,
-      });
-      toast.show(form.type === "in" ? "Stock added." : "Stock removed.", "success");
-      setFormOpen(false);
-      setPage(1);
-      // Re-fetch items too -- their per-location quantities just changed.
-      api.stock.items().then(setItems).catch(() => {});
-      api.stock
-        .movements({ stockItemId: itemFilter || undefined, location: location.length ? (location as StockLocation[]) : undefined, type: type.length ? (type as StockMovementType[]) : undefined, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, page: 1, pageSize: PAGE_SIZE })
-        .then((res) => {
-          setMovements(res.items);
-          setTotal(res.total);
-        })
-        .catch(() => {});
+      if (editingMovement) {
+        const dto: UpdateStockMovementInput = {
+          quantity: form.quantity,
+          movementDate: form.movementDate,
+          reason: form.reason?.trim() || undefined,
+          notes: form.notes?.trim() || undefined,
+        };
+        await api.stock.updateMovement(editingMovement.id, dto);
+        toast.show("Movement updated.", "success");
+      } else {
+        if (!form.stockItemId) {
+          toast.show("Pick a stock item first.", "error");
+          setSaving(false);
+          return;
+        }
+        await api.stock.createMovement({
+          stockItemId: form.stockItemId,
+          location: form.location,
+          type: form.type,
+          quantity: form.quantity,
+          movementDate: form.movementDate,
+          reason: form.reason?.trim() || undefined,
+          notes: form.notes?.trim() || undefined,
+        });
+        toast.show(form.type === "in" ? "Stock added." : "Stock removed.", "success");
+      }
+      closeForm();
+      reloadAfterSave();
     } catch (err) {
-      toast.show(err instanceof ApiError ? err.message : "Failed to record movement", "error");
+      toast.show(err instanceof ApiError ? err.message : "Failed to save movement", "error");
     } finally {
       setSaving(false);
     }
@@ -210,8 +257,8 @@ export default function StockMovements() {
       {formOpen && (
         <div className="fade-in-up" style={{ ...cardStyle, marginBottom: 18, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>Log a stock movement</div>
-            <button onClick={() => setFormOpen(false)} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{editingMovement ? "Edit movement" : "Log a stock movement"}</div>
+            <button onClick={closeForm} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
               <X size={15} />
             </button>
           </div>
@@ -219,7 +266,12 @@ export default function StockMovements() {
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
             <label style={fieldLabelStyle}>
               Item
-              <select style={inputStyle} value={form.stockItemId} onChange={(e) => setForm((f) => ({ ...f, stockItemId: e.target.value }))}>
+              <select
+                style={inputStyle}
+                value={form.stockItemId}
+                disabled={Boolean(editingMovement)}
+                onChange={(e) => setForm((f) => ({ ...f, stockItemId: e.target.value }))}
+              >
                 <option value="">Select an item</option>
                 {items.map((i) => (
                   <option key={i.id} value={i.id}>{i.name}</option>
@@ -228,7 +280,15 @@ export default function StockMovements() {
             </label>
             <label style={fieldLabelStyle}>
               Location
-              <select style={inputStyle} value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value as StockLocation }))}>
+              <select
+                style={inputStyle}
+                value={form.location}
+                disabled={Boolean(editingMovement)}
+                onChange={(e) => {
+                  const nextLocation = e.target.value as StockLocation;
+                  setForm((f) => ({ ...f, location: nextLocation, type: nextLocation === "warehouse" ? "out" : f.type }));
+                }}
+              >
                 {LOCATION_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -241,13 +301,15 @@ export default function StockMovements() {
           </div>
 
           <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
-            {TYPE_OPTIONS.map((o) => {
+            {TYPE_OPTIONS.filter((o) => form.location !== "warehouse" || o.value === "out").map((o) => {
               const active = form.type === o.value;
               const Icon = o.value === "in" ? ArrowDownToLine : ArrowUpFromLine;
+              const disabled = Boolean(editingMovement);
               return (
                 <button
                   key={o.value}
                   type="button"
+                  disabled={disabled}
                   onClick={() => setForm((f) => ({ ...f, type: o.value }))}
                   style={{
                     display: "flex",
@@ -260,6 +322,7 @@ export default function StockMovements() {
                     color: active ? "var(--brand-strong)" : "var(--text-soft)",
                     fontSize: 13,
                     fontWeight: active ? 700 : 600,
+                    opacity: disabled && !active ? 0.5 : 1,
                   }}
                 >
                   <Icon size={14} /> {o.label}
@@ -267,6 +330,11 @@ export default function StockMovements() {
               );
             })}
           </div>
+          {form.location === "warehouse" && !editingMovement && (
+            <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: -6, marginBottom: 12 }}>
+              Warehouse only tracks stock going out here -- add warehouse stock from the Stock Items screen.
+            </p>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "0.6fr 1.4fr", gap: 12, marginBottom: 12 }}>
             <label style={fieldLabelStyle}>
@@ -297,9 +365,9 @@ export default function StockMovements() {
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleSave} disabled={saving} style={primaryButtonStyle}>
-              {saving ? "Saving…" : "Log movement"}
+              {saving ? "Saving…" : editingMovement ? "Save changes" : "Log movement"}
             </button>
-            <button onClick={() => setFormOpen(false)} style={secondaryButtonStyle}>
+            <button onClick={closeForm} style={secondaryButtonStyle}>
               Cancel
             </button>
           </div>
@@ -332,7 +400,7 @@ export default function StockMovements() {
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: 840 }}>
+          <div style={{ minWidth: 870 }}>
             <div className="mono" style={theadStyle}>
               <span>Date</span>
               <span>Item</span>
@@ -375,7 +443,15 @@ export default function StockMovements() {
                       <span className="mono" style={{ fontWeight: 700 }}>{m.quantity}</span>
                       <span style={{ color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.reason ?? "—"}</span>
                       <span style={{ color: "var(--text-faint)", fontSize: 12.5 }}>{m.enteredBy?.name ?? "—"}</span>
-                      <span>
+                      <span style={{ display: "flex", gap: 4 }}>
+                        <button
+                          onClick={() => openEdit(m)}
+                          aria-label="Edit movement"
+                          title="Edit"
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, background: "none", border: "none", borderRadius: 6, color: "var(--text-soft)" }}
+                        >
+                          <Pencil size={14} />
+                        </button>
                         <button
                           onClick={() => handleDelete(m)}
                           disabled={deletingId === m.id}
@@ -415,7 +491,7 @@ const cardStyle: CSSProperties = {
   boxShadow: "var(--shadow-card)",
 };
 
-const gridColumns = "100px 1.4fr 1.1fr 90px 60px 1.3fr 1fr 70px";
+const gridColumns = "100px 1.4fr 1.1fr 90px 60px 1.2fr 1fr 96px";
 
 const theadStyle: CSSProperties = {
   display: "grid",
