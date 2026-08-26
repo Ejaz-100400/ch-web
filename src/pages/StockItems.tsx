@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Plus, X, Pencil, Trash2, ArrowLeftRight, ShieldAlert } from "lucide-react";
+import { Package, Plus, X, Pencil, Trash2, ArrowLeftRight, ShieldAlert, MapPin, Boxes, AlertTriangle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge } from "../components/ui/StatusBadge";
@@ -66,6 +66,7 @@ export default function StockItems() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<StockItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [activeLocation, setActiveLocation] = useState<StockLocation>("ambattur");
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StockItem | null>(null);
@@ -99,6 +100,23 @@ export default function StockItems() {
     () => products.filter((p) => p.active && p.category === form.category && !p.name.toLowerCase().includes("doom")),
     [products, form.category],
   );
+
+  // Per-location snapshot for the box row -- total units on hand there, and
+  // how many items are flagged low, computed straight from what's already
+  // loaded rather than a separate request per location.
+  const locationStats = useMemo(() => {
+    const stats = new Map<StockLocation, { totalQty: number; lowCount: number }>();
+    for (const loc of ALL_LOCATIONS) stats.set(loc, { totalQty: 0, lowCount: 0 });
+    for (const item of items) {
+      for (const q of item.quantities) {
+        const s = stats.get(q.location);
+        if (!s) continue;
+        s.totalQty += q.quantity;
+        if (q.lowStock) s.lowCount += 1;
+      }
+    }
+    return stats;
+  }, [items]);
 
   if (appUser && !canManage(appUser.role)) {
     return (
@@ -340,6 +358,62 @@ export default function StockItems() {
         </div>
       )}
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+        {ALL_LOCATIONS.map((loc) => {
+          const active = activeLocation === loc;
+          const stat = locationStats.get(loc);
+          const Icon = loc === "warehouse" ? Boxes : MapPin;
+          return (
+            <button
+              key={loc}
+              onClick={() => setActiveLocation(loc)}
+              aria-pressed={active}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                padding: "16px 16px 14px",
+                background: active ? "var(--brand-soft)" : "var(--paper-raised)",
+                border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-card)",
+                textAlign: "left",
+                cursor: "pointer",
+                transition: "background 120ms ease, border-color 120ms ease",
+              }}
+            >
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: active ? "var(--brand)" : "var(--border-soft)",
+                  color: active ? "var(--on-brand)" : "var(--text-soft)",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon size={15} />
+              </span>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: active ? "var(--brand-strong)" : "var(--text-soft)" }}>{LOCATION_LABELS[loc]}</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
+                  <span className="mono" style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}>{stat?.totalQty ?? 0}</span>
+                  <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>on hand</span>
+                </div>
+                {Boolean(stat?.lowCount) && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 11, fontWeight: 700, color: "var(--coral)" }}>
+                    <AlertTriangle size={11} /> {stat!.lowCount} low
+                  </div>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Search by name" />
         <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
@@ -347,18 +421,16 @@ export default function StockItems() {
       </FilterBar>
 
       <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? <LoadingText /> : `${items.length} item${items.length === 1 ? "" : "s"}`}
+        {loading ? <LoadingText /> : `${items.length} item${items.length === 1 ? "" : "s"} · showing ${LOCATION_LABELS[activeLocation]}`}
       </div>
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: 1040 }}>
+          <div style={{ minWidth: 640 }}>
             <div className="mono" style={theadStyle}>
               <span>Name</span>
               <span>Category</span>
-              {ALL_LOCATIONS.map((l) => (
-                <span key={l}>{LOCATION_LABELS[l]}</span>
-              ))}
+              <span>On hand</span>
               <span>Reorder at</span>
               <span>Actions</span>
             </div>
@@ -368,21 +440,18 @@ export default function StockItems() {
             {!loading && (
               <motion.div variants={listContainerVariants} initial="hidden" animate="visible">
                 <AnimatePresence initial={false}>
-                  {items.map((item) => (
+                  {items.map((item) => {
+                    const q = item.quantities.find((x) => x.location === activeLocation);
+                    return (
                     <motion.div key={item.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle}>
                       <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.active ? 1 : 0.5 }}>
                         {item.name}
                         {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
                       </span>
                       <span><CategoryBadge category={item.category} /></span>
-                      {ALL_LOCATIONS.map((l) => {
-                        const q = item.quantities.find((x) => x.location === l);
-                        return (
-                          <span key={l} className="mono" style={{ fontWeight: q?.lowStock ? 700 : 400, color: q?.lowStock ? "var(--coral)" : "var(--text)" }}>
-                            {q?.quantity ?? 0} {item.unit}
-                          </span>
-                        );
-                      })}
+                      <span className="mono" style={{ fontWeight: q?.lowStock ? 700 : 400, color: q?.lowStock ? "var(--coral)" : "var(--text)" }}>
+                        {q?.quantity ?? 0} {item.unit}
+                      </span>
                       <span className="mono" style={{ color: "var(--text-faint)" }}>{item.reorderThreshold}</span>
                       <span style={{ display: "flex", gap: 4 }}>
                         <Link to={`/stock/movements?item=${item.id}`} aria-label={`Log movement for ${item.name}`} title="Log movement" style={iconButtonStyle}>
@@ -404,7 +473,8 @@ export default function StockItems() {
                         )}
                       </span>
                     </motion.div>
-                  ))}
+                    );
+                  })}
                 </AnimatePresence>
               </motion.div>
             )}
@@ -430,7 +500,7 @@ const cardStyle: CSSProperties = {
   boxShadow: "var(--shadow-card)",
 };
 
-const gridColumns = "1.5fr 1fr repeat(5, 0.85fr) 0.75fr 104px";
+const gridColumns = "1.8fr 1.2fr 1fr 0.9fr 104px";
 
 const theadStyle: CSSProperties = {
   display: "grid",
