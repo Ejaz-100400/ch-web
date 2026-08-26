@@ -15,6 +15,7 @@ import {
   CalendarClock,
   MapPin,
   AlertTriangle,
+  Bookmark,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
@@ -71,6 +72,7 @@ export default function CallDetails() {
   const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [actionPending, setActionPending] = useState<"reprocess" | "summary" | "delete" | null>(null);
+  const [bookmarking, setBookmarking] = useState(false);
   const [customerCalls, setCustomerCalls] = useState<Call[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -240,6 +242,21 @@ export default function CallDetails() {
     }
   }
 
+  async function handleToggleBookmark() {
+    if (!call?.customer) return;
+    const next = !call.customer.bookmarked;
+    setBookmarking(true);
+    try {
+      const updatedCustomer = await api.customers.toggleBookmark(call.customer.id, next);
+      setCall((prev) => (prev ? { ...prev, customer: updatedCustomer } : prev));
+      toast.show(next ? "Bookmarked." : "Bookmark removed.", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to update bookmark", "error");
+    } finally {
+      setBookmarking(false);
+    }
+  }
+
   async function handleDelete() {
     if (!id) return;
     if (!window.confirm("Delete this call permanently? This cannot be undone.")) return;
@@ -309,6 +326,20 @@ export default function CallDetails() {
               <CallTrackingTimeline calls={customerCalls} activeCallId={call.id} loading={customerCallsLoading} />
             )}
             <div style={{ display: "flex", gap: 8 }}>
+              {call.customer && (
+                <button
+                  onClick={handleToggleBookmark}
+                  disabled={bookmarking}
+                  style={{
+                    ...secondaryButtonStyle,
+                    color: call.customer.bookmarked ? "var(--amber)" : secondaryButtonStyle.color,
+                    borderColor: call.customer.bookmarked ? "var(--amber)" : secondaryButtonStyle.borderColor,
+                  }}
+                >
+                  <Bookmark size={14} fill={call.customer.bookmarked ? "var(--amber)" : "none"} />
+                  {call.customer.bookmarked ? "Bookmarked" : "Bookmark"}
+                </button>
+              )}
               {canEdit && (
                 <button onClick={handleReprocess} disabled={actionPending !== null} style={secondaryButtonStyle}>
                   {actionPending === "reprocess" ? <Spinner size={14} /> : <RefreshCw size={14} />} Reprocess
@@ -339,7 +370,14 @@ export default function CallDetails() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                   <Avatar name={call.customer.name ?? call.customer.phoneNumber} />
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{call.customer.name ?? "Unnamed caller"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{call.customer.name ?? "Unnamed caller"}</span>
+                      {call.customer.bookmarked && (
+                        <span title="Bookmarked" style={{ display: "flex" }}>
+                          <Bookmark size={13} fill="var(--amber)" color="var(--amber)" />
+                        </span>
+                      )}
+                    </div>
                     <div className="mono" style={{ fontSize: 12.5, color: "var(--text-soft)" }}>{call.customer.phoneNumber}</div>
                   </div>
                 </div>

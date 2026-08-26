@@ -137,6 +137,7 @@ export interface CustomersQuery {
   category?: string[];
   status?: string[];
   productId?: string[];
+  bookmarked?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -460,6 +461,8 @@ export const api = {
     calls: (id: string) => request<Call[]>(`/customers/${id}/calls`),
     update: (id: string, dto: { name?: string; notes?: string }) =>
       request<Customer>(`/customers/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    toggleBookmark: (id: string, bookmarked: boolean) =>
+      request<Customer>(`/customers/${id}/bookmark`, { method: "PATCH", body: JSON.stringify({ bookmarked }) }),
     duplicates: () =>
       request<
         {

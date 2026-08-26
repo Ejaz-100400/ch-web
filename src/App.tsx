@@ -6,6 +6,7 @@ import { ToastProvider } from "./components/ui/Toast";
 import Login from "./pages/Login";
 import CustomerList from "./pages/CustomerList";
 import CustomerDetails from "./pages/CustomerDetails";
+import Bookmarks from "./pages/Bookmarks";
 import CallList from "./pages/CallList";
 import CallDetails from "./pages/CallDetails";
 import MissedCalls from "./pages/MissedCalls";
@@ -37,6 +38,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/customers/:id" element={<CustomerDetails />} />
+                <Route path="/bookmarks" element={<Bookmarks />} />
                 <Route path="/calls" element={<CallList />} />
                 <Route path="/calls/:id" element={<CallDetails />} />
                 <Route path="/missed-calls" element={<MissedCalls />} />

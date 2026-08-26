@@ -42,6 +42,8 @@ export interface Customer {
   name: string | null;
   phoneNumber: string;
   notes: string | null;
+  bookmarked: boolean;
+  bookmarkedAt: string | null;
   createdAt: string;
   updatedAt: string;
   // Only present on list responses -- the vehicle from this customer's most

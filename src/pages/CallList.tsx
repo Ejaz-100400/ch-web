@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy, MessageCircle } from "lucide-react";
+import { PhoneCall, PhoneOutgoing, Pencil, Save, X, Trash2, Copy, MessageCircle, Bookmark } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, FilterSelect, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge, CallStatusBadge, SentimentBadge, ImportedBadge, BranchBadge } from "../components/ui/StatusBadge";
@@ -112,6 +112,7 @@ export default function CallList() {
   const [deleting, setDeleting] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [bookmarkingId, setBookmarkingId] = useState<string | null>(null);
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
@@ -231,11 +232,32 @@ export default function CallList() {
   // them enough fixed width for their longest label ("Car Modifications",
   // "Processing") so the badge never bleeds into the next column.
   const gridCols = isAdmin
-    ? "24px 120px 138px 1fr 1.2fr 1fr 130px 76px 104px 1fr 36px"
-    : "120px 138px 1fr 1.2fr 1fr 130px 76px 104px 1fr";
+    ? "24px 28px 120px 138px 1fr 1.2fr 1fr 130px 76px 104px 1fr 36px"
+    : "28px 120px 138px 1fr 1.2fr 1fr 130px 76px 104px 1fr";
 
   function refreshCall(updated: Call) {
     setCalls((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+  }
+
+  // A customer can show up on several call rows -- bookmarking from any one
+  // of them should flip the icon everywhere that customer appears on the
+  // current page, not just the row that was clicked.
+  async function handleToggleBookmark(call: Call) {
+    if (!call.customer) return;
+    const customerId = call.customer.id;
+    const next = !call.customer.bookmarked;
+    setBookmarkingId(customerId);
+    try {
+      await api.customers.toggleBookmark(customerId, next);
+      setCalls((prev) =>
+        prev.map((c) => (c.customer?.id === customerId ? { ...c, customer: { ...c.customer, bookmarked: next } } : c)),
+      );
+      toast.show(next ? "Bookmarked." : "Bookmark removed.", "success");
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to update bookmark", "error");
+    } finally {
+      setBookmarkingId(null);
+    }
   }
 
   function toggleSelect(id: string) {
@@ -441,6 +463,7 @@ export default function CallList() {
               style={{ accentColor: "var(--brand)" }}
             />
           )}
+          <span />
           <span>Date</span>
           <span>Category</span>
           <span>Vehicle</span>
@@ -506,6 +529,23 @@ export default function CallList() {
                   style={{ accentColor: "var(--brand)" }}
                 />
               )}
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleBookmark(call); }}
+                disabled={!call.customer || bookmarkingId === call.customer.id}
+                aria-label={call.customer?.bookmarked ? "Remove bookmark" : "Bookmark this customer"}
+                title={!call.customer ? "No customer record to bookmark" : call.customer.bookmarked ? "Remove bookmark" : "Bookmark this customer"}
+                style={{
+                  background: "none",
+                  border: "none",
+                  display: "flex",
+                  padding: 4,
+                  color: call.customer?.bookmarked ? "var(--amber)" : "var(--text-faint)",
+                  opacity: call.customer ? 1 : 0.35,
+                  cursor: call.customer ? "pointer" : "default",
+                }}
+              >
+                <Bookmark size={15} fill={call.customer?.bookmarked ? "var(--amber)" : "none"} />
+              </button>
               <span className="mono" style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--text-soft)", fontSize: 12 }}>
                 {call.channel === "whatsapp" && (
                   <span title="WhatsApp call" style={{ display: "flex", flexShrink: 0 }}>

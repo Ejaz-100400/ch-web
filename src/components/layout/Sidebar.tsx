@@ -19,6 +19,7 @@ import {
   Boxes,
   LayoutDashboard,
   ArrowLeftRight,
+  Bookmark,
 } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { to: "/calls", label: "Calls", icon: PhoneIncoming },
   { to: "/missed-calls", label: "Missed Calls", icon: PhoneMissed },
   { to: "/follow-ups", label: "Follow-ups", icon: ClipboardList },
+  { to: "/bookmarks", label: "Bookmarks", icon: Bookmark },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/export", label: "Export", icon: Download },
   { to: "/import", label: "Import", icon: Upload },
