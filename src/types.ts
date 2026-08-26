@@ -275,43 +275,6 @@ export interface BusinessNumber {
   label: string;
 }
 
-export interface EmployeePerformanceCoverage {
-  type: "backup" | "scheduled";
-  label?: string;
-  lines?: { phoneNumber: string; window: { startHour: number; endHour: number } | null }[];
-}
-
-export interface EmployeePerformanceMetrics {
-  totalCalls: number;
-  completedCalls: number;
-  failedCalls: number;
-  completionRate: number | null;
-  avgDurationSeconds: number | null;
-  interestedRate: number | null;
-  notInterestedRate: number | null;
-  needsFollowUpCount: number;
-  sentimentSampleSize: number;
-  dataCaptureRate: number | null;
-  followUpTotal: number;
-  followUpCompleted: number;
-  followUpRate: number | null;
-  followUpOverdue: number;
-}
-
-export interface EmployeePerformanceRow {
-  employee: { id: string; name: string; role: string | null };
-  coverage: EmployeePerformanceCoverage;
-  score: number | null;
-  metrics: EmployeePerformanceMetrics;
-  pros: string[];
-  cons: string[];
-}
-
-export interface EmployeePerformanceReport {
-  month: string;
-  employees: EmployeePerformanceRow[];
-}
-
 export interface NumberCoverage {
   id: string;
   phoneNumber: string;
@@ -321,4 +284,80 @@ export interface NumberCoverage {
   isBackup: boolean;
   createdAt: string;
   employee: Employee;
+}
+
+export type SaleSource = "call" | "whatsapp" | "walk_in" | "unknown";
+
+export type EnquiryOutcome = "purchased" | "not_purchased" | "undecided";
+
+export interface Sale {
+  id: string;
+  customerPhone: string;
+  customerId: string | null;
+  carMake: string | null;
+  carModel: string | null;
+  branch: Branch;
+  saleDate: string;
+  source: SaleSource;
+  matchedCallId: string | null;
+  notes: string | null;
+  enteredByUserId: string;
+  createdAt: string;
+  customer?: { id: string; name: string | null; phoneNumber: string } | Customer | null;
+  matchedCall?: { id: string; callDate: string; businessCategory: BusinessCategory } | null;
+  enteredBy?: { name: string } | null;
+}
+
+export interface InPersonEnquiry {
+  id: string;
+  customerPhone: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  carMake: string | null;
+  carModel: string | null;
+  branch: Branch;
+  enquiryDate: string;
+  outcome: EnquiryOutcome;
+  notes: string | null;
+  employeeId: string | null;
+  enteredByUserId: string;
+  createdAt: string;
+  customer?: { id: string; name: string | null; phoneNumber: string } | Customer | null;
+  employee?: Employee | null;
+  enteredBy?: { name: string } | null;
+}
+
+export interface SaleMatchCall {
+  id: string;
+  callDate: string;
+  businessCategory: BusinessCategory;
+  employee: { name: string } | null;
+  extraction: { sentiment: SentimentType | null; summary: string | null } | null;
+}
+
+export type SaleMatchResult =
+  | { matched: false }
+  | {
+      matched: true;
+      customer: {
+        id: string;
+        name: string | null;
+        carMake: string | null;
+        carModel: string | null;
+        calls: SaleMatchCall[];
+      };
+    };
+
+export interface SalesReminderStatus {
+  afterCutoff: boolean;
+  missingBranches: Branch[];
+}
+
+export interface ConversionSummary {
+  totalSales: number;
+  salesBySource: { source: SaleSource; count: number }[];
+  totalEnquiries: number;
+  purchasedEnquiries: number;
+  callToSaleRate: number | null;
+  walkInToSaleRate: number | null;
 }

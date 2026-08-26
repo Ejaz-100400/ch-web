@@ -10,19 +10,25 @@ import type {
   CallDuplicateGroup,
   CallExtraction,
   CallsByPeriodPoint,
+  ConversionSummary,
   Customer,
   CustomerCallHistoryRow,
   CustomersByPeriodPoint,
   Employee,
-  EmployeePerformanceReport,
+  EnquiryOutcome,
   FollowUp,
   FollowUpBreakdownPoint,
   FollowUpStatus,
+  InPersonEnquiry,
   NumberCoverage,
   Paginated,
   PhotoExtractResult,
   Product,
   ReportsSummary,
+  Sale,
+  SaleMatchResult,
+  SalesReminderStatus,
+  SaleSource,
   SentimentBreakdownPoint,
   SentimentType,
   TopCarMakePoint,
@@ -291,6 +297,55 @@ export interface UpdateCallInput {
   branch?: Branch | "";
 }
 
+export interface SalesQuery {
+  branch?: Branch[];
+  source?: SaleSource[];
+  phone?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface EnquiriesQuery {
+  branch?: Branch[];
+  outcome?: EnquiryOutcome[];
+  phone?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ConversionSummaryQuery {
+  branch?: Branch[];
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface CreateSaleInput {
+  customerPhone: string;
+  carMake?: string;
+  carModel?: string;
+  branch: Branch;
+  saleDate: string;
+  source?: SaleSource;
+  matchedCallId?: string;
+  notes?: string;
+}
+
+export interface CreateEnquiryInput {
+  customerPhone?: string;
+  customerName?: string;
+  carMake?: string;
+  carModel?: string;
+  branch: Branch;
+  enquiryDate: string;
+  outcome?: EnquiryOutcome;
+  notes?: string;
+  employeeId?: string;
+}
+
 export interface UpdateExtractionInput {
   customerName?: string;
   carMake?: string;
@@ -430,10 +485,6 @@ export const api = {
     remove: (id: string) => request<{ deleted: true }>(`/coverage/${id}`, { method: "DELETE" }),
   },
 
-  performance: {
-    employees: (month?: string) => request<EmployeePerformanceReport>(`/performance/employees${query({ month })}`),
-  },
-
   export: {
     calls: (format: "xlsx" | "pdf", q: CallsQuery = {}) => requestBlob(`/export/calls.${format}${query(q)}`),
     history: () => request<AuditLogEntry[]>("/export/history"),
@@ -465,6 +516,19 @@ export const api = {
     invite: (dto: InviteTeamMemberInput) => request<AppUser>("/team/invite", { method: "POST", body: JSON.stringify(dto) }),
     update: (id: string, dto: { name?: string; role?: UserRole; active?: boolean }) =>
       request<AppUser>(`/team/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+  },
+
+  sales: {
+    list: (q: SalesQuery = {}) => request<Paginated<Sale>>(`/sales${query(q)}`),
+    match: (phone: string) => request<SaleMatchResult>(`/sales/match${query({ phone })}`),
+    reminderStatus: () => request<SalesReminderStatus>("/sales/reminder-status"),
+    conversionSummary: (q: ConversionSummaryQuery = {}) => request<ConversionSummary>(`/sales/conversion-summary${query(q)}`),
+    create: (dto: CreateSaleInput) => request<Sale>("/sales", { method: "POST", body: JSON.stringify(dto) }),
+  },
+
+  enquiries: {
+    list: (q: EnquiriesQuery = {}) => request<Paginated<InPersonEnquiry>>(`/enquiries${query(q)}`),
+    create: (dto: CreateEnquiryInput) => request<InPersonEnquiry>("/enquiries", { method: "POST", body: JSON.stringify(dto) }),
   },
 };
 
