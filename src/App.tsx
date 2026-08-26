@@ -17,6 +17,9 @@ import Employees from "./pages/Employees";
 import Products from "./pages/Products";
 import BusinessNumbers from "./pages/BusinessNumbers";
 import CustomerTracker from "./pages/CustomerTracker";
+import StockOverview from "./pages/StockOverview";
+import StockItems from "./pages/StockItems";
+import StockMovements from "./pages/StockMovements";
 import TeamCoverage from "./pages/TeamCoverage";
 import Team from "./pages/Team";
 import SetPassword from "./pages/SetPassword";
@@ -46,6 +49,9 @@ export default function App() {
                 <Route path="/business-numbers" element={<BusinessNumbers />} />
                 <Route path="/team-coverage" element={<TeamCoverage />} />
                 <Route path="/customer-tracker" element={<CustomerTracker />} />
+                <Route path="/stock" element={<StockOverview />} />
+                <Route path="/stock/items" element={<StockItems />} />
+                <Route path="/stock/movements" element={<StockMovements />} />
               </Route>
               <Route path="/" element={<Navigate to="/customers" replace />} />
               <Route path="*" element={<Navigate to="/customers" replace />} />

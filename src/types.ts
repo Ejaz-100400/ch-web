@@ -353,6 +353,57 @@ export interface SalesReminderStatus {
   missingBranches: Branch[];
 }
 
+export type StockMovementType = "in" | "out";
+
+export interface StockItemQuantity {
+  branch: Branch;
+  quantity: number;
+  lowStock: boolean;
+}
+
+export interface StockItem {
+  id: string;
+  name: string;
+  category: "car_glasses" | "car_modifications";
+  unit: string;
+  reorderThreshold: number;
+  active: boolean;
+  createdAt: string;
+  quantities: StockItemQuantity[];
+}
+
+export interface StockMovement {
+  id: string;
+  stockItemId: string;
+  branch: Branch;
+  type: StockMovementType;
+  quantity: number;
+  reason: string | null;
+  movementDate: string;
+  notes: string | null;
+  enteredByUserId: string;
+  createdAt: string;
+  stockItem?: { id: string; name: string; category: BusinessCategory; unit: string } | null;
+  enteredBy?: { name: string } | null;
+}
+
+export interface StockLowStockEntry {
+  stockItemId: string;
+  name: string;
+  category: string;
+  unit: string;
+  branch: Branch;
+  quantity: number;
+  reorderThreshold: number;
+}
+
+export interface StockOverview {
+  totalItems: number;
+  lowStockCount: number;
+  lowStockEntries: StockLowStockEntry[];
+  totalsByCategory: { category: string; total: number }[];
+}
+
 export interface ConversionSummary {
   totalSales: number;
   salesBySource: { source: SaleSource; count: number }[];

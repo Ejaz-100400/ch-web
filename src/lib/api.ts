@@ -31,6 +31,10 @@ import type {
   SaleSource,
   SentimentBreakdownPoint,
   SentimentType,
+  StockItem,
+  StockMovement,
+  StockMovementType,
+  StockOverview,
   TopCarMakePoint,
   TopCarModelPoint,
   TopEmployeePoint,
@@ -346,6 +350,46 @@ export interface CreateEnquiryInput {
   employeeId?: string;
 }
 
+export interface StockItemsQuery {
+  category?: ("car_glasses" | "car_modifications")[];
+  search?: string;
+  active?: boolean;
+}
+
+export interface StockMovementsQuery {
+  stockItemId?: string;
+  branch?: Branch[];
+  type?: StockMovementType[];
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface StockOverviewQuery {
+  branch?: Branch[];
+  category?: ("car_glasses" | "car_modifications")[];
+}
+
+export interface CreateStockItemInput {
+  name: string;
+  category: "car_glasses" | "car_modifications";
+  unit?: string;
+  reorderThreshold?: number;
+  active?: boolean;
+}
+
+export interface CreateStockMovementInput {
+  stockItemId: string;
+  branch: Branch;
+  type: StockMovementType;
+  quantity: number;
+  movementDate: string;
+  reason?: string;
+  notes?: string;
+}
+
 export interface UpdateExtractionInput {
   customerName?: string;
   carMake?: string;
@@ -529,6 +573,16 @@ export const api = {
   enquiries: {
     list: (q: EnquiriesQuery = {}) => request<Paginated<InPersonEnquiry>>(`/enquiries${query(q)}`),
     create: (dto: CreateEnquiryInput) => request<InPersonEnquiry>("/enquiries", { method: "POST", body: JSON.stringify(dto) }),
+  },
+
+  stock: {
+    overview: (q: StockOverviewQuery = {}) => request<StockOverview>(`/stock/overview${query(q)}`),
+    items: (q: StockItemsQuery = {}) => request<StockItem[]>(`/stock/items${query(q)}`),
+    createItem: (dto: CreateStockItemInput) => request<StockItem>("/stock/items", { method: "POST", body: JSON.stringify(dto) }),
+    updateItem: (id: string, dto: Partial<CreateStockItemInput>) =>
+      request<StockItem>(`/stock/items/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    movements: (q: StockMovementsQuery = {}) => request<Paginated<StockMovement>>(`/stock/movements${query(q)}`),
+    createMovement: (dto: CreateStockMovementInput) => request<StockMovement>("/stock/movements", { method: "POST", body: JSON.stringify(dto) }),
   },
 };
 

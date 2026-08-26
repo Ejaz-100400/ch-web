@@ -1,6 +1,25 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
-import { Users, BarChart3, Download, Upload, LogOut, PhoneIncoming, PhoneMissed, ClipboardList, Phone, UserCog, Package, UsersRound, CalendarClock, TrendingUp, X } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import {
+  Users,
+  BarChart3,
+  Download,
+  Upload,
+  LogOut,
+  PhoneIncoming,
+  PhoneMissed,
+  ClipboardList,
+  Phone,
+  UserCog,
+  Package,
+  UsersRound,
+  CalendarClock,
+  TrendingUp,
+  X,
+  Boxes,
+  LayoutDashboard,
+  ArrowLeftRight,
+} from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
 import { Logo } from "../ui/Logo";
@@ -28,6 +47,12 @@ const ADMIN_NAV_ITEMS = [
   { to: "/team", label: "Team", icon: UsersRound },
 ];
 
+const STOCK_NAV_ITEMS = [
+  { to: "/stock", label: "Overview", icon: LayoutDashboard },
+  { to: "/stock/items", label: "Stock Items", icon: Package },
+  { to: "/stock/movements", label: "Movements", icon: ArrowLeftRight },
+];
+
 const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager", viewer: "Viewer" };
 
 export function Sidebar({
@@ -40,7 +65,11 @@ export function Sidebar({
   onCloseMobile?: () => void;
 }) {
   const { appUser } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [inFlight, setInFlight] = useState<number | null>(null);
+  const canSeeStock = canManage(appUser?.role);
+  const mode: "calls" | "stock" = canSeeStock && location.pathname.startsWith("/stock") ? "stock" : "calls";
 
   useEffect(() => {
     let active = true;
@@ -110,15 +139,68 @@ export function Sidebar({
         </button>
       </div>
 
+      {canSeeStock && (
+        <div style={{ display: "flex", gap: 3, padding: "0 2px 16px" }}>
+          <button
+            onClick={() => navigate("/customers")}
+            title="Call Tracking"
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 6px",
+              border: "none",
+              borderRadius: 7,
+              fontSize: 12,
+              fontWeight: 700,
+              background: mode === "calls" ? "var(--brand)" : "var(--surface-1)",
+              color: mode === "calls" ? "var(--on-brand)" : "var(--text-inverse-soft)",
+              transition: "background 120ms ease, color 120ms ease",
+            }}
+          >
+            <Phone size={13} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+            <span className="app-sidebar-label">Call Tracking</span>
+          </button>
+          <button
+            onClick={() => navigate("/stock")}
+            title="Stock Tracking"
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 6px",
+              border: "none",
+              borderRadius: 7,
+              fontSize: 12,
+              fontWeight: 700,
+              background: mode === "stock" ? "var(--brand)" : "var(--surface-1)",
+              color: mode === "stock" ? "var(--on-brand)" : "var(--text-inverse-soft)",
+              transition: "background 120ms ease, color 120ms ease",
+            }}
+          >
+            <Boxes size={13} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+            <span className="app-sidebar-label">Stock Tracking</span>
+          </button>
+        </div>
+      )}
+
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {[
-          ...NAV_ITEMS,
-          ...(canManage(appUser?.role) ? MANAGER_NAV_ITEMS : []),
-          ...(appUser?.role === "admin" ? ADMIN_NAV_ITEMS : []),
-        ].map(({ to, label, icon: Icon }) => (
+        {(mode === "stock"
+          ? STOCK_NAV_ITEMS
+          : [
+              ...NAV_ITEMS,
+              ...(canManage(appUser?.role) ? MANAGER_NAV_ITEMS : []),
+              ...(appUser?.role === "admin" ? ADMIN_NAV_ITEMS : []),
+            ]
+        ).map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
+            end={to === "/stock"}
             title={label}
             onClick={onCloseMobile}
             style={({ isActive }) => ({
