@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert } from "lucide-react";
+import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert, Trash2 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
@@ -58,6 +58,7 @@ export default function StockMovements() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<CreateStockMovementInput>(emptyForm(""));
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     api.stock.items().then(setItems).catch(() => setItems([]));
@@ -158,6 +159,22 @@ export default function StockMovements() {
       toast.show(err instanceof ApiError ? err.message : "Failed to record movement", "error");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(m: StockMovement) {
+    if (!window.confirm(`Delete this ${m.type === "in" ? "stock in" : "stock out"} entry for "${m.stockItem?.name ?? "this item"}"?`)) return;
+    setDeletingId(m.id);
+    try {
+      await api.stock.deleteMovement(m.id);
+      toast.show("Movement deleted.", "success");
+      setMovements((prev) => prev.filter((x) => x.id !== m.id));
+      setTotal((t) => t - 1);
+      api.stock.items().then(setItems).catch(() => {});
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to delete movement", "error");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -314,7 +331,7 @@ export default function StockMovements() {
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: 780 }}>
+          <div style={{ minWidth: 840 }}>
             <div className="mono" style={theadStyle}>
               <span>Date</span>
               <span>Item</span>
@@ -323,6 +340,7 @@ export default function StockMovements() {
               <span>Qty</span>
               <span>Reason</span>
               <span>Entered by</span>
+              <span>Actions</span>
             </div>
 
             {loading && <SkeletonRows rows={6} />}
@@ -356,6 +374,17 @@ export default function StockMovements() {
                       <span className="mono" style={{ fontWeight: 700 }}>{m.quantity}</span>
                       <span style={{ color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.reason ?? "—"}</span>
                       <span style={{ color: "var(--text-faint)", fontSize: 12.5 }}>{m.enteredBy?.name ?? "—"}</span>
+                      <span>
+                        <button
+                          onClick={() => handleDelete(m)}
+                          disabled={deletingId === m.id}
+                          aria-label="Delete movement"
+                          title="Delete"
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, background: "none", border: "none", borderRadius: 6, color: "var(--coral)" }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </span>
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -385,7 +414,7 @@ const cardStyle: CSSProperties = {
   boxShadow: "var(--shadow-card)",
 };
 
-const gridColumns = "100px 1.4fr 1.1fr 90px 60px 1.4fr 1fr";
+const gridColumns = "100px 1.4fr 1.1fr 90px 60px 1.3fr 1fr 70px";
 
 const theadStyle: CSSProperties = {
   display: "grid",

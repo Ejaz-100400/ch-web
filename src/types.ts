@@ -368,6 +368,7 @@ export interface StockItem {
   unit: string;
   reorderThreshold: number;
   active: boolean;
+  productId: string | null;
   createdAt: string;
   quantities: StockItemQuantity[];
 }

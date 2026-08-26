@@ -1,17 +1,17 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Plus, X, Pencil, ArrowLeftRight, ShieldAlert } from "lucide-react";
+import { Package, Plus, X, Pencil, Trash2, ArrowLeftRight, ShieldAlert } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
-import { api, ApiError, type CreateStockItemInput } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
-import type { Branch, StockItem } from "../types";
+import type { Branch, Product, StockItem } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
   ambattur: "Ambattur",
@@ -26,7 +26,29 @@ const CATEGORY_OPTIONS = [
   { value: "car_modifications", label: "Car Modifications" },
 ];
 
-const EMPTY_FORM: CreateStockItemInput = { name: "", category: "car_glasses", unit: "pcs", reorderThreshold: 0, active: true };
+const CUSTOM_ITEM = "__custom__";
+
+interface ItemForm {
+  productChoice: string; // a Product id, CUSTOM_ITEM, or "" (nothing picked yet)
+  customName: string;
+  customCategory: "car_glasses" | "car_modifications";
+  unit: string;
+  reorderThreshold: number;
+  active: boolean;
+  initialStock: Record<Branch, string>;
+}
+
+function emptyForm(): ItemForm {
+  return {
+    productChoice: "",
+    customName: "",
+    customCategory: "car_glasses",
+    unit: "pcs",
+    reorderThreshold: 0,
+    active: true,
+    initialStock: { ambattur: "", kattankulathur: "", sithalapakkam: "", pondicherry: "" },
+  };
+}
 
 export default function StockItems() {
   const { appUser } = useAuth();
@@ -36,11 +58,13 @@ export default function StockItems() {
   const [category, setCategory] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<StockItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StockItem | null>(null);
-  const [form, setForm] = useState<CreateStockItemInput>(EMPTY_FORM);
+  const [form, setForm] = useState<ItemForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -57,6 +81,18 @@ export default function StockItems() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, category]);
 
+  useEffect(() => {
+    api.products.list().then(setProducts).catch(() => setProducts([]));
+  }, []);
+
+  // What you're actually allowed to pick as a stock item's identity: real,
+  // active, sellable products -- not a leftover "unknown"-category row, and
+  // not a service like Doom cleaning, which has nothing to hold in stock.
+  const pickableProducts = useMemo(
+    () => products.filter((p) => p.active && !p.name.toLowerCase().includes("doom")),
+    [products],
+  );
+
   if (appUser && !canManage(appUser.role)) {
     return (
       <div>
@@ -72,29 +108,48 @@ export default function StockItems() {
 
   function openCreate() {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm(emptyForm());
     setFormOpen(true);
   }
 
   function openEdit(item: StockItem) {
     setEditing(item);
-    setForm({ name: item.name, category: item.category, unit: item.unit, reorderThreshold: item.reorderThreshold, active: item.active });
+    setForm({
+      productChoice: item.productId ?? CUSTOM_ITEM,
+      customName: item.productId ? "" : item.name,
+      customCategory: item.category,
+      unit: item.unit,
+      reorderThreshold: item.reorderThreshold,
+      active: item.active,
+      initialStock: { ambattur: "", kattankulathur: "", sithalapakkam: "", pondicherry: "" },
+    });
     setFormOpen(true);
   }
 
   async function handleSave() {
-    if (!form.name.trim()) {
-      toast.show("Item name is required.", "error");
+    if (!form.productChoice) {
+      toast.show("Pick a product, or choose “Custom item”.", "error");
       return;
     }
-    setSaving(true);
-    const dto: CreateStockItemInput = {
-      name: form.name.trim(),
-      category: form.category,
+    if (form.productChoice === CUSTOM_ITEM && !form.customName.trim()) {
+      toast.show("Item name is required for a custom item.", "error");
+      return;
+    }
+
+    const isCustom = form.productChoice === CUSTOM_ITEM;
+    const dto = {
+      productId: isCustom ? undefined : form.productChoice,
+      name: isCustom ? form.customName.trim() : undefined,
+      category: isCustom ? form.customCategory : undefined,
       unit: form.unit?.trim() || "pcs",
       reorderThreshold: form.reorderThreshold ?? 0,
       active: form.active,
+      initialStock: editing
+        ? undefined
+        : ALL_BRANCHES.filter((b) => Number(form.initialStock[b]) > 0).map((b) => ({ branch: b, quantity: Number(form.initialStock[b]) })),
     };
+
+    setSaving(true);
     try {
       if (editing) {
         await api.stock.updateItem(editing.id, dto);
@@ -112,7 +167,22 @@ export default function StockItems() {
     }
   }
 
+  async function handleDelete(item: StockItem) {
+    if (!window.confirm(`Delete "${item.name}"? This can't be undone.`)) return;
+    setDeletingId(item.id);
+    try {
+      await api.stock.deleteItem(item.id);
+      toast.show("Stock item deleted.", "success");
+      load();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to delete stock item", "error");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const hasFilters = Boolean(search || category.length);
+  const isAdmin = appUser?.role === "admin";
 
   return (
     <div>
@@ -135,19 +205,40 @@ export default function StockItems() {
               <X size={15} />
             </button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 0.8fr 0.8fr", gap: 12, marginBottom: 16 }}>
-            <label style={fieldLabelStyle}>
-              Name
-              <input style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Swift LED headlight set" />
-            </label>
-            <label style={fieldLabelStyle}>
-              Category
-              <select style={inputStyle} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as CreateStockItemInput["category"] }))}>
-                {CATEGORY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+
+          <label style={{ ...fieldLabelStyle, marginBottom: 12 }}>
+            Product
+            <select style={inputStyle} value={form.productChoice} onChange={(e) => setForm((f) => ({ ...f, productChoice: e.target.value }))}>
+              <option value="" disabled>Choose from your Products catalog…</option>
+              {pickableProducts.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+              {/* Keep an item's already-linked product selectable even if it's since gone inactive or been excluded, so editing doesn't silently drop the link. */}
+              {editing?.productId && !pickableProducts.some((p) => p.id === editing.productId) && (
+                <option value={editing.productId}>{editing.name} (no longer in catalog list)</option>
+              )}
+              <option value={CUSTOM_ITEM}>Custom item (not in catalog)</option>
+            </select>
+          </label>
+
+          {form.productChoice === CUSTOM_ITEM && (
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12, marginBottom: 12 }}>
+              <label style={fieldLabelStyle}>
+                Name
+                <input style={inputStyle} value={form.customName} onChange={(e) => setForm((f) => ({ ...f, customName: e.target.value }))} placeholder="e.g. Custom mounting bracket" />
+              </label>
+              <label style={fieldLabelStyle}>
+                Category
+                <select style={inputStyle} value={form.customCategory} onChange={(e) => setForm((f) => ({ ...f, customCategory: e.target.value as ItemForm["customCategory"] }))}>
+                  {CATEGORY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             <label style={fieldLabelStyle}>
               Unit
               <input style={inputStyle} value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} placeholder="pcs" />
@@ -163,12 +254,37 @@ export default function StockItems() {
               />
             </label>
           </div>
+
+          {!editing && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-soft)", marginBottom: 8 }}>
+                Starting stock <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional -- leave blank for branches with none yet)</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                {ALL_BRANCHES.map((b) => (
+                  <label key={b} style={fieldLabelStyle}>
+                    {BRANCH_LABELS[b]}
+                    <input
+                      type="number"
+                      min={0}
+                      style={inputStyle}
+                      value={form.initialStock[b]}
+                      onChange={(e) => setForm((f) => ({ ...f, initialStock: { ...f.initialStock, [b]: e.target.value } }))}
+                      placeholder="0"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {editing && (
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-soft)", marginBottom: 16 }}>
-              <input type="checkbox" checked={form.active ?? true} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} style={{ accentColor: "var(--brand)" }} />
+              <input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} style={{ accentColor: "var(--brand)" }} />
               Active
             </label>
           )}
+
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleSave} disabled={saving} style={primaryButtonStyle}>
               {saving ? "Saving…" : editing ? "Save changes" : "Add item"}
@@ -192,7 +308,7 @@ export default function StockItems() {
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: 900 }}>
+          <div style={{ minWidth: 940 }}>
             <div className="mono" style={theadStyle}>
               <span>Name</span>
               <span>Category</span>
@@ -231,6 +347,17 @@ export default function StockItems() {
                         <button onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`} title="Edit" style={iconButtonStyle}>
                           <Pencil size={14} />
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(item)}
+                            disabled={deletingId === item.id}
+                            aria-label={`Delete ${item.name}`}
+                            title="Delete"
+                            style={{ ...iconButtonStyle, color: "var(--coral)" }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </span>
                     </motion.div>
                   ))}
@@ -259,7 +386,7 @@ const cardStyle: CSSProperties = {
   boxShadow: "var(--shadow-card)",
 };
 
-const gridColumns = "1.6fr 1fr repeat(4, 0.9fr) 0.8fr 80px";
+const gridColumns = "1.6fr 1fr repeat(4, 0.9fr) 0.8fr 104px";
 
 const theadStyle: CSSProperties = {
   display: "grid",

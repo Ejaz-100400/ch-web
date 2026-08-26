@@ -373,11 +373,13 @@ export interface StockOverviewQuery {
 }
 
 export interface CreateStockItemInput {
-  name: string;
-  category: "car_glasses" | "car_modifications";
+  productId?: string;
+  name?: string;
+  category?: "car_glasses" | "car_modifications";
   unit?: string;
   reorderThreshold?: number;
   active?: boolean;
+  initialStock?: { branch: Branch; quantity: number }[];
 }
 
 export interface CreateStockMovementInput {
@@ -581,8 +583,10 @@ export const api = {
     createItem: (dto: CreateStockItemInput) => request<StockItem>("/stock/items", { method: "POST", body: JSON.stringify(dto) }),
     updateItem: (id: string, dto: Partial<CreateStockItemInput>) =>
       request<StockItem>(`/stock/items/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    deleteItem: (id: string) => request<{ deleted: true }>(`/stock/items/${id}`, { method: "DELETE" }),
     movements: (q: StockMovementsQuery = {}) => request<Paginated<StockMovement>>(`/stock/movements${query(q)}`),
     createMovement: (dto: CreateStockMovementInput) => request<StockMovement>("/stock/movements", { method: "POST", body: JSON.stringify(dto) }),
+    deleteMovement: (id: string) => request<{ deleted: true }>(`/stock/movements/${id}`, { method: "DELETE" }),
   },
 };
 
