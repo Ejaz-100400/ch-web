@@ -15,6 +15,7 @@ import {
   MinusCircle,
   ClipboardList,
   Handshake,
+  UserCog,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -37,8 +38,8 @@ const BRANCH_LABELS: Record<Branch, string> = {
 };
 const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));
 
-const SOURCE_LABELS: Record<SaleSource, string> = { call: "Call", whatsapp: "WhatsApp", walk_in: "Walk-in", unknown: "Unknown" };
-const SOURCE_ICONS: Record<SaleSource, typeof Phone> = { call: Phone, whatsapp: MessageCircle, walk_in: Store, unknown: HelpCircle };
+const SOURCE_LABELS: Record<SaleSource, string> = { call: "Call", whatsapp: "WhatsApp", walk_in: "Walk-in", owner: "Owner", unknown: "Unknown" };
+const SOURCE_ICONS: Record<SaleSource, typeof Phone> = { call: Phone, whatsapp: MessageCircle, walk_in: Store, owner: UserCog, unknown: HelpCircle };
 const SOURCE_OPTIONS = (Object.keys(SOURCE_LABELS) as SaleSource[]).map((value) => ({ value, label: SOURCE_LABELS[value] }));
 
 const OUTCOME_LABELS: Record<EnquiryOutcome, string> = { purchased: "Purchased", not_purchased: "Not purchased", undecided: "Undecided" };

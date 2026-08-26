@@ -286,7 +286,7 @@ export interface NumberCoverage {
   employee: Employee;
 }
 
-export type SaleSource = "call" | "whatsapp" | "walk_in" | "unknown";
+export type SaleSource = "call" | "whatsapp" | "walk_in" | "owner" | "unknown";
 
 export type EnquiryOutcome = "purchased" | "not_purchased" | "undecided";
 
