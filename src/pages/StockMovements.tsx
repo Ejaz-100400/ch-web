@@ -13,7 +13,7 @@ import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { formatDate } from "../lib/format";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
-import type { Branch, StockItem, StockMovement, StockMovementType } from "../types";
+import type { Branch, StockItem, StockLocation, StockMovement, StockMovementType } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
   ambattur: "Ambattur (HQ)",
@@ -21,7 +21,8 @@ const BRANCH_LABELS: Record<Branch, string> = {
   sithalapakkam: "Sithalapakkam",
   pondicherry: "Pondicherry",
 };
-const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));
+const LOCATION_LABELS: Record<StockLocation, string> = { ...BRANCH_LABELS, warehouse: "Warehouse" };
+const LOCATION_OPTIONS = (Object.keys(LOCATION_LABELS) as StockLocation[]).map((value) => ({ value, label: LOCATION_LABELS[value] }));
 
 const TYPE_OPTIONS: { value: StockMovementType; label: string }[] = [
   { value: "in", label: "Stock in" },
@@ -35,7 +36,7 @@ function todayIso(): string {
 }
 
 function emptyForm(defaultItemId: string): CreateStockMovementInput {
-  return { stockItemId: defaultItemId, branch: "ambattur", type: "in", quantity: 1, movementDate: todayIso(), reason: "", notes: "" };
+  return { stockItemId: defaultItemId, location: "ambattur", type: "in", quantity: 1, movementDate: todayIso(), reason: "", notes: "" };
 }
 
 export default function StockMovements() {
@@ -45,7 +46,7 @@ export default function StockMovements() {
   const itemFilter = searchParams.get("item") ?? "";
 
   const [items, setItems] = useState<StockItem[]>([]);
-  const [branch, setBranch] = useState<string[]>([]);
+  const [location, setLocation] = useState<string[]>([]);
   const [type, setType] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -66,7 +67,7 @@ export default function StockMovements() {
 
   useEffect(() => {
     setPage(1);
-  }, [itemFilter, branch, type, search, dateFrom, dateTo]);
+  }, [itemFilter, location, type, search, dateFrom, dateTo]);
 
   useEffect(() => {
     let active = true;
@@ -74,7 +75,7 @@ export default function StockMovements() {
     api.stock
       .movements({
         stockItemId: itemFilter || undefined,
-        branch: branch.length ? (branch as Branch[]) : undefined,
+        location: location.length ? (location as StockLocation[]) : undefined,
         type: type.length ? (type as StockMovementType[]) : undefined,
         search: search || undefined,
         dateFrom: dateFrom || undefined,
@@ -95,7 +96,7 @@ export default function StockMovements() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemFilter, branch, type, search, dateFrom, dateTo, page]);
+  }, [itemFilter, location, type, search, dateFrom, dateTo, page]);
 
   if (appUser && !canManage(appUser.role)) {
     return (
@@ -136,7 +137,7 @@ export default function StockMovements() {
     try {
       await api.stock.createMovement({
         stockItemId: form.stockItemId,
-        branch: form.branch,
+        location: form.location,
         type: form.type,
         quantity: form.quantity,
         movementDate: form.movementDate,
@@ -146,10 +147,10 @@ export default function StockMovements() {
       toast.show(form.type === "in" ? "Stock added." : "Stock removed.", "success");
       setFormOpen(false);
       setPage(1);
-      // Re-fetch items too -- their per-branch quantities just changed.
+      // Re-fetch items too -- their per-location quantities just changed.
       api.stock.items().then(setItems).catch(() => {});
       api.stock
-        .movements({ stockItemId: itemFilter || undefined, branch: branch.length ? (branch as Branch[]) : undefined, type: type.length ? (type as StockMovementType[]) : undefined, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, page: 1, pageSize: PAGE_SIZE })
+        .movements({ stockItemId: itemFilter || undefined, location: location.length ? (location as StockLocation[]) : undefined, type: type.length ? (type as StockMovementType[]) : undefined, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, page: 1, pageSize: PAGE_SIZE })
         .then((res) => {
           setMovements(res.items);
           setTotal(res.total);
@@ -180,7 +181,7 @@ export default function StockMovements() {
 
   const filteredItemName = itemFilter ? items.find((i) => i.id === itemFilter)?.name : null;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const hasFilters = Boolean(branch.length || type.length || search || dateFrom || dateTo || itemFilter);
+  const hasFilters = Boolean(location.length || type.length || search || dateFrom || dateTo || itemFilter);
 
   return (
     <div>
@@ -226,9 +227,9 @@ export default function StockMovements() {
               </select>
             </label>
             <label style={fieldLabelStyle}>
-              Branch
-              <select style={inputStyle} value={form.branch} onChange={(e) => setForm((f) => ({ ...f, branch: e.target.value as Branch }))}>
-                {BRANCH_OPTIONS.map((o) => (
+              Location
+              <select style={inputStyle} value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value as StockLocation }))}>
+                {LOCATION_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
@@ -307,14 +308,14 @@ export default function StockMovements() {
 
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Search reason or item" />
-        <MultiSelectFilter label="Branch" values={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
+        <MultiSelectFilter label="Location" values={location} onChange={setLocation} options={LOCATION_OPTIONS} />
         <FilterSelect label="Type" value={type[0] ?? ""} onChange={(v) => setType(v ? [v] : [])} options={TYPE_OPTIONS} />
         <DateInput value={dateFrom} onChange={setDateFrom} aria-label="From date" style={filterDateStyle} />
         <DateInput value={dateTo} onChange={setDateTo} aria-label="To date" style={filterDateStyle} />
         {hasFilters && (
           <ClearFiltersButton
             onClick={() => {
-              setBranch([]);
+              setLocation([]);
               setType([]);
               setSearch("");
               setDateFrom("");
@@ -335,7 +336,7 @@ export default function StockMovements() {
             <div className="mono" style={theadStyle}>
               <span>Date</span>
               <span>Item</span>
-              <span>Branch</span>
+              <span>Location</span>
               <span>Type</span>
               <span>Qty</span>
               <span>Reason</span>
@@ -352,7 +353,7 @@ export default function StockMovements() {
                     <motion.div key={m.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle}>
                       <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>{formatDate(m.movementDate)}</span>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{m.stockItem?.name ?? "—"}</span>
-                      <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{BRANCH_LABELS[m.branch]}</span>
+                      <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{LOCATION_LABELS[m.location]}</span>
                       <span>
                         <span
                           style={{

@@ -7,7 +7,7 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
-import type { Branch, StockOverview as StockOverviewData } from "../types";
+import type { Branch, StockLocation, StockOverview as StockOverviewData } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
   ambattur: "Ambattur (HQ)",
@@ -15,7 +15,8 @@ const BRANCH_LABELS: Record<Branch, string> = {
   sithalapakkam: "Sithalapakkam",
   pondicherry: "Pondicherry",
 };
-const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));
+const LOCATION_LABELS: Record<StockLocation, string> = { ...BRANCH_LABELS, warehouse: "Warehouse" };
+const LOCATION_OPTIONS = (Object.keys(LOCATION_LABELS) as StockLocation[]).map((value) => ({ value, label: LOCATION_LABELS[value] }));
 
 const CATEGORY_LABELS: Record<string, string> = { car_glasses: "Car Glasses", car_modifications: "Car Modifications" };
 const CATEGORY_OPTIONS = [
@@ -26,7 +27,7 @@ const CATEGORY_OPTIONS = [
 export default function StockOverview() {
   const { appUser } = useAuth();
   const toast = useToast();
-  const [branch, setBranch] = useState<string[]>([]);
+  const [location, setLocation] = useState<string[]>([]);
   const [category, setCategory] = useState<string[]>([]);
   const [data, setData] = useState<StockOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +36,7 @@ export default function StockOverview() {
     let active = true;
     setLoading(true);
     api.stock
-      .overview({ branch: branch.length ? (branch as Branch[]) : undefined, category: category.length ? (category as ("car_glasses" | "car_modifications")[]) : undefined })
+      .overview({ location: location.length ? (location as StockLocation[]) : undefined, category: category.length ? (category as ("car_glasses" | "car_modifications")[]) : undefined })
       .then((res) => {
         if (active) setData(res);
       })
@@ -47,7 +48,7 @@ export default function StockOverview() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branch, category]);
+  }, [location, category]);
 
   if (appUser && !canManage(appUser.role)) {
     return (
@@ -81,12 +82,12 @@ export default function StockOverview() {
       </div>
 
       <FilterBar>
-        <MultiSelectFilter label="Branch" values={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
+        <MultiSelectFilter label="Location" values={location} onChange={setLocation} options={LOCATION_OPTIONS} />
         <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
-        {(branch.length > 0 || category.length > 0) && (
+        {(location.length > 0 || category.length > 0) && (
           <ClearFiltersButton
             onClick={() => {
-              setBranch([]);
+              setLocation([]);
               setCategory([]);
             }}
           />
@@ -108,7 +109,7 @@ export default function StockOverview() {
             <div className="mono" style={theadStyle}>
               <span>Item</span>
               <span>Category</span>
-              <span>Branch</span>
+              <span>Location</span>
               <span>On hand</span>
               <span>Threshold</span>
             </div>
@@ -121,10 +122,10 @@ export default function StockOverview() {
 
             {!loading &&
               data?.lowStockEntries.map((e, i) => (
-                <div key={`${e.stockItemId}-${e.branch}`} style={trowStyle(i === data.lowStockEntries.length - 1)}>
+                <div key={`${e.stockItemId}-${e.location}`} style={trowStyle(i === data.lowStockEntries.length - 1)}>
                   <span style={{ fontWeight: 600 }}>{e.name}</span>
                   <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{CATEGORY_LABELS[e.category] ?? e.category}</span>
-                  <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{BRANCH_LABELS[e.branch]}</span>
+                  <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{LOCATION_LABELS[e.location]}</span>
                   <span className="mono" style={{ color: "var(--coral)", fontWeight: 700 }}>
                     {e.quantity} {e.unit}
                   </span>

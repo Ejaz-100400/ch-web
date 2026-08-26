@@ -355,8 +355,14 @@ export interface SalesReminderStatus {
 
 export type StockMovementType = "in" | "out";
 
+// The 4 physical branches, plus a single central "warehouse" pool that
+// isn't tied to any one branch -- distinct from Branch (used by Sales/
+// Enquiries/Calls) since Warehouse only ever makes sense as a stock
+// location.
+export type StockLocation = Branch | "warehouse";
+
 export interface StockItemQuantity {
-  branch: Branch;
+  location: StockLocation;
   quantity: number;
   lowStock: boolean;
 }
@@ -376,7 +382,7 @@ export interface StockItem {
 export interface StockMovement {
   id: string;
   stockItemId: string;
-  branch: Branch;
+  location: StockLocation;
   type: StockMovementType;
   quantity: number;
   reason: string | null;
@@ -393,7 +399,7 @@ export interface StockLowStockEntry {
   name: string;
   category: string;
   unit: string;
-  branch: Branch;
+  location: StockLocation;
   quantity: number;
   reorderThreshold: number;
 }

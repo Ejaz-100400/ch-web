@@ -11,7 +11,7 @@ import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
-import type { Branch, Product, StockItem } from "../types";
+import type { Branch, Product, StockItem, StockLocation } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
   ambattur: "Ambattur",
@@ -21,6 +21,9 @@ const BRANCH_LABELS: Record<Branch, string> = {
 };
 const ALL_BRANCHES = Object.keys(BRANCH_LABELS) as Branch[];
 
+const LOCATION_LABELS: Record<StockLocation, string> = { ...BRANCH_LABELS, warehouse: "Warehouse" };
+const ALL_LOCATIONS: StockLocation[] = [...ALL_BRANCHES, "warehouse"];
+
 const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
   { value: "car_modifications", label: "Car Modifications" },
@@ -29,24 +32,28 @@ const CATEGORY_OPTIONS = [
 const CUSTOM_ITEM = "__custom__";
 
 interface ItemForm {
+  category: "car_glasses" | "car_modifications";
   productChoice: string; // a Product id, CUSTOM_ITEM, or "" (nothing picked yet)
   customName: string;
-  customCategory: "car_glasses" | "car_modifications";
   unit: string;
   reorderThreshold: number;
   active: boolean;
-  initialStock: Record<Branch, string>;
+  storageType: "branch" | "warehouse";
+  startingBranch: Branch;
+  startingQuantity: string;
 }
 
 function emptyForm(): ItemForm {
   return {
+    category: "car_glasses",
     productChoice: "",
     customName: "",
-    customCategory: "car_glasses",
     unit: "pcs",
     reorderThreshold: 0,
     active: true,
-    initialStock: { ambattur: "", kattankulathur: "", sithalapakkam: "", pondicherry: "" },
+    storageType: "branch",
+    startingBranch: "ambattur",
+    startingQuantity: "",
   };
 }
 
@@ -86,11 +93,11 @@ export default function StockItems() {
   }, []);
 
   // What you're actually allowed to pick as a stock item's identity: real,
-  // active, sellable products -- not a leftover "unknown"-category row, and
-  // not a service like Doom cleaning, which has nothing to hold in stock.
+  // active, sellable products -- not a service like Doom cleaning, which
+  // has nothing to hold in stock. Narrowed further to the chosen category.
   const pickableProducts = useMemo(
-    () => products.filter((p) => p.active && !p.name.toLowerCase().includes("doom")),
-    [products],
+    () => products.filter((p) => p.active && p.category === form.category && !p.name.toLowerCase().includes("doom")),
+    [products, form.category],
   );
 
   if (appUser && !canManage(appUser.role)) {
@@ -115,13 +122,15 @@ export default function StockItems() {
   function openEdit(item: StockItem) {
     setEditing(item);
     setForm({
+      category: item.category,
       productChoice: item.productId ?? CUSTOM_ITEM,
       customName: item.productId ? "" : item.name,
-      customCategory: item.category,
       unit: item.unit,
       reorderThreshold: item.reorderThreshold,
       active: item.active,
-      initialStock: { ambattur: "", kattankulathur: "", sithalapakkam: "", pondicherry: "" },
+      storageType: "branch",
+      startingBranch: "ambattur",
+      startingQuantity: "",
     });
     setFormOpen(true);
   }
@@ -137,16 +146,20 @@ export default function StockItems() {
     }
 
     const isCustom = form.productChoice === CUSTOM_ITEM;
+    const startingQty = Number(form.startingQuantity);
+    const initialStock =
+      !editing && startingQty > 0
+        ? [{ location: form.storageType === "warehouse" ? ("warehouse" as const) : form.startingBranch, quantity: startingQty }]
+        : undefined;
+
     const dto = {
       productId: isCustom ? undefined : form.productChoice,
       name: isCustom ? form.customName.trim() : undefined,
-      category: isCustom ? form.customCategory : undefined,
+      category: isCustom ? form.category : undefined,
       unit: form.unit?.trim() || "pcs",
       reorderThreshold: form.reorderThreshold ?? 0,
       active: form.active,
-      initialStock: editing
-        ? undefined
-        : ALL_BRANCHES.filter((b) => Number(form.initialStock[b]) > 0).map((b) => ({ branch: b, quantity: Number(form.initialStock[b]) })),
+      initialStock,
     };
 
     setSaving(true);
@@ -189,7 +202,7 @@ export default function StockItems() {
       <PageHeader
         eyebrow="Stock Tracking"
         title="Stock items"
-        description="What you're tracking, and how much is on hand at each branch."
+        description="What you're tracking, and how much is on hand at each branch and the warehouse."
         actions={
           <button onClick={openCreate} style={primaryButtonStyle}>
             <Plus size={15} /> Add item
@@ -206,36 +219,39 @@ export default function StockItems() {
             </button>
           </div>
 
-          <label style={{ ...fieldLabelStyle, marginBottom: 12 }}>
-            Product
-            <select style={inputStyle} value={form.productChoice} onChange={(e) => setForm((f) => ({ ...f, productChoice: e.target.value }))}>
-              <option value="" disabled>Choose from your Products catalog…</option>
-              {pickableProducts.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-              {/* Keep an item's already-linked product selectable even if it's since gone inactive or been excluded, so editing doesn't silently drop the link. */}
-              {editing?.productId && !pickableProducts.some((p) => p.id === editing.productId) && (
-                <option value={editing.productId}>{editing.name} (no longer in catalog list)</option>
-              )}
-              <option value={CUSTOM_ITEM}>Custom item (not in catalog)</option>
-            </select>
-          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 12, marginBottom: 12 }}>
+            <label style={fieldLabelStyle}>
+              Product category
+              <select
+                style={inputStyle}
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ItemForm["category"], productChoice: "" }))}
+              >
+                {CATEGORY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label style={fieldLabelStyle}>
+              Product name
+              <select style={inputStyle} value={form.productChoice} onChange={(e) => setForm((f) => ({ ...f, productChoice: e.target.value }))}>
+                <option value="" disabled>Choose from your Products catalog…</option>
+                {pickableProducts.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+                {editing?.productId && !pickableProducts.some((p) => p.id === editing.productId) && (
+                  <option value={editing.productId}>{editing.name} (no longer in catalog list)</option>
+                )}
+                <option value={CUSTOM_ITEM}>Custom item (not in catalog)</option>
+              </select>
+            </label>
+          </div>
 
           {form.productChoice === CUSTOM_ITEM && (
-            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12, marginBottom: 12 }}>
-              <label style={fieldLabelStyle}>
-                Name
-                <input style={inputStyle} value={form.customName} onChange={(e) => setForm((f) => ({ ...f, customName: e.target.value }))} placeholder="e.g. Custom mounting bracket" />
-              </label>
-              <label style={fieldLabelStyle}>
-                Category
-                <select style={inputStyle} value={form.customCategory} onChange={(e) => setForm((f) => ({ ...f, customCategory: e.target.value as ItemForm["customCategory"] }))}>
-                  {CATEGORY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <label style={{ ...fieldLabelStyle, marginBottom: 12 }}>
+              Name
+              <input style={inputStyle} value={form.customName} onChange={(e) => setForm((f) => ({ ...f, customName: e.target.value }))} placeholder="e.g. Custom mounting bracket" />
+            </label>
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
@@ -258,22 +274,53 @@ export default function StockItems() {
           {!editing && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-soft)", marginBottom: 8 }}>
-                Starting stock <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional -- leave blank for branches with none yet)</span>
+                Starting stock <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional -- leave blank if you don't have any yet)</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                {ALL_BRANCHES.map((b) => (
-                  <label key={b} style={fieldLabelStyle}>
-                    {BRANCH_LABELS[b]}
-                    <input
-                      type="number"
-                      min={0}
-                      style={inputStyle}
-                      value={form.initialStock[b]}
-                      onChange={(e) => setForm((f) => ({ ...f, initialStock: { ...f.initialStock, [b]: e.target.value } }))}
-                      placeholder="0"
-                    />
+              <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
+                {(["branch", "warehouse"] as const).map((t) => {
+                  const active = form.storageType === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, storageType: t }))}
+                      style={{
+                        padding: "7px 14px",
+                        border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
+                        borderRadius: "var(--radius-sm)",
+                        background: active ? "var(--brand-soft)" : "var(--paper)",
+                        color: active ? "var(--brand-strong)" : "var(--text-soft)",
+                        fontSize: 13,
+                        fontWeight: active ? 700 : 600,
+                      }}
+                    >
+                      {t === "branch" ? "Branch" : "Warehouse"}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: form.storageType === "branch" ? "1fr 1fr" : "1fr", gap: 12 }}>
+                {form.storageType === "branch" && (
+                  <label style={fieldLabelStyle}>
+                    Branch
+                    <select style={inputStyle} value={form.startingBranch} onChange={(e) => setForm((f) => ({ ...f, startingBranch: e.target.value as Branch }))}>
+                      {ALL_BRANCHES.map((b) => (
+                        <option key={b} value={b}>{BRANCH_LABELS[b]}</option>
+                      ))}
+                    </select>
                   </label>
-                ))}
+                )}
+                <label style={fieldLabelStyle}>
+                  Quantity
+                  <input
+                    type="number"
+                    min={0}
+                    style={inputStyle}
+                    value={form.startingQuantity}
+                    onChange={(e) => setForm((f) => ({ ...f, startingQuantity: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
               </div>
             </div>
           )}
@@ -308,12 +355,12 @@ export default function StockItems() {
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: 940 }}>
+          <div style={{ minWidth: 1040 }}>
             <div className="mono" style={theadStyle}>
               <span>Name</span>
               <span>Category</span>
-              {ALL_BRANCHES.map((b) => (
-                <span key={b}>{BRANCH_LABELS[b]}</span>
+              {ALL_LOCATIONS.map((l) => (
+                <span key={l}>{LOCATION_LABELS[l]}</span>
               ))}
               <span>Reorder at</span>
               <span>Actions</span>
@@ -331,10 +378,10 @@ export default function StockItems() {
                         {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
                       </span>
                       <span><CategoryBadge category={item.category} /></span>
-                      {ALL_BRANCHES.map((b) => {
-                        const q = item.quantities.find((x) => x.branch === b);
+                      {ALL_LOCATIONS.map((l) => {
+                        const q = item.quantities.find((x) => x.location === l);
                         return (
-                          <span key={b} className="mono" style={{ fontWeight: q?.lowStock ? 700 : 400, color: q?.lowStock ? "var(--coral)" : "var(--text)" }}>
+                          <span key={l} className="mono" style={{ fontWeight: q?.lowStock ? 700 : 400, color: q?.lowStock ? "var(--coral)" : "var(--text)" }}>
                             {q?.quantity ?? 0} {item.unit}
                           </span>
                         );
@@ -386,7 +433,7 @@ const cardStyle: CSSProperties = {
   boxShadow: "var(--shadow-card)",
 };
 
-const gridColumns = "1.6fr 1fr repeat(4, 0.9fr) 0.8fr 104px";
+const gridColumns = "1.5fr 1fr repeat(5, 0.85fr) 0.75fr 104px";
 
 const theadStyle: CSSProperties = {
   display: "grid",

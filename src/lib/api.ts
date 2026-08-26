@@ -32,6 +32,7 @@ import type {
   SentimentBreakdownPoint,
   SentimentType,
   StockItem,
+  StockLocation,
   StockMovement,
   StockMovementType,
   StockOverview,
@@ -358,7 +359,7 @@ export interface StockItemsQuery {
 
 export interface StockMovementsQuery {
   stockItemId?: string;
-  branch?: Branch[];
+  location?: StockLocation[];
   type?: StockMovementType[];
   search?: string;
   dateFrom?: string;
@@ -368,7 +369,7 @@ export interface StockMovementsQuery {
 }
 
 export interface StockOverviewQuery {
-  branch?: Branch[];
+  location?: StockLocation[];
   category?: ("car_glasses" | "car_modifications")[];
 }
 
@@ -379,12 +380,12 @@ export interface CreateStockItemInput {
   unit?: string;
   reorderThreshold?: number;
   active?: boolean;
-  initialStock?: { branch: Branch; quantity: number }[];
+  initialStock?: { location: StockLocation; quantity: number }[];
 }
 
 export interface CreateStockMovementInput {
   stockItemId: string;
-  branch: Branch;
+  location: StockLocation;
   type: StockMovementType;
   quantity: number;
   movementDate: string;
