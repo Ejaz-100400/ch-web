@@ -375,8 +375,8 @@ export interface StockOverviewQuery {
 
 export interface CreateStockItemInput {
   productId?: string;
-  name?: string;
-  category?: "car_glasses" | "car_modifications";
+  name: string;
+  category: "car_glasses" | "car_modifications";
   unit?: string;
   reorderThreshold?: number;
   active?: boolean;

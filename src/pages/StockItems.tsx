@@ -29,12 +29,12 @@ const CATEGORY_OPTIONS = [
   { value: "car_modifications", label: "Car Modifications" },
 ];
 
-const CUSTOM_ITEM = "__custom__";
+const NO_SUBCATEGORY = "__none__";
 
 interface ItemForm {
   category: "car_glasses" | "car_modifications";
-  productChoice: string; // a Product id, CUSTOM_ITEM, or "" (nothing picked yet)
-  customName: string;
+  productChoice: string; // a Product id, NO_SUBCATEGORY, or "" (nothing picked yet)
+  name: string; // this specific stock item's own name -- several items can share one subcategory
   unit: string;
   reorderThreshold: number;
   active: boolean;
@@ -47,7 +47,7 @@ function emptyForm(): ItemForm {
   return {
     category: "car_glasses",
     productChoice: "",
-    customName: "",
+    name: "",
     unit: "pcs",
     reorderThreshold: 0,
     active: true,
@@ -123,8 +123,8 @@ export default function StockItems() {
     setEditing(item);
     setForm({
       category: item.category,
-      productChoice: item.productId ?? CUSTOM_ITEM,
-      customName: item.productId ? "" : item.name,
+      productChoice: item.productId ?? NO_SUBCATEGORY,
+      name: item.name,
       unit: item.unit,
       reorderThreshold: item.reorderThreshold,
       active: item.active,
@@ -137,15 +137,14 @@ export default function StockItems() {
 
   async function handleSave() {
     if (!form.productChoice) {
-      toast.show("Pick a product, or choose “Custom item”.", "error");
+      toast.show("Pick a subcategory, or choose “No subcategory”.", "error");
       return;
     }
-    if (form.productChoice === CUSTOM_ITEM && !form.customName.trim()) {
-      toast.show("Item name is required for a custom item.", "error");
+    if (!form.name.trim()) {
+      toast.show("Product name is required.", "error");
       return;
     }
 
-    const isCustom = form.productChoice === CUSTOM_ITEM;
     const startingQty = Number(form.startingQuantity);
     const initialStock =
       !editing && startingQty > 0
@@ -153,9 +152,9 @@ export default function StockItems() {
         : undefined;
 
     const dto = {
-      productId: isCustom ? undefined : form.productChoice,
-      name: isCustom ? form.customName.trim() : undefined,
-      category: isCustom ? form.category : undefined,
+      productId: form.productChoice === NO_SUBCATEGORY ? undefined : form.productChoice,
+      name: form.name.trim(),
+      category: form.category,
       unit: form.unit?.trim() || "pcs",
       reorderThreshold: form.reorderThreshold ?? 0,
       active: form.active,
@@ -233,7 +232,7 @@ export default function StockItems() {
               </select>
             </label>
             <label style={fieldLabelStyle}>
-              Product name
+              Product subcategory
               <select style={inputStyle} value={form.productChoice} onChange={(e) => setForm((f) => ({ ...f, productChoice: e.target.value }))}>
                 <option value="" disabled>Choose from your Products catalog…</option>
                 {pickableProducts.map((p) => (
@@ -242,17 +241,15 @@ export default function StockItems() {
                 {editing?.productId && !pickableProducts.some((p) => p.id === editing.productId) && (
                   <option value={editing.productId}>{editing.name} (no longer in catalog list)</option>
                 )}
-                <option value={CUSTOM_ITEM}>Custom item (not in catalog)</option>
+                <option value={NO_SUBCATEGORY}>No subcategory</option>
               </select>
             </label>
           </div>
 
-          {form.productChoice === CUSTOM_ITEM && (
-            <label style={{ ...fieldLabelStyle, marginBottom: 12 }}>
-              Name
-              <input style={inputStyle} value={form.customName} onChange={(e) => setForm((f) => ({ ...f, customName: e.target.value }))} placeholder="e.g. Custom mounting bracket" />
-            </label>
-          )}
+          <label style={{ ...fieldLabelStyle, marginBottom: 12 }}>
+            Product name
+            <input style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Amy Tricolor Fog" />
+          </label>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             <label style={fieldLabelStyle}>
