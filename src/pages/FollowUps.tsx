@@ -97,6 +97,7 @@ export default function FollowUps() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const isAdmin = appUser?.role === "admin";
 
   useEffect(() => {
@@ -280,6 +281,28 @@ export default function FollowUps() {
       toast.show(err instanceof ApiError ? err.message : "Failed to delete follow-ups", "error");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleDeleteOne(f: FollowUp) {
+    if (!window.confirm(`Delete this follow-up due ${formatDate(f.dueDate)}? This can't be undone.`)) return;
+    setDeletingId(f.id);
+    try {
+      await api.followUps.remove(f.id);
+      setFollowUps((prev) => prev.filter((x) => x.id !== f.id));
+      setTotal((prev) => Math.max(0, prev - 1));
+      setSelectedIds((prev) => {
+        if (!prev.has(f.id)) return prev;
+        const next = new Set(prev);
+        next.delete(f.id);
+        return next;
+      });
+      toast.show("Follow-up deleted.", "success");
+      loadCounts();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to delete follow-up", "error");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -482,12 +505,12 @@ export default function FollowUps() {
         }}
       >
       <div className="table-scroll">
-        <div style={{ minWidth: isAdmin ? 790 : 760 }}>
+        <div style={{ minWidth: isAdmin ? 830 : 760 }}>
         <div
           className="mono"
           style={{
             display: "grid",
-            gridTemplateColumns: isAdmin ? "28px 110px 1fr 1.6fr 1fr 1.4fr 150px" : "110px 1fr 1.6fr 1fr 1.4fr 150px",
+            gridTemplateColumns: isAdmin ? "28px 110px 1fr 1.6fr 1fr 1.4fr 150px 40px" : "110px 1fr 1.6fr 1fr 1.4fr 150px",
             padding: "10px 18px",
             fontSize: 11,
             fontFamily: "var(--font-body)",
@@ -513,6 +536,7 @@ export default function FollowUps() {
           <span>Assigned to</span>
           <span>Notes</span>
           <span>Status</span>
+          {isAdmin && <span />}
         </div>
 
         {loading && <SkeletonRows rows={8} />}
@@ -523,7 +547,7 @@ export default function FollowUps() {
               key={f.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: isAdmin ? "28px 110px 1fr 1.6fr 1fr 1.4fr 150px" : "110px 1fr 1.6fr 1fr 1.4fr 150px",
+                gridTemplateColumns: isAdmin ? "28px 110px 1fr 1.6fr 1fr 1.4fr 150px 40px" : "110px 1fr 1.6fr 1fr 1.4fr 150px",
                 alignItems: "center",
                 padding: "12px 18px",
                 borderBottom: "1px solid var(--border-soft)",
@@ -576,6 +600,17 @@ export default function FollowUps() {
                 </select>
               ) : (
                 <FollowUpStatusBadge status={f.status} />
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => handleDeleteOne(f)}
+                  disabled={deletingId === f.id}
+                  aria-label="Delete follow-up"
+                  title="Delete follow-up"
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, background: "none", border: "none", borderRadius: 6, color: "var(--coral)" }}
+                >
+                  <Trash2 size={14} />
+                </button>
               )}
             </div>
           ))}
