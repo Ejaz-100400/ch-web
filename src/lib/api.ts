@@ -614,11 +614,13 @@ export const api = {
     reminderStatus: () => request<SalesReminderStatus>("/sales/reminder-status"),
     conversionSummary: (q: ConversionSummaryQuery = {}) => request<ConversionSummary>(`/sales/conversion-summary${query(q)}`),
     create: (dto: CreateSaleInput) => request<Sale>("/sales", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: Partial<CreateSaleInput>) => request<Sale>(`/sales/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
   },
 
   enquiries: {
     list: (q: EnquiriesQuery = {}) => request<Paginated<InPersonEnquiry>>(`/enquiries${query(q)}`),
     create: (dto: CreateEnquiryInput) => request<InPersonEnquiry>("/enquiries", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: Partial<CreateEnquiryInput>) => request<InPersonEnquiry>(`/enquiries/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
   },
 
   stock: {

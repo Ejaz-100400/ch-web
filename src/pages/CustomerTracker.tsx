@@ -16,6 +16,8 @@ import {
   ClipboardList,
   Handshake,
   UserCog,
+  User,
+  Pencil,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -38,8 +40,8 @@ const BRANCH_LABELS: Record<Branch, string> = {
 };
 const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));
 
-const SOURCE_LABELS: Record<SaleSource, string> = { call: "Call", whatsapp: "WhatsApp", walk_in: "Walk-in", owner: "Owner", unknown: "Unknown" };
-const SOURCE_ICONS: Record<SaleSource, typeof Phone> = { call: Phone, whatsapp: MessageCircle, walk_in: Store, owner: UserCog, unknown: HelpCircle };
+const SOURCE_LABELS: Record<SaleSource, string> = { call: "Call", whatsapp: "WhatsApp", walk_in: "Walk-in", owner: "Owner", dastagir: "Dastagir", unknown: "Unknown" };
+const SOURCE_ICONS: Record<SaleSource, typeof Phone> = { call: Phone, whatsapp: MessageCircle, walk_in: Store, owner: UserCog, dastagir: User, unknown: HelpCircle };
 const SOURCE_OPTIONS = (Object.keys(SOURCE_LABELS) as SaleSource[]).map((value) => ({ value, label: SOURCE_LABELS[value] }));
 
 const OUTCOME_LABELS: Record<EnquiryOutcome, string> = { purchased: "Purchased", not_purchased: "Not purchased", undecided: "Undecided" };
@@ -224,6 +226,7 @@ function SalesTab({
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateSaleInput>(EMPTY_SALE_FORM);
   const [sourceTouched, setSourceTouched] = useState(false);
   const [matchResult, setMatchResult] = useState<SaleMatchResult | null>(null);
@@ -294,8 +297,28 @@ function SalesTab({
   }, [form.customerPhone, formOpen]);
 
   function openForm() {
+    setEditingId(null);
     setForm(EMPTY_SALE_FORM);
     setSourceTouched(false);
+    setMatchResult(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(sale: Sale) {
+    setEditingId(sale.id);
+    setForm({
+      customerPhone: sale.customerPhone,
+      carMake: sale.carMake ?? "",
+      carModel: sale.carModel ?? "",
+      branch: sale.branch,
+      saleDate: sale.saleDate.slice(0, 10),
+      source: sale.source,
+      notes: sale.notes ?? "",
+    });
+    // The phone-match effect would otherwise overwrite an already-set
+    // source the moment it re-runs on open -- an edit's existing source was
+    // a deliberate choice, not something a fresh match lookup should override.
+    setSourceTouched(true);
     setMatchResult(null);
     setFormOpen(true);
   }
@@ -308,7 +331,7 @@ function SalesTab({
     }
     setSaving(true);
     try {
-      await api.sales.create({
+      const dto = {
         customerPhone: phoneValue,
         carMake: form.carMake?.trim() || undefined,
         carModel: form.carModel?.trim() || undefined,
@@ -317,12 +340,18 @@ function SalesTab({
         source: form.source,
         matchedCallId: matchResult?.matched ? matchResult.customer.calls[0]?.id : undefined,
         notes: form.notes?.trim() || undefined,
-      });
-      toast.show("Sale recorded.", "success");
+      };
+      if (editingId) {
+        await api.sales.update(editingId, dto);
+        toast.show("Sale updated.", "success");
+      } else {
+        await api.sales.create(dto);
+        toast.show("Sale recorded.", "success");
+      }
       setFormOpen(false);
       onSaved();
     } catch (err) {
-      toast.show(err instanceof ApiError ? err.message : "Failed to record sale", "error");
+      toast.show(err instanceof ApiError ? err.message : "Failed to save sale", "error");
     } finally {
       setSaving(false);
     }
@@ -344,7 +373,7 @@ function SalesTab({
       {formOpen && (
         <div className="fade-in-up" style={{ ...cardStyle, padding: 16, marginBottom: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>New sale</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{editingId ? "Edit sale" : "New sale"}</div>
             <button onClick={() => setFormOpen(false)} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
               <X size={15} />
             </button>
@@ -432,7 +461,7 @@ function SalesTab({
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleSave} disabled={saving} style={primaryButtonStyle}>
-              {saving ? "Saving…" : "Record sale"}
+              {saving ? "Saving…" : editingId ? "Save changes" : "Record sale"}
             </button>
             <button onClick={() => setFormOpen(false)} style={secondaryButtonStyle}>
               Cancel
@@ -453,14 +482,15 @@ function SalesTab({
 
       <div style={tableWrapStyle}>
         <div className="table-scroll">
-          <div style={{ minWidth: 820 }}>
-            <div className="mono" style={theadStyle("1fr 1.4fr 1.2fr 1fr 110px 1.2fr")}>
+          <div style={{ minWidth: 860 }}>
+            <div className="mono" style={theadStyle("1fr 1.4fr 1.2fr 1fr 110px 1.2fr 40px")}>
               <span>Date</span>
               <span>Customer</span>
               <span>Vehicle</span>
               <span>Branch</span>
               <span>Source</span>
               <span>Entered by</span>
+              <span></span>
             </div>
 
             {loading && <SkeletonRows rows={6} />}
@@ -471,7 +501,7 @@ function SalesTab({
                   {items.map((s) => {
                     const Icon = SOURCE_ICONS[s.source];
                     return (
-                      <motion.div key={s.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle("1fr 1.4fr 1.2fr 1fr 110px 1.2fr")}>
+                      <motion.div key={s.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle("1fr 1.4fr 1.2fr 1fr 110px 1.2fr 40px")}>
                         <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>{formatDate(s.saleDate)}</span>
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           <span style={{ fontWeight: 600 }}>{s.customer && "name" in s.customer ? s.customer.name ?? s.customerPhone : s.customerPhone}</span>
@@ -483,6 +513,11 @@ function SalesTab({
                           <Icon size={13} /> {SOURCE_LABELS[s.source]}
                         </span>
                         <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>{s.enteredBy?.name ?? "—"}</span>
+                        <span>
+                          <button onClick={() => openEdit(s)} aria-label="Edit sale" title="Edit" style={iconButtonStyle}>
+                            <Pencil size={14} />
+                          </button>
+                        </span>
                       </motion.div>
                     );
                   })}
@@ -547,6 +582,7 @@ function EnquiriesTab({
   const [total, setTotal] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateEnquiryInput>(EMPTY_ENQUIRY_FORM);
   const [saving, setSaving] = useState(false);
 
@@ -583,14 +619,31 @@ function EnquiriesTab({
   }, [branch, outcome, phone, dateFrom, dateTo, page, refreshKey]);
 
   function openForm() {
+    setEditingId(null);
     setForm(EMPTY_ENQUIRY_FORM);
+    setFormOpen(true);
+  }
+
+  function openEdit(enquiry: InPersonEnquiry) {
+    setEditingId(enquiry.id);
+    setForm({
+      customerPhone: enquiry.customerPhone ?? "",
+      customerName: enquiry.customerName ?? "",
+      carMake: enquiry.carMake ?? "",
+      carModel: enquiry.carModel ?? "",
+      branch: enquiry.branch,
+      enquiryDate: enquiry.enquiryDate.slice(0, 10),
+      outcome: enquiry.outcome,
+      notes: enquiry.notes ?? "",
+      employeeId: enquiry.employeeId ?? "",
+    });
     setFormOpen(true);
   }
 
   async function handleSave() {
     setSaving(true);
     try {
-      await api.enquiries.create({
+      const dto = {
         customerPhone: form.customerPhone?.trim() || undefined,
         customerName: form.customerName?.trim() || undefined,
         carMake: form.carMake?.trim() || undefined,
@@ -600,12 +653,18 @@ function EnquiriesTab({
         outcome: form.outcome,
         notes: form.notes?.trim() || undefined,
         employeeId: form.employeeId || undefined,
-      });
-      toast.show("Enquiry recorded.", "success");
+      };
+      if (editingId) {
+        await api.enquiries.update(editingId, dto);
+        toast.show("Enquiry updated.", "success");
+      } else {
+        await api.enquiries.create(dto);
+        toast.show("Enquiry recorded.", "success");
+      }
       setFormOpen(false);
       onSaved();
     } catch (err) {
-      toast.show(err instanceof ApiError ? err.message : "Failed to record enquiry", "error");
+      toast.show(err instanceof ApiError ? err.message : "Failed to save enquiry", "error");
     } finally {
       setSaving(false);
     }
@@ -627,7 +686,7 @@ function EnquiriesTab({
       {formOpen && (
         <div className="fade-in-up" style={{ ...cardStyle, padding: 16, marginBottom: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>New in-person enquiry</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{editingId ? "Edit in-person enquiry" : "New in-person enquiry"}</div>
             <button onClick={() => setFormOpen(false)} aria-label="Close" style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}>
               <X size={15} />
             </button>
@@ -688,7 +747,7 @@ function EnquiriesTab({
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleSave} disabled={saving} style={primaryButtonStyle}>
-              {saving ? "Saving…" : "Record enquiry"}
+              {saving ? "Saving…" : editingId ? "Save changes" : "Record enquiry"}
             </button>
             <button onClick={() => setFormOpen(false)} style={secondaryButtonStyle}>
               Cancel
@@ -709,14 +768,15 @@ function EnquiriesTab({
 
       <div style={tableWrapStyle}>
         <div className="table-scroll">
-          <div style={{ minWidth: 820 }}>
-            <div className="mono" style={theadStyle("1fr 1.4fr 1.2fr 1fr 130px 1.2fr")}>
+          <div style={{ minWidth: 860 }}>
+            <div className="mono" style={theadStyle("1fr 1.4fr 1.2fr 1fr 130px 1.2fr 40px")}>
               <span>Date</span>
               <span>Customer</span>
               <span>Vehicle</span>
               <span>Branch</span>
               <span>Outcome</span>
               <span>Entered by</span>
+              <span></span>
             </div>
 
             {loading && <SkeletonRows rows={6} />}
@@ -727,7 +787,7 @@ function EnquiriesTab({
                   {items.map((e) => {
                     const Icon = OUTCOME_ICONS[e.outcome];
                     return (
-                      <motion.div key={e.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle("1fr 1.4fr 1.2fr 1fr 130px 1.2fr")}>
+                      <motion.div key={e.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle("1fr 1.4fr 1.2fr 1fr 130px 1.2fr 40px")}>
                         <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>{formatDate(e.enquiryDate)}</span>
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           <span style={{ fontWeight: 600 }}>{e.customerName ?? e.customerPhone ?? "Unnamed visitor"}</span>
@@ -739,6 +799,11 @@ function EnquiriesTab({
                           <Icon size={13} /> {OUTCOME_LABELS[e.outcome]}
                         </span>
                         <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>{e.enteredBy?.name ?? "—"}</span>
+                        <span>
+                          <button onClick={() => openEdit(e)} aria-label="Edit enquiry" title="Edit" style={iconButtonStyle}>
+                            <Pencil size={14} />
+                          </button>
+                        </span>
                       </motion.div>
                     );
                   })}
@@ -882,6 +947,18 @@ const secondaryButtonStyle: CSSProperties = {
   borderRadius: "var(--radius-sm)",
   fontSize: 13.5,
   fontWeight: 600,
+};
+
+const iconButtonStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 26,
+  height: 26,
+  background: "none",
+  border: "none",
+  borderRadius: 6,
+  color: "var(--text-soft)",
 };
 
 const matchHintStyle: CSSProperties = {
