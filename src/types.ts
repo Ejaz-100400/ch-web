@@ -377,6 +377,8 @@ export interface StockItem {
   reorderThreshold: number;
   active: boolean;
   productId: string | null;
+  // Which box this item lives in at the Warehouse -- only meaningful there.
+  boxNumber: string | null;
   createdAt: string;
   quantities: StockItemQuantity[];
 }
@@ -390,11 +392,16 @@ export interface StockMovement {
   reason: string | null;
   transferId: string | null;
   relatedLocation: StockLocation | null;
+  // Set on both sides of a swap (see StockService.createSwap) -- shared
+  // swapId links the pair, relatedStockItem is the *other* product in it.
+  swapId: string | null;
+  relatedStockItemId: string | null;
   movementDate: string;
   notes: string | null;
   enteredByUserId: string;
   createdAt: string;
   stockItem?: { id: string; name: string; category: BusinessCategory; unit: string } | null;
+  relatedStockItem?: { id: string; name: string; category: BusinessCategory; unit: string } | null;
   enteredBy?: { name: string } | null;
 }
 

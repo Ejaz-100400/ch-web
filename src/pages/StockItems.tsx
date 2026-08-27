@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Plus, X, Pencil, Trash2, ShieldAlert, MapPin, Boxes, AlertTriangle } from "lucide-react";
+import { Package, Plus, X, Pencil, Trash2, ShieldAlert, MapPin, Boxes, AlertTriangle, Box } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge } from "../components/ui/StatusBadge";
@@ -11,6 +11,7 @@ import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
+import { boxColor } from "../lib/box-color";
 import type { Branch, Product, StockItem, StockLocation } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
@@ -41,6 +42,7 @@ interface ItemForm {
   storageType: "branch" | "warehouse";
   startingBranch: Branch;
   startingQuantity: string;
+  boxNumber: string;
 }
 
 function emptyForm(): ItemForm {
@@ -54,6 +56,7 @@ function emptyForm(): ItemForm {
     storageType: "branch",
     startingBranch: "ambattur",
     startingQuantity: "",
+    boxNumber: "",
   };
 }
 
@@ -149,6 +152,7 @@ export default function StockItems() {
       storageType: "branch",
       startingBranch: "ambattur",
       startingQuantity: "",
+      boxNumber: item.boxNumber ?? "",
     });
     setFormOpen(true);
   }
@@ -176,6 +180,10 @@ export default function StockItems() {
       unit: form.unit?.trim() || "pcs",
       reorderThreshold: form.reorderThreshold ?? 0,
       active: form.active,
+      // Always sent (even empty) so clearing an existing box number on edit
+      // actually reaches the server -- omitting the key would just leave
+      // the old value untouched instead of clearing it.
+      boxNumber: form.boxNumber.trim(),
       initialStock,
     };
 
@@ -314,7 +322,7 @@ export default function StockItems() {
                   );
                 })}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: form.storageType === "branch" ? "1fr 1fr" : "1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {form.storageType === "branch" && (
                   <label style={fieldLabelStyle}>
                     Branch
@@ -336,8 +344,33 @@ export default function StockItems() {
                     placeholder="0"
                   />
                 </label>
+                {form.storageType === "warehouse" && (
+                  <label style={fieldLabelStyle}>
+                    Box number <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional)</span>
+                    <input
+                      style={inputStyle}
+                      value={form.boxNumber}
+                      onChange={(e) => setForm((f) => ({ ...f, boxNumber: e.target.value }))}
+                      placeholder="e.g. Box 5"
+                    />
+                  </label>
+                )}
               </div>
             </div>
+          )}
+
+          {editing && (
+            <label style={{ ...fieldLabelStyle, marginBottom: 16 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <Box size={12} /> Warehouse box number <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional -- only relevant if you keep this item in the Warehouse)</span>
+              </span>
+              <input
+                style={inputStyle}
+                value={form.boxNumber}
+                onChange={(e) => setForm((f) => ({ ...f, boxNumber: e.target.value }))}
+                placeholder="e.g. Box 5"
+              />
+            </label>
           )}
 
           {editing && (
@@ -450,9 +483,22 @@ export default function StockItems() {
                   {items.map((item) => {
                     return (
                     <motion.div key={item.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle}>
-                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.active ? 1 : 0.5 }}>
-                        {item.name}
-                        {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
+                      <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden", opacity: item.active ? 1 : 0.5 }}>
+                        <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.name}
+                          {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
+                        </span>
+                        {item.boxNumber && (() => {
+                          const c = boxColor(item.boxNumber);
+                          return (
+                            <span
+                              title={`Warehouse box: ${item.boxNumber}`}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 7px", borderRadius: 999, fontSize: 11, fontWeight: 700, color: c.fg, background: c.bg, flexShrink: 0 }}
+                            >
+                              <Box size={10} /> {item.boxNumber}
+                            </span>
+                          );
+                        })()}
                       </span>
                       <span><CategoryBadge category={item.category} /></span>
                       <span style={{ color: "var(--text-soft)" }}>{item.unit}</span>

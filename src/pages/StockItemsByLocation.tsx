@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowLeftRight, Package, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Package, ShieldAlert, Box } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge } from "../components/ui/StatusBadge";
@@ -11,6 +11,7 @@ import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
+import { boxColor } from "../lib/box-color";
 import type { Branch, Product, StockItem, StockLocation } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
@@ -144,9 +145,10 @@ export default function StockItemsByLocation() {
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: 640 }}>
-            <div className="mono" style={theadStyle}>
+          <div style={{ minWidth: location === "warehouse" ? 740 : 640 }}>
+            <div className="mono" style={theadStyle(location)}>
               <span>Name</span>
+              {location === "warehouse" && <span>Box</span>}
               <span>Category</span>
               <span>On hand</span>
               <span>Reorder at</span>
@@ -161,11 +163,29 @@ export default function StockItemsByLocation() {
                   {filteredItems.map((item) => {
                     const q = item.quantities.find((x) => x.location === location);
                     return (
-                      <motion.div key={item.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle}>
+                      <motion.div key={item.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle(location)}>
                         <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.active ? 1 : 0.5 }}>
                           {item.name}
                           {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
                         </span>
+                        {location === "warehouse" && (
+                          <span>
+                            {item.boxNumber ? (
+                              (() => {
+                                const c = boxColor(item.boxNumber);
+                                return (
+                                  <span
+                                    style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 7px", borderRadius: 999, fontSize: 11, fontWeight: 700, color: c.fg, background: c.bg }}
+                                  >
+                                    <Box size={10} /> {item.boxNumber}
+                                  </span>
+                                );
+                              })()
+                            ) : (
+                              <span style={{ color: "var(--text-faint)", fontSize: 12 }}>—</span>
+                            )}
+                          </span>
+                        )}
                         <span><CategoryBadge category={item.category} /></span>
                         <span className="mono" style={{ fontWeight: q?.lowStock ? 700 : 400, color: q?.lowStock ? "var(--coral)" : "var(--text)" }}>
                           {q?.quantity ?? 0} {item.unit}
@@ -221,29 +241,35 @@ const cardStyle: CSSProperties = {
   boxShadow: "var(--shadow-card)",
 };
 
-const gridColumns = "1.8fr 1.2fr 1fr 0.9fr 80px";
+function gridColumns(location: StockLocation | null): string {
+  return location === "warehouse" ? "1.6fr 0.9fr 1.1fr 0.9fr 0.9fr 80px" : "1.8fr 1.2fr 1fr 0.9fr 80px";
+}
 
-const theadStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: gridColumns,
-  padding: "10px 18px",
-  fontSize: 11,
-  fontFamily: "var(--font-body)",
-  fontWeight: 700,
-  color: "var(--text-faint)",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  borderBottom: "1px solid var(--border-soft)",
-};
+function theadStyle(location: StockLocation | null): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: gridColumns(location),
+    padding: "10px 18px",
+    fontSize: 11,
+    fontFamily: "var(--font-body)",
+    fontWeight: 700,
+    color: "var(--text-faint)",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    borderBottom: "1px solid var(--border-soft)",
+  };
+}
 
-const trowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: gridColumns,
-  alignItems: "center",
-  padding: "12px 18px",
-  borderBottom: "1px solid var(--border-soft)",
-  fontSize: 13,
-};
+function trowStyle(location: StockLocation | null): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: gridColumns(location),
+    alignItems: "center",
+    padding: "12px 18px",
+    borderBottom: "1px solid var(--border-soft)",
+    fontSize: 13,
+  };
+}
 
 const iconButtonStyle: CSSProperties = {
   display: "flex",

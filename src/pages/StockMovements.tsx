@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert, Trash2, Pencil, ArrowRightLeft } from "lucide-react";
+import { ArrowLeftRight, Plus, X, ArrowDownToLine, ArrowUpFromLine, ShieldAlert, Trash2, Pencil, ArrowRightLeft, Shuffle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, FilterSelect, ClearFiltersButton } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
@@ -40,7 +40,7 @@ function todayIso(): string {
 
 interface MovementFormState {
   stockItemId: string;
-  mode: "single" | "transfer";
+  mode: "single" | "transfer" | "swap";
   location: StockLocation;
   type: StockMovementType;
   fromLocation: StockLocation;
@@ -49,6 +49,9 @@ interface MovementFormState {
   movementDate: string;
   reason: string;
   notes: string;
+  swapLocation: Branch;
+  oldStockItemId: string;
+  newStockItemId: string;
 }
 
 function emptyForm(defaultItemId: string, defaultLocation: StockLocation): MovementFormState {
@@ -63,6 +66,9 @@ function emptyForm(defaultItemId: string, defaultLocation: StockLocation): Movem
     movementDate: todayIso(),
     reason: "",
     notes: "",
+    swapLocation: defaultLocation === "warehouse" ? "ambattur" : (defaultLocation as Branch),
+    oldStockItemId: "",
+    newStockItemId: "",
   };
 }
 
@@ -225,6 +231,27 @@ export default function StockMovements() {
           notes: form.notes?.trim() || undefined,
         });
         toast.show(`Transferred to ${LOCATION_LABELS[form.toLocation]}.`, "success");
+      } else if (form.mode === "swap") {
+        if (!form.oldStockItemId || !form.newStockItemId) {
+          toast.show("Pick both the old and new product.", "error");
+          setSaving(false);
+          return;
+        }
+        if (form.oldStockItemId === form.newStockItemId) {
+          toast.show("Pick two different products to swap between.", "error");
+          setSaving(false);
+          return;
+        }
+        await api.stock.createSwap({
+          location: form.swapLocation,
+          oldStockItemId: form.oldStockItemId,
+          newStockItemId: form.newStockItemId,
+          quantity: form.quantity,
+          movementDate: form.movementDate,
+          notes: form.notes?.trim() || undefined,
+        });
+        const newName = items.find((i) => i.id === form.newStockItemId)?.name ?? "the new product";
+        toast.show(`Swapped in ${newName}.`, "success");
       } else {
         if (!form.stockItemId) {
           toast.show("Pick a stock item first.", "error");
@@ -253,8 +280,12 @@ export default function StockMovements() {
 
   async function handleDelete(m: StockMovement) {
     const base = `Delete this ${m.type === "in" ? "stock in" : "stock out"} entry for "${m.stockItem?.name ?? "this item"}"?`;
-    const transferNote = m.transferId ? " This is one side of a branch transfer -- the other side won't be deleted automatically." : "";
-    if (!window.confirm(base + transferNote)) return;
+    const linkedNote = m.transferId
+      ? " This is one side of a branch transfer -- the other side won't be deleted automatically."
+      : m.swapId
+        ? " This is one side of a product swap -- the other side won't be deleted automatically."
+        : "";
+    if (!window.confirm(base + linkedNote)) return;
     setDeletingId(m.id);
     try {
       await api.stock.deleteMovement(m.id);
@@ -308,7 +339,7 @@ export default function StockMovements() {
 
           {!editingMovement && (
             <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
-              {(["single", "transfer"] as const).map((m) => {
+              {(["single", "transfer", "swap"] as const).map((m) => {
                 const active = form.mode === m;
                 return (
                   <button
@@ -325,7 +356,7 @@ export default function StockMovements() {
                       fontWeight: active ? 700 : 600,
                     }}
                   >
-                    {m === "single" ? "Stock in / out" : "Transfer between branches"}
+                    {m === "single" ? "Stock in / out" : m === "transfer" ? "Transfer between branches" : "Swap product"}
                   </button>
                 );
               })}
@@ -362,6 +393,39 @@ export default function StockMovements() {
                 To
                 <select style={inputStyle} value={form.toLocation} onChange={(e) => setForm((f) => ({ ...f, toLocation: e.target.value as Branch }))}>
                   {TRANSFER_TO_OPTIONS.filter((o) => o.value !== form.fromLocation).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                Date
+                <DateInput value={form.movementDate} onChange={(v) => setForm((f) => ({ ...f, movementDate: v }))} style={inputStyle} />
+              </label>
+            </div>
+          ) : form.mode === "swap" && !editingMovement ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1.1fr 0.8fr 0.9fr", gap: 12, marginBottom: 12 }}>
+              <label style={fieldLabelStyle}>
+                Product being removed <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(back to stock)</span>
+                <select style={inputStyle} value={form.oldStockItemId} onChange={(e) => setForm((f) => ({ ...f, oldStockItemId: e.target.value }))}>
+                  <option value="">Select an item</option>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                Product being installed <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(out of stock)</span>
+                <select style={inputStyle} value={form.newStockItemId} onChange={(e) => setForm((f) => ({ ...f, newStockItemId: e.target.value }))}>
+                  <option value="">Select an item</option>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={fieldLabelStyle}>
+                Branch
+                <select style={inputStyle} value={form.swapLocation} onChange={(e) => setForm((f) => ({ ...f, swapLocation: e.target.value as Branch }))}>
+                  {TRANSFER_TO_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
@@ -448,13 +512,17 @@ export default function StockMovements() {
                 </p>
               )}
             </>
+          ) : form.mode === "swap" ? (
+            <p style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <Shuffle size={13} /> This logs a stock-in for the removed product and a matching stock-out for the replacement, both at {LOCATION_LABELS[form.swapLocation]}.
+            </p>
           ) : (
             <p style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
               <ArrowRightLeft size={13} /> This logs a stock-out at {LOCATION_LABELS[form.fromLocation]} and a matching stock-in at {LOCATION_LABELS[form.toLocation]}.
             </p>
           )}
 
-          {form.mode === "transfer" && !editingMovement ? (
+          {(form.mode === "transfer" || form.mode === "swap") && !editingMovement ? (
             <label style={{ ...fieldLabelStyle, marginBottom: 12, maxWidth: 160 }}>
               Quantity
               <input
@@ -496,7 +564,7 @@ export default function StockMovements() {
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleSave} disabled={saving} style={primaryButtonStyle}>
-              {saving ? "Saving…" : editingMovement ? "Save changes" : form.mode === "transfer" ? "Transfer stock" : "Log movement"}
+              {saving ? "Saving…" : editingMovement ? "Save changes" : form.mode === "transfer" ? "Transfer stock" : form.mode === "swap" ? "Swap product" : "Log movement"}
             </button>
             <button onClick={closeForm} style={secondaryButtonStyle}>
               Cancel
@@ -571,6 +639,23 @@ export default function StockMovements() {
                             <ArrowRightLeft size={11} />
                             Transfer
                           </span>
+                        ) : m.swapId ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              color: "var(--amber)",
+                              background: "var(--amber-soft)",
+                            }}
+                          >
+                            <Shuffle size={11} />
+                            Swap
+                          </span>
                         ) : (
                           <span
                             style={{
@@ -596,6 +681,11 @@ export default function StockMovements() {
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, color: "var(--violet)", fontWeight: 600 }}>
                             <ArrowRightLeft size={11} />
                             {m.type === "out" ? `To ${LOCATION_LABELS[m.relatedLocation]}` : `From ${LOCATION_LABELS[m.relatedLocation]}`}
+                          </span>
+                        ) : m.swapId && m.relatedStockItem ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, color: "var(--amber)", fontWeight: 600 }} title={m.relatedStockItem.name}>
+                            <Shuffle size={11} />
+                            {m.type === "out" ? `Replaces ${m.relatedStockItem.name}` : `Swapped for ${m.relatedStockItem.name}`}
                           </span>
                         ) : (
                           <span style={{ color: "var(--text-soft)" }}>{m.reason ?? "—"}</span>
