@@ -383,6 +383,8 @@ export interface CreateStockItemInput {
   reorderThreshold?: number;
   active?: boolean;
   boxNumber?: string;
+  price?: number | null;
+  attributes?: Record<string, string>;
   initialStock?: { location: StockLocation; quantity: number }[];
 }
 

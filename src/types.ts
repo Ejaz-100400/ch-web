@@ -379,6 +379,11 @@ export interface StockItem {
   productId: string | null;
   // Which box this item lives in at the Warehouse -- only meaningful there.
   boxNumber: string | null;
+  // Cost/purchase price, internal tracking only.
+  price: number | null;
+  // Free-form spec fields whose relevance depends on the product type --
+  // see lib/stock-variant-fields.ts for which keys apply to which product.
+  attributes: Record<string, string> | null;
   createdAt: string;
   quantities: StockItemQuantity[];
 }

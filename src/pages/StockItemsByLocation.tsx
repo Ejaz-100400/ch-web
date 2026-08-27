@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowLeftRight, Package, ShieldAlert, Box } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Package, ShieldAlert, Box, Plus, Pencil } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { CategoryBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
+import { StockItemForm } from "../components/stock/StockItemForm";
 import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
@@ -41,6 +42,8 @@ export default function StockItemsByLocation() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<StockItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<StockItem | null>(null);
 
   const location = (VALID_LOCATIONS as string[]).includes(locationParam ?? "") ? (locationParam as StockLocation) : null;
 
@@ -99,6 +102,21 @@ export default function StockItemsByLocation() {
     );
   }
 
+  function openCreate() {
+    setEditing(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(item: StockItem) {
+    setEditing(item);
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    setEditing(null);
+  }
+
   const hasFilters = Boolean(search || category.length || subcategory);
 
   return (
@@ -110,7 +128,25 @@ export default function StockItemsByLocation() {
         eyebrow="Stock Tracking"
         title={LOCATION_LABELS[location]}
         description={`Everything you're tracking, and how much is on hand at ${LOCATION_LABELS[location]}.`}
+        actions={
+          <button onClick={openCreate} style={primaryButtonStyle}>
+            <Plus size={15} /> Add item
+          </button>
+        }
       />
+
+      {formOpen && (
+        <StockItemForm
+          editing={editing}
+          products={products}
+          defaultLocation={location}
+          onClose={closeForm}
+          onSaved={() => {
+            closeForm();
+            load();
+          }}
+        />
+      )}
 
       {subcategoryChips.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18 }}>
@@ -145,7 +181,7 @@ export default function StockItemsByLocation() {
 
       <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
         <div className="table-scroll">
-          <div style={{ minWidth: location === "warehouse" ? 740 : 640 }}>
+          <div style={{ minWidth: location === "warehouse" ? 760 : 660 }}>
             <div className="mono" style={theadStyle(location)}>
               <span>Name</span>
               {location === "warehouse" && <span>Box</span>}
@@ -191,7 +227,10 @@ export default function StockItemsByLocation() {
                           {q?.quantity ?? 0} {item.unit}
                         </span>
                         <span className="mono" style={{ color: "var(--text-faint)" }}>{item.reorderThreshold}</span>
-                        <span>
+                        <span style={{ display: "flex", gap: 4 }}>
+                          <button onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`} title="Edit" style={iconButtonStyle}>
+                            <Pencil size={14} />
+                          </button>
                           <Link
                             to={`/stock/movements?item=${item.id}&location=${location}`}
                             aria-label={`Log movement for ${item.name}`}
@@ -242,7 +281,7 @@ const cardStyle: CSSProperties = {
 };
 
 function gridColumns(location: StockLocation | null): string {
-  return location === "warehouse" ? "1.6fr 0.9fr 1.1fr 0.9fr 0.9fr 80px" : "1.8fr 1.2fr 1fr 0.9fr 80px";
+  return location === "warehouse" ? "1.6fr 0.9fr 1.1fr 0.9fr 0.9fr 96px" : "1.8fr 1.2fr 1fr 0.9fr 96px";
 }
 
 function theadStyle(location: StockLocation | null): CSSProperties {
@@ -270,6 +309,19 @@ function trowStyle(location: StockLocation | null): CSSProperties {
     fontSize: 13,
   };
 }
+
+const primaryButtonStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "9px 15px",
+  background: "var(--brand)",
+  color: "var(--on-brand)",
+  border: "none",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 13.5,
+  fontWeight: 700,
+};
 
 const iconButtonStyle: CSSProperties = {
   display: "flex",
