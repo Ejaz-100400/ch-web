@@ -12,6 +12,8 @@ const BRANCH_LABELS: Record<Branch, string> = {
   pondicherry: "Pondicherry",
 };
 const ALL_BRANCHES = Object.keys(BRANCH_LABELS) as Branch[];
+const LOCATION_LABELS: Record<StockLocation, string> = { ...BRANCH_LABELS, warehouse: "Warehouse" };
+const ALL_LOCATIONS = Object.keys(LOCATION_LABELS) as StockLocation[];
 
 const CATEGORY_OPTIONS = [
   { value: "car_glasses", label: "Car Glasses" },
@@ -33,6 +35,8 @@ interface ItemFormState {
   boxNumber: string;
   price: string;
   attributes: Record<string, string>;
+  addStockLocation: StockLocation;
+  addStockQuantity: string;
 }
 
 function emptyForm(defaultLocation?: StockLocation): ItemFormState {
@@ -50,6 +54,8 @@ function emptyForm(defaultLocation?: StockLocation): ItemFormState {
     boxNumber: "",
     price: "",
     attributes: {},
+    addStockLocation: defaultLocation ?? "ambattur",
+    addStockQuantity: "",
   };
 }
 
@@ -88,6 +94,8 @@ export function StockItemForm({
           boxNumber: editing.boxNumber ?? "",
           price: editing.price != null ? String(editing.price) : "",
           attributes: editing.attributes ?? {},
+          addStockLocation: defaultLocation ?? "ambattur",
+          addStockQuantity: "",
         }
       : emptyForm(defaultLocation),
   );
@@ -103,6 +111,12 @@ export function StockItemForm({
 
   const selectedProductName = useMemo(() => products.find((p) => p.id === form.productChoice)?.name, [products, form.productChoice]);
   const variantFields = variantFieldsForProduct(selectedProductName);
+
+  // Box number only makes sense for Warehouse items -- hide it when we know
+  // for certain we're editing from a specific branch's page. Still shown
+  // when opened from the main Stock Items catalog (no location context) or
+  // from the Warehouse page itself.
+  const showBoxNumberField = !defaultLocation || defaultLocation === "warehouse";
 
   function selectProduct(productId: string) {
     // Reset spec fields on a subcategory change -- carrying over e.g. an
@@ -127,6 +141,12 @@ export function StockItemForm({
         ? [{ location: form.storageType === "warehouse" ? ("warehouse" as const) : form.startingBranch, quantity: startingQty }]
         : undefined;
 
+    const trimmedAddQty = form.addStockQuantity.trim();
+    if (trimmedAddQty && (!Number.isFinite(Number(trimmedAddQty)) || Number(trimmedAddQty) <= 0)) {
+      toast.show("Add stock quantity must be a positive number.", "error");
+      return;
+    }
+
     const trimmedPrice = form.price.trim();
     const dto = {
       productId: form.productChoice === NO_SUBCATEGORY ? undefined : form.productChoice,
@@ -142,13 +162,14 @@ export function StockItemForm({
       price: trimmedPrice ? Number(trimmedPrice) : null,
       attributes: Object.fromEntries(Object.entries(form.attributes).filter(([, v]) => v.trim())),
       initialStock,
+      addStock: editing && trimmedAddQty ? { location: form.addStockLocation, quantity: Number(trimmedAddQty) } : undefined,
     };
 
     setSaving(true);
     try {
       if (editing) {
         await api.stock.updateItem(editing.id, dto);
-        toast.show("Stock item updated.", "success");
+        toast.show(dto.addStock ? `Stock item updated -- added ${dto.addStock.quantity} to ${LOCATION_LABELS[dto.addStock.location]}.` : "Stock item updated.", "success");
       } else {
         await api.stock.createItem(dto);
         toast.show("Stock item added.", "success");
@@ -318,7 +339,7 @@ export function StockItemForm({
         </div>
       )}
 
-      {editing && (
+      {editing && showBoxNumberField && (
         <label style={{ ...fieldLabelStyle, marginBottom: 16 }}>
           <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <Box size={12} /> Warehouse box number <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional -- only relevant if you keep this item in the Warehouse)</span>
@@ -330,6 +351,35 @@ export function StockItemForm({
             placeholder="e.g. Box 5"
           />
         </label>
+      )}
+
+      {editing && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-soft)", marginBottom: 8 }}>
+            Add stock <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional -- adds to whatever's already there; this is the only way to add more Warehouse stock)</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label style={fieldLabelStyle}>
+              Location
+              <select style={inputStyle} value={form.addStockLocation} onChange={(e) => setForm((f) => ({ ...f, addStockLocation: e.target.value as StockLocation }))}>
+                {ALL_LOCATIONS.map((l) => (
+                  <option key={l} value={l}>{LOCATION_LABELS[l]}</option>
+                ))}
+              </select>
+            </label>
+            <label style={fieldLabelStyle}>
+              Quantity
+              <input
+                type="number"
+                min={0}
+                style={inputStyle}
+                value={form.addStockQuantity}
+                onChange={(e) => setForm((f) => ({ ...f, addStockQuantity: e.target.value }))}
+                placeholder="0"
+              />
+            </label>
+          </div>
+        </div>
       )}
 
       {editing && (

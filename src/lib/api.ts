@@ -386,6 +386,10 @@ export interface CreateStockItemInput {
   price?: number | null;
   attributes?: Record<string, string>;
   initialStock?: { location: StockLocation; quantity: number }[];
+  // Update-only: adds this many units at this location as a "stock in"
+  // movement -- the only way to add more Warehouse stock to an item after
+  // creation, since Stock Movements blocks "stock in" there on purpose.
+  addStock?: { location: StockLocation; quantity: number };
 }
 
 export interface CreateStockMovementInput {
