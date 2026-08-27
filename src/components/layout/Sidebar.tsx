@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   Bookmark,
+  Shield,
 } from "lucide-react";
 import { Waveform } from "../ui/Waveform";
 import { Avatar } from "../ui/Avatar";
@@ -48,6 +49,7 @@ const ADMIN_NAV_ITEMS = [
   { to: "/employees", label: "Employees", icon: UserCog },
   { to: "/team", label: "Team", icon: UsersRound },
 ];
+const OWNER_NAV_ITEMS = [{ to: "/login-activity", label: "Login Activity", icon: Shield }];
 
 const STOCK_NAV_ITEMS = [
   { to: "/stock", label: "Overview", icon: LayoutDashboard },
@@ -191,14 +193,16 @@ export function Sidebar({
       )}
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {(mode === "stock"
-          ? STOCK_NAV_ITEMS
-          : [
-              ...NAV_ITEMS,
-              ...(canManage(appUser?.role) ? MANAGER_NAV_ITEMS : []),
-              ...(appUser?.role === "admin" ? ADMIN_NAV_ITEMS : []),
-            ]
-        ).map(({ to, label, icon: Icon }) => (
+        {[
+          ...(mode === "stock"
+            ? STOCK_NAV_ITEMS
+            : [
+                ...NAV_ITEMS,
+                ...(canManage(appUser?.role) ? MANAGER_NAV_ITEMS : []),
+                ...(appUser?.role === "admin" ? ADMIN_NAV_ITEMS : []),
+              ]),
+          ...(appUser?.isOwner ? OWNER_NAV_ITEMS : []),
+        ].map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

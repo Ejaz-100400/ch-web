@@ -423,3 +423,20 @@ export interface ConversionSummary {
   callToSaleRate: number | null;
   walkInToSaleRate: number | null;
 }
+
+export interface UserDevice {
+  id: string;
+  userId: string;
+  deviceLabel: string;
+  deviceType: string;
+  browser: string | null;
+  os: string | null;
+  ipAddress: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  loginCount: number;
+  user: { id: string; name: string; email: string; role: UserRole };
+}

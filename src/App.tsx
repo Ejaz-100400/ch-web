@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import CustomerList from "./pages/CustomerList";
 import CustomerDetails from "./pages/CustomerDetails";
 import Bookmarks from "./pages/Bookmarks";
+import DeviceActivity from "./pages/DeviceActivity";
 import CallList from "./pages/CallList";
 import CallDetails from "./pages/CallDetails";
 import MissedCalls from "./pages/MissedCalls";
@@ -39,6 +40,7 @@ export default function App() {
                 <Route path="/customers" element={<CustomerList />} />
                 <Route path="/customers/:id" element={<CustomerDetails />} />
                 <Route path="/bookmarks" element={<Bookmarks />} />
+                <Route path="/login-activity" element={<DeviceActivity />} />
                 <Route path="/calls" element={<CallList />} />
                 <Route path="/calls/:id" element={<CallDetails />} />
                 <Route path="/missed-calls" element={<MissedCalls />} />

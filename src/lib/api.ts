@@ -40,6 +40,7 @@ import type {
   TopCarModelPoint,
   TopEmployeePoint,
   TopProductPoint,
+  UserDevice,
   UserRole,
 } from "../types";
 
@@ -428,6 +429,8 @@ export interface UpdateExtractionInput {
 export const api = {
   auth: {
     me: () => request<AppUser>("/auth/me"),
+    devices: () => request<UserDevice[]>("/auth/devices"),
+    deleteDevice: (id: string) => request<{ deleted: true }>(`/auth/devices/${id}`, { method: "DELETE" }),
   },
 
   calls: {
