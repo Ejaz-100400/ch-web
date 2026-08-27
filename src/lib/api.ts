@@ -527,6 +527,9 @@ export const api = {
     counts: (q: FollowUpsQuery = {}) => request<FollowUpBreakdownPoint[]>(`/follow-ups/counts${query(q)}`),
     update: (id: string, dto: { status?: FollowUpStatus; assignedTo?: string; notes?: string }) =>
       request<FollowUp>(`/follow-ups/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    remove: (id: string) => request<{ deleted: true }>(`/follow-ups/${id}`, { method: "DELETE" }),
+    removeMany: (ids: string[]) =>
+      request<{ deleted: number }>("/follow-ups/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
   },
 
   reports: {

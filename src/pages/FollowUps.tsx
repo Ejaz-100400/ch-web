@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ClipboardCheck, Clock, PhoneMissed, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, Clock, PhoneMissed, CheckCircle2, AlertTriangle, Trash2 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, FilterSelect, SearchInput, MultiSelectFilter, AdvancedFiltersToggle, ClearFiltersButton } from "../components/ui/FilterBar";
 import { FollowUpStatusBadge, CategoryBadge } from "../components/ui/StatusBadge";
@@ -94,6 +94,10 @@ export default function FollowUps() {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [total, setTotal] = useState(0);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const isAdmin = appUser?.role === "admin";
 
   useEffect(() => {
     api.employees.list().then(setEmployees).catch(() => setEmployees([]));
@@ -201,6 +205,10 @@ export default function FollowUps() {
       .then((res) => {
         setFollowUps(res.items);
         setTotal(res.total);
+        // A selection only makes sense against the rows currently on screen --
+        // a fresh fetch (new page, new filters) means it's stale.
+        setSelectedIds(new Set());
+        setConfirmingDelete(false);
       })
       .catch((err) => toast.show(err instanceof ApiError ? err.message : "Failed to load follow-ups", "error"))
       .finally(() => setLoading(false));
@@ -238,6 +246,40 @@ export default function FollowUps() {
       toast.show(err instanceof ApiError ? err.message : "Failed to update follow-up", "error");
     } finally {
       setUpdating(null);
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allOnPageSelected = followUps.length > 0 && followUps.every((f) => selectedIds.has(f.id));
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds(allOnPageSelected ? new Set() : new Set(followUps.map((f) => f.id)));
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await api.followUps.removeMany(ids);
+      setFollowUps((prev) => prev.filter((f) => !selectedIds.has(f.id)));
+      setTotal((prev) => Math.max(0, prev - res.deleted));
+      setSelectedIds(new Set());
+      setConfirmingDelete(false);
+      toast.show(`Deleted ${res.deleted} follow-up${res.deleted === 1 ? "" : "s"}.`, "success");
+      loadCounts();
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Failed to delete follow-ups", "error");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -396,8 +438,38 @@ export default function FollowUps() {
         </FilterBar>
       )}
 
-      <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-        {loading ? <LoadingText /> : `${total} follow-up${total === 1 ? "" : "s"}`}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12.5, color: "var(--text-faint)" }}>
+          {loading ? <LoadingText /> : `${total} follow-up${total === 1 ? "" : "s"}`}
+        </div>
+
+        {isAdmin && selectedIds.size > 0 && (
+          <div className="fade-in-up" style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+            {confirmingDelete ? (
+              <>
+                <span style={{ color: "var(--coral)", fontWeight: 700 }}>
+                  Delete {selectedIds.size} follow-up{selectedIds.size === 1 ? "" : "s"}? This can't be undone.
+                </span>
+                <button onClick={handleBulkDelete} disabled={deleting} style={bulkDeleteConfirmButtonStyle}>
+                  {deleting ? "Deleting…" : "Confirm delete"}
+                </button>
+                <button onClick={() => setConfirmingDelete(false)} disabled={deleting} style={bulkCancelButtonStyle}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{ color: "var(--text-soft)", fontWeight: 600 }}>{selectedIds.size} selected</span>
+                <button onClick={() => setConfirmingDelete(true)} style={bulkDeleteButtonStyle}>
+                  <Trash2 size={13} /> Delete selected
+                </button>
+                <button onClick={() => setSelectedIds(new Set())} style={bulkCancelButtonStyle}>
+                  Clear
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div
@@ -410,12 +482,12 @@ export default function FollowUps() {
         }}
       >
       <div className="table-scroll">
-        <div style={{ minWidth: 760 }}>
+        <div style={{ minWidth: isAdmin ? 790 : 760 }}>
         <div
           className="mono"
           style={{
             display: "grid",
-            gridTemplateColumns: "110px 1fr 1.6fr 1fr 1.4fr 150px",
+            gridTemplateColumns: isAdmin ? "28px 110px 1fr 1.6fr 1fr 1.4fr 150px" : "110px 1fr 1.6fr 1fr 1.4fr 150px",
             padding: "10px 18px",
             fontSize: 11,
             fontFamily: "var(--font-body)",
@@ -426,6 +498,15 @@ export default function FollowUps() {
             borderBottom: "1px solid var(--border-soft)",
           }}
         >
+          {isAdmin && (
+            <input
+              type="checkbox"
+              checked={allOnPageSelected}
+              onChange={toggleSelectAllOnPage}
+              aria-label="Select all follow-ups on this page"
+              style={{ accentColor: "var(--brand)" }}
+            />
+          )}
           <span>Due</span>
           <span>Category</span>
           <span>Customer</span>
@@ -442,13 +523,22 @@ export default function FollowUps() {
               key={f.id}
               style={{
                 display: "grid",
-                gridTemplateColumns: "110px 1fr 1.6fr 1fr 1.4fr 150px",
+                gridTemplateColumns: isAdmin ? "28px 110px 1fr 1.6fr 1fr 1.4fr 150px" : "110px 1fr 1.6fr 1fr 1.4fr 150px",
                 alignItems: "center",
                 padding: "12px 18px",
                 borderBottom: "1px solid var(--border-soft)",
                 fontSize: 13,
               }}
             >
+              {isAdmin && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(f.id)}
+                  onChange={() => toggleSelect(f.id)}
+                  aria-label={`Select follow-up due ${formatDate(f.dueDate)}`}
+                  style={{ accentColor: "var(--brand)" }}
+                />
+              )}
               <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>{formatDate(f.dueDate)}</span>
               <span>{f.call && <CategoryBadge category={f.call.businessCategory} />}</span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
@@ -505,4 +595,37 @@ export default function FollowUps() {
     </div>
   );
 }
+
+const bulkDeleteButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "6px 12px",
+  background: "var(--coral-soft)",
+  color: "var(--coral)",
+  border: "1px solid var(--coral)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 12.5,
+  fontWeight: 700,
+} as const;
+
+const bulkDeleteConfirmButtonStyle = {
+  padding: "6px 12px",
+  background: "var(--coral)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 12.5,
+  fontWeight: 700,
+} as const;
+
+const bulkCancelButtonStyle = {
+  padding: "6px 12px",
+  background: "none",
+  color: "var(--text-soft)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-sm)",
+  fontSize: 12.5,
+  fontWeight: 600,
+} as const;
 
