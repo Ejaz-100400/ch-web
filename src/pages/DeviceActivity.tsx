@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShieldAlert, Laptop, Smartphone, Tablet, MonitorSmartphone, Trash2 } from "lucide-react";
+import { ShieldAlert, Laptop, Smartphone, Tablet, MonitorSmartphone, Trash2, MapPin } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, ClearFiltersButton } from "../components/ui/FilterBar";
 import { SkeletonRows } from "../components/ui/Skeleton";
@@ -135,8 +135,30 @@ export default function DeviceActivity() {
                           <span style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.deviceLabel}</span>
                         </span>
                         <span style={{ fontSize: 12.5, color: "var(--text-soft)" }}>
-                          {[d.city, d.region, d.country].filter(Boolean).join(", ") || "Unknown"}
-                          {d.ipAddress && <div className="mono" style={{ fontSize: 11, color: "var(--text-faint)" }}>{d.ipAddress}</div>}
+                          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                            {[d.city, d.region, d.country].filter(Boolean).join(", ") || "Unknown"}
+                            {d.locationSource === "gps" && (
+                              <span title="Precise GPS fix from the browser, not just an IP lookup" style={{ display: "inline-flex" }}>
+                                <MapPin size={11} color="var(--brand)" />
+                              </span>
+                            )}
+                          </span>
+                          {d.ipAddress && (
+                            <div className="mono" style={{ fontSize: 11, color: "var(--text-faint)" }}>
+                              {d.ipAddress}
+                              {d.locationSource !== "gps" && " (IP-based, approximate)"}
+                            </div>
+                          )}
+                          {d.lat != null && d.lng != null && (
+                            <a
+                              href={`https://www.google.com/maps?q=${d.lat},${d.lng}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ fontSize: 11, color: "var(--brand)" }}
+                            >
+                              View on map
+                            </a>
+                          )}
                         </span>
                         <span style={{ fontSize: 12, color: "var(--text-soft)" }} title={formatDateTime(d.firstSeenAt)}>
                           {relativeDay(d.firstSeenAt)}

@@ -16,6 +16,27 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Best-effort GPS fix, sent up alongside the IP-based location /auth/me
+ * already records. Entirely non-blocking: if the browser doesn't support
+ * geolocation, the user denies the permission prompt, or it times out, this
+ * silently does nothing and the IP-based location (already shown) stands.
+ * IP geolocation alone can be wildly wrong for anyone behind a VPN or
+ * Cloudflare WARP -- GPS is unaffected by that.
+ */
+function reportBrowserLocation() {
+  if (!("geolocation" in navigator)) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      api.auth.updateLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {});
+    },
+    () => {
+      // Permission denied, unavailable, or timed out -- nothing to do.
+    },
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
@@ -56,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .me()
       .then((u) => {
         if (active) setAppUser(u);
+        reportBrowserLocation();
       })
       .catch(() => {
         if (active) setAppUser(null);

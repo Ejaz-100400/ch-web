@@ -435,6 +435,12 @@ export interface UserDevice {
   city: string | null;
   region: string | null;
   country: string | null;
+  lat: number | null;
+  lng: number | null;
+  // "gps" when the browser's Geolocation permission gave us a precise fix,
+  // reverse-geocoded server-side; null/"ip" means city/region/country are
+  // only as accurate as the IP lookup (which a VPN can push way off).
+  locationSource: "gps" | "ip" | null;
   firstSeenAt: string;
   lastSeenAt: string;
   loginCount: number;

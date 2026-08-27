@@ -429,6 +429,8 @@ export interface UpdateExtractionInput {
 export const api = {
   auth: {
     me: () => request<AppUser>("/auth/me"),
+    updateLocation: (lat: number, lng: number) =>
+      request<{ updated: true }>("/auth/location", { method: "POST", body: JSON.stringify({ lat, lng }) }),
     devices: () => request<UserDevice[]>("/auth/devices"),
     deleteDevice: (id: string) => request<{ deleted: true }>(`/auth/devices/${id}`, { method: "DELETE" }),
   },
