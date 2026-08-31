@@ -2,15 +2,27 @@ import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
-import type { CallsByPeriodPoint, SentimentType } from "../../types";
+import type { CallsByPeriodPoint, DailyRatePoint, SentimentType } from "../../types";
 
-type Metric = "total" | "glasses" | "mods";
+type CountMetric = "total" | "glasses" | "mods";
+type RateMetric = "interestedRate" | "callToSaleRate" | "followUpCompletionRate";
+type Metric = CountMetric | RateMetric;
 
-const METRIC_OPTIONS: { value: Metric; label: string }[] = [
+const COUNT_OPTIONS: { value: CountMetric; label: string }[] = [
   { value: "total", label: "Total calls" },
   { value: "glasses", label: "Car Glasses" },
   { value: "mods", label: "Car Modifications" },
 ];
+
+const RATE_OPTIONS: { value: RateMetric; label: string }[] = [
+  { value: "interestedRate", label: "Interested rate" },
+  { value: "callToSaleRate", label: "Conversion rate" },
+  { value: "followUpCompletionRate", label: "Follow-up completed" },
+];
+
+function isRateMetric(metric: Metric): metric is RateMetric {
+  return metric === "interestedRate" || metric === "callToSaleRate" || metric === "followUpCompletionRate";
+}
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -51,6 +63,7 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
   const toast = useToast();
   const [metric, setMetric] = useState<Metric>("total");
   const [points, setPoints] = useState<CallsByPeriodPoint[]>([]);
+  const [ratePoints, setRatePoints] = useState<DailyRatePoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [year, monthNum] = month.split("-").map(Number);
@@ -71,13 +84,18 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
     [month, category, employeeId, carMake, carModel, sentiment, productId, daysInMonth],
   );
 
+  // Both the counts (for the Total calls/Car Glasses/Car Modifications row)
+  // and the rates (for the Interested rate/Conversion rate/Follow-up
+  // completed row) load together on every filter change -- switching
+  // between the two button rows is then instant, no re-fetch/flash needed.
   useEffect(() => {
     let active = true;
     setLoading(true);
-    api.reports
-      .callsByPeriod("daily", filters)
-      .then((res) => {
-        if (active) setPoints(res);
+    Promise.all([api.reports.callsByPeriod("daily", filters), api.reports.dailyRates(filters)])
+      .then(([counts, rates]) => {
+        if (!active) return;
+        setPoints(counts);
+        setRatePoints(rates);
       })
       .catch((err) => toast.show(err instanceof ApiError ? err.message : "Failed to load calendar data", "error"))
       .finally(() => {
@@ -89,17 +107,25 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  const byDay = new Map<number, { total: number; glasses: number; mods: number }>();
+  const byDayCount = new Map<number, { total: number; glasses: number; mods: number }>();
   for (const p of points) {
     const day = new Date(p.period).getDate();
-    byDay.set(day, {
+    byDayCount.set(day, {
       total: p.carGlasses + p.carModifications + p.unknown,
       glasses: p.carGlasses,
       mods: p.carModifications,
     });
   }
+  const byDayRate = new Map<number, DailyRatePoint>();
+  for (const p of ratePoints) {
+    byDayRate.set(new Date(p.period).getDate(), p);
+  }
 
-  const values = Array.from({ length: daysInMonth }, (_, i) => byDay.get(i + 1)?.[metric] ?? 0);
+  const rateActive = isRateMetric(metric);
+  const dayValue = (day: number): number | null =>
+    rateActive ? (byDayRate.get(day)?.[metric] ?? null) : (byDayCount.get(day)?.[metric as CountMetric] ?? 0);
+
+  const values = Array.from({ length: daysInMonth }, (_, i) => dayValue(i + 1) ?? 0);
   const max = Math.max(...values, 1);
 
   const cells: { day: number | null }[] = [
@@ -112,8 +138,8 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
 
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {METRIC_OPTIONS.map((opt) => (
+      <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+        {COUNT_OPTIONS.map((opt) => (
           <button
             key={opt.value}
             onClick={() => setMetric(opt.value)}
@@ -123,6 +149,26 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
               border: `1px solid ${metric === opt.value ? "var(--brand)" : "var(--border)"}`,
               background: metric === opt.value ? "var(--brand-soft)" : "var(--paper-raised)",
               color: metric === opt.value ? "var(--brand-strong)" : "var(--text)",
+              fontSize: 13,
+              fontWeight: metric === opt.value ? 700 : 600,
+              cursor: "pointer",
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        {RATE_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setMetric(opt.value)}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "var(--radius-sm)",
+              border: `1px solid ${metric === opt.value ? "var(--violet)" : "var(--border)"}`,
+              background: metric === opt.value ? "var(--violet-soft)" : "var(--paper-raised)",
+              color: metric === opt.value ? "var(--violet)" : "var(--text)",
               fontSize: 13,
               fontWeight: metric === opt.value ? 700 : 600,
               cursor: "pointer",
@@ -156,16 +202,21 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
                 </div>
                 {cells.slice(r * 7, r * 7 + 7).map((cell, i) => {
                   if (cell.day === null) return <div key={i} />;
-                  const dayValue = byDay.get(cell.day)?.[metric] ?? 0;
-                  const step = bucket(dayValue, max);
+                  const raw = dayValue(cell.day);
+                  // Rate metrics bucket against a fixed 0-100% scale (a 51%
+                  // day always looks the same shade regardless of what else
+                  // is on the calendar) -- count metrics keep bucketing
+                  // relative to this month's own busiest day, unchanged.
+                  const step = rateActive ? bucket(raw ?? 0, 100) : bucket(raw ?? 0, max);
                   const iso = `${month}-${String(cell.day).padStart(2, "0")}`;
                   const isSelected = iso === selectedDay;
+                  const displayValue = raw == null ? null : rateActive ? `${raw}%` : raw;
                   return (
                     <button
                       key={i}
                       onClick={() => onSelectDay(iso)}
                       aria-pressed={isSelected}
-                      aria-label={`View ${iso}, ${dayValue} call${dayValue === 1 ? "" : "s"}`}
+                      aria-label={`View ${iso}, ${displayValue ?? "no data"}`}
                       style={{
                         minHeight: 52,
                         borderRadius: 6,
@@ -180,7 +231,7 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
                       }}
                     >
                       <span style={{ fontSize: 11, color: "var(--text-soft)" }}>{cell.day}</span>
-                      {dayValue > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{dayValue}</span>}
+                      {displayValue != null && <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{displayValue}</span>}
                     </button>
                   );
                 })}

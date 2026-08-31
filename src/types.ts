@@ -171,6 +171,9 @@ export interface ReportsSummary {
   avgCallDurationSeconds: number | null;
   interestedRate: number | null;
   followUpCompletionRate: number | null;
+  // % of "worth following up on" calls (interested or needs_follow_up) with
+  // a matching call-sourced sale.
+  callToSaleRate: number | null;
   totalCustomers: number;
   returningCustomers: number;
 }
@@ -180,6 +183,13 @@ export interface CallsByPeriodPoint {
   carGlasses: number;
   carModifications: number;
   unknown: number;
+}
+
+export interface DailyRatePoint {
+  period: string;
+  interestedRate: number | null;
+  callToSaleRate: number | null;
+  followUpCompletionRate: number | null;
 }
 
 export interface CustomersByPeriodPoint {

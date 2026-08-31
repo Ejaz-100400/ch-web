@@ -16,7 +16,7 @@ import {
   Cell,
   ReferenceDot,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Smile, AlertTriangle, HelpCircle, Users, Repeat2, Eye, EyeOff, CheckCircle2, PhoneMissed } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Smile, AlertTriangle, HelpCircle, Users, Repeat2, Eye, EyeOff, CheckCircle2, PhoneMissed, Handshake } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
@@ -324,6 +324,13 @@ export default function Reports() {
               icon={Smile}
               label="Interested rate"
               value={summary?.interestedRate != null ? `${summary.interestedRate}%` : "—"}
+              tint="var(--brand)"
+              loading={loading}
+            />
+            <KpiCard
+              icon={Handshake}
+              label="Call → Sale rate"
+              value={summary?.callToSaleRate != null ? `${summary.callToSaleRate}%` : "—"}
               tint="var(--brand)"
               loading={loading}
             />

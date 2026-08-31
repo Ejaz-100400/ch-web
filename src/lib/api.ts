@@ -10,6 +10,7 @@ import type {
   CallDuplicateGroup,
   CallExtraction,
   CallsByPeriodPoint,
+  DailyRatePoint,
   ConversionSummary,
   Customer,
   CustomerCallHistoryRow,
@@ -544,6 +545,7 @@ export const api = {
       request<CallsByPeriodPoint[]>(`/reports/calls-by-period${query({ granularity, ...q })}`),
     customersByPeriod: (granularity: "daily" | "weekly" | "monthly" = "daily", q: ReportsQuery = {}) =>
       request<CustomersByPeriodPoint[]>(`/reports/customers-by-period${query({ granularity, ...q })}`),
+    dailyRates: (q: ReportsQuery = {}) => request<DailyRatePoint[]>(`/reports/daily-rates${query(q)}`),
     followUps: (q: ReportsQuery = {}) => request<FollowUpBreakdownPoint[]>(`/reports/follow-ups${query(q)}`),
     sentiment: (q: ReportsQuery = {}) => request<SentimentBreakdownPoint[]>(`/reports/sentiment${query(q)}`),
     topCarModels: (limit?: number, q: ReportsQuery = {}) =>
