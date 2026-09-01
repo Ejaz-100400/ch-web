@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 
 // Native <input type="date"> renders its visible text in whatever locale the
@@ -64,6 +65,12 @@ export function DateInput({ value, onChange, style, disabled, placeholder, ...re
   const [text, setText] = useState(() => isoToDisplay(value));
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  // The popup renders in a portal (see below) so a scroll-clipping ancestor
+  // -- AppShell's <main> is exactly this -- can never cut it off the way an
+  // inline position:absolute child would be. Position is computed from the
+  // input's real screen location instead of relying on CSS inheritance.
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
   const selected = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
   const today = new Date();
@@ -83,12 +90,39 @@ export function DateInput({ value, onChange, style, disabled, placeholder, ...re
   }, [open]);
 
   useEffect(() => {
+    if (!open || !rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left });
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (popupRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    // Simpler and less error-prone than tracking every scrollable ancestor
+    // to keep the popup glued to the input -- closing on scroll/resize is
+    // the same behavior most popover libraries default to. `capture: true`
+    // so this fires for a scroll on any ancestor (e.g. AppShell's <main>),
+    // not just window-level scrolling.
+    function close() {
+      setOpen(false);
+    }
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
   }, [open]);
 
   function commitText() {
@@ -157,14 +191,15 @@ export function DateInput({ value, onChange, style, disabled, placeholder, ...re
         )}
       </div>
 
-      {open && !disabled && (
+      {open && !disabled && coords && createPortal(
         <div
+          ref={popupRef}
           className="fade-in-up"
           style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            zIndex: 30,
+            position: "fixed",
+            top: coords.top,
+            left: coords.left,
+            zIndex: 1000,
             width: 240,
             background: "var(--paper-raised)",
             border: "1px solid var(--border)",
@@ -248,7 +283,8 @@ export function DateInput({ value, onChange, style, disabled, placeholder, ...re
               Clear
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
