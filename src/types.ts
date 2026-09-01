@@ -309,6 +309,7 @@ export type SaleSource =
   | "instagram"
   | "facebook"
   | "youtube"
+  | "regular_customer"
   | "unknown";
 
 export type EnquiryOutcome = "purchased" | "not_purchased" | "undecided";
