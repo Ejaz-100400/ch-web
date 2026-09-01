@@ -20,6 +20,9 @@ import {
   UserCircle,
   UserPlus,
   Pencil,
+  Camera,
+  ThumbsUp,
+  PlayCircle,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -50,6 +53,9 @@ const SOURCE_LABELS: Record<SaleSource, string> = {
   dastagir: "Dastagir",
   karthik: "Karthik",
   referral: "Referral",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  youtube: "YouTube",
   unknown: "Unknown",
 };
 const SOURCE_ICONS: Record<SaleSource, typeof Phone> = {
@@ -60,6 +66,9 @@ const SOURCE_ICONS: Record<SaleSource, typeof Phone> = {
   dastagir: User,
   karthik: UserCircle,
   referral: UserPlus,
+  instagram: Camera,
+  facebook: ThumbsUp,
+  youtube: PlayCircle,
   unknown: HelpCircle,
 };
 const SOURCE_OPTIONS = (Object.keys(SOURCE_LABELS) as SaleSource[]).map((value) => ({ value, label: SOURCE_LABELS[value] }));
