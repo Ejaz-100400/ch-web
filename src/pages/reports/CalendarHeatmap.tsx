@@ -16,7 +16,7 @@ const COUNT_OPTIONS: { value: CountMetric; label: string }[] = [
 
 const RATE_OPTIONS: { value: RateMetric; label: string }[] = [
   { value: "interestedRate", label: "Interested rate" },
-  { value: "callToSaleRate", label: "Conversion rate" },
+  { value: "callToSaleRate", label: "Call → Sale rate" },
   { value: "followUpCompletionRate", label: "Follow-up completed" },
 ];
 
@@ -85,7 +85,7 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
   );
 
   // Both the counts (for the Total calls/Car Glasses/Car Modifications row)
-  // and the rates (for the Interested rate/Conversion rate/Follow-up
+  // and the rates (for the Interested rate/Call → Sale rate/Follow-up
   // completed row) load together on every filter change -- switching
   // between the two button rows is then instant, no re-fetch/flash needed.
   useEffect(() => {
