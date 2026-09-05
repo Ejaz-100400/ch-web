@@ -174,6 +174,8 @@ export interface ReportsSummary {
   // % of "worth following up on" calls (interested or needs_follow_up) with
   // a matching call-sourced sale.
   callToSaleRate: number | null;
+  // % of total sales (any source) that came through a social/messaging channel.
+  socialMediaToSaleRate: number | null;
   totalCustomers: number;
   returningCustomers: number;
 }
@@ -220,6 +222,10 @@ export interface TopEmployeePoint {
 export interface BranchBreakdownPoint {
   branch: Branch;
   count: number;
+  interested: number;
+  needsFollowUp: number;
+  notInterested: number;
+  unknown: number;
 }
 
 export interface TopCarModelPoint {

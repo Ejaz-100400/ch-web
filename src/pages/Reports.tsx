@@ -16,7 +16,7 @@ import {
   Cell,
   ReferenceDot,
 } from "recharts";
-import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Smile, AlertTriangle, HelpCircle, Users, Repeat2, Eye, EyeOff, CheckCircle2, PhoneMissed, Handshake } from "lucide-react";
+import { PhoneCall, Glasses, Wrench, CalendarClock, SlidersHorizontal, Timer, Smile, AlertTriangle, HelpCircle, Users, Repeat2, Eye, EyeOff, CheckCircle2, PhoneMissed, Handshake, Share2 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
@@ -92,7 +92,7 @@ const SENTIMENT_COLORS: Record<string, string> = {
   unknown: "#9199a8",
 };
 
-const EMPLOYEE_SENTIMENT_LEGEND = [
+const SENTIMENT_LEGEND = [
   { key: "interested", label: "Interested", color: SENTIMENT_COLORS.interested },
   { key: "needs_follow_up", label: "Needs follow-up", color: SENTIMENT_COLORS.needs_follow_up },
   { key: "not_interested", label: "Not interested", color: SENTIMENT_COLORS.not_interested },
@@ -241,7 +241,14 @@ export default function Reports() {
     not_interested: e.notInterested,
     unknown: e.unknown,
   }));
-  const branchData = branchBreakdown.map((b) => ({ name: BRANCH_LABELS[b.branch], count: b.count }));
+  const branchData = branchBreakdown.map((b) => ({
+    name: BRANCH_LABELS[b.branch],
+    count: b.count,
+    interested: b.interested,
+    needs_follow_up: b.needsFollowUp,
+    not_interested: b.notInterested,
+    unknown: b.unknown,
+  }));
 
   const hasActiveFilters = Boolean(
     category.length ||
@@ -346,6 +353,13 @@ export default function Reports() {
               icon={Handshake}
               label="Call → Sale rate"
               value={summary?.callToSaleRate != null ? `${summary.callToSaleRate}%` : "—"}
+              tint="var(--brand)"
+              loading={loading}
+            />
+            <KpiCard
+              icon={Share2}
+              label="Social media → Sales rate"
+              value={summary?.socialMediaToSaleRate != null ? `${summary.socialMediaToSaleRate}%` : "—"}
               tint="var(--brand)"
               loading={loading}
             />
@@ -570,7 +584,7 @@ export default function Reports() {
                   <BarChart data={employeeData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
                     <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
                     <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
-                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} formatter={(value, key) => [value, EMPLOYEE_SENTIMENT_LEGEND.find((s) => s.key === key)?.label ?? String(key)]} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} formatter={(value, key) => [value, SENTIMENT_LEGEND.find((s) => s.key === key)?.label ?? String(key)]} />
                     <Bar dataKey="interested" stackId="sentiment" fill={SENTIMENT_COLORS.interested} maxBarSize={18} isAnimationActive />
                     <Bar dataKey="needs_follow_up" stackId="sentiment" fill={SENTIMENT_COLORS.needs_follow_up} maxBarSize={18} isAnimationActive />
                     <Bar dataKey="not_interested" stackId="sentiment" fill={SENTIMENT_COLORS.not_interested} maxBarSize={18} isAnimationActive />
@@ -579,7 +593,7 @@ export default function Reports() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <Legend items={EMPLOYEE_SENTIMENT_LEGEND} />
+                <Legend items={SENTIMENT_LEGEND} />
               </>
             )}
           </div>
@@ -591,16 +605,22 @@ export default function Reports() {
             ) : branchData.length === 0 ? (
               <EmptyChart message="No branch assigned to any call yet -- tracked from now on, so older calls won't show here." />
             ) : (
-              <ResponsiveContainer width="100%" height={Math.max(180, branchData.length * 34)}>
-                <BarChart data={branchData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
-                  <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
-                  <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
-                  <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                  <Bar dataKey="count" fill="#1e9e58" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
-                    <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={Math.max(180, branchData.length * 34)}>
+                  <BarChart data={branchData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
+                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
+                    <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} formatter={(value, key) => [value, SENTIMENT_LEGEND.find((s) => s.key === key)?.label ?? String(key)]} />
+                    <Bar dataKey="interested" stackId="sentiment" fill={SENTIMENT_COLORS.interested} maxBarSize={18} isAnimationActive />
+                    <Bar dataKey="needs_follow_up" stackId="sentiment" fill={SENTIMENT_COLORS.needs_follow_up} maxBarSize={18} isAnimationActive />
+                    <Bar dataKey="not_interested" stackId="sentiment" fill={SENTIMENT_COLORS.not_interested} maxBarSize={18} isAnimationActive />
+                    <Bar dataKey="unknown" stackId="sentiment" fill={SENTIMENT_COLORS.unknown} radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <Legend items={SENTIMENT_LEGEND} />
+              </>
             )}
           </div>
 
