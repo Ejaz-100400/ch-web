@@ -5,7 +5,7 @@ import { Skeleton } from "../../components/ui/Skeleton";
 import type { CallsByPeriodPoint, DailyRatePoint, SentimentType } from "../../types";
 
 type CountMetric = "total" | "glasses" | "mods";
-type RateMetric = "interestedRate" | "callToSaleRate" | "followUpCompletionRate";
+type RateMetric = "interestedRate" | "callToSaleRate" | "followUpCompletionRate" | "socialMediaToSaleRate";
 type Metric = CountMetric | RateMetric;
 
 const COUNT_OPTIONS: { value: CountMetric; label: string }[] = [
@@ -18,10 +18,16 @@ const RATE_OPTIONS: { value: RateMetric; label: string }[] = [
   { value: "interestedRate", label: "Interested rate" },
   { value: "callToSaleRate", label: "Call → Sale rate" },
   { value: "followUpCompletionRate", label: "Follow-up completed" },
+  { value: "socialMediaToSaleRate", label: "Social media → Sales rate" },
 ];
 
 function isRateMetric(metric: Metric): metric is RateMetric {
-  return metric === "interestedRate" || metric === "callToSaleRate" || metric === "followUpCompletionRate";
+  return (
+    metric === "interestedRate" ||
+    metric === "callToSaleRate" ||
+    metric === "followUpCompletionRate" ||
+    metric === "socialMediaToSaleRate"
+  );
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

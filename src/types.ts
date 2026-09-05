@@ -190,6 +190,7 @@ export interface DailyRatePoint {
   interestedRate: number | null;
   callToSaleRate: number | null;
   followUpCompletionRate: number | null;
+  socialMediaToSaleRate: number | null;
 }
 
 export interface CustomersByPeriodPoint {
