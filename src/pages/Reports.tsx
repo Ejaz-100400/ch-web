@@ -89,7 +89,15 @@ const SENTIMENT_COLORS: Record<string, string> = {
   interested: "#17967f",
   not_interested: "#d9503a",
   needs_follow_up: "#d99a2b",
+  unknown: "#9199a8",
 };
+
+const EMPLOYEE_SENTIMENT_LEGEND = [
+  { key: "interested", label: "Interested", color: SENTIMENT_COLORS.interested },
+  { key: "needs_follow_up", label: "Needs follow-up", color: SENTIMENT_COLORS.needs_follow_up },
+  { key: "not_interested", label: "Not interested", color: SENTIMENT_COLORS.not_interested },
+  { key: "unknown", label: "Not yet extracted", color: SENTIMENT_COLORS.unknown },
+];
 
 export default function Reports() {
   const toast = useToast();
@@ -225,7 +233,14 @@ export default function Reports() {
   const carModelData = topCarModels.map((c) => ({ name: c.car_model, count: c.count }));
   const carMakeData = topCarMakes.map((c) => ({ name: c.car_make, count: c.count }));
   const carVizData = carVizMode === "model" ? carModelData : carMakeData;
-  const employeeData = topEmployees.map((e) => ({ name: e.name, count: e.count }));
+  const employeeData = topEmployees.map((e) => ({
+    name: e.name,
+    count: e.count,
+    interested: e.interested,
+    needs_follow_up: e.needsFollowUp,
+    not_interested: e.notInterested,
+    unknown: e.unknown,
+  }));
   const branchData = branchBreakdown.map((b) => ({ name: BRANCH_LABELS[b.branch], count: b.count }));
 
   const hasActiveFilters = Boolean(
@@ -550,16 +565,22 @@ export default function Reports() {
             ) : employeeData.length === 0 ? (
               <EmptyChart message="No calls assigned to an employee yet." />
             ) : (
-              <ResponsiveContainer width="100%" height={Math.max(220, employeeData.length * 32)}>
-                <BarChart data={employeeData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
-                  <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
-                  <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
-                  <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} />
-                  <Bar dataKey="count" fill="#d99a2b" radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
-                    <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={Math.max(220, employeeData.length * 32)}>
+                  <BarChart data={employeeData} layout="vertical" margin={{ left: 0, right: 30, top: 8 }}>
+                    <XAxis type="number" tick={{ fontSize: 12, fill: "#5b6270" }} axisLine={false} tickLine={false} allowDecimals={false} hide />
+                    <YAxis type="category" dataKey="name" interval={0} tick={{ fontSize: 11, fill: "#5b6270" }} axisLine={false} tickLine={false} width={130} />
+                    <Tooltip contentStyle={{ borderRadius: 8, borderColor: "#e2e4ea", fontSize: 13 }} formatter={(value, key) => [value, EMPLOYEE_SENTIMENT_LEGEND.find((s) => s.key === key)?.label ?? String(key)]} />
+                    <Bar dataKey="interested" stackId="sentiment" fill={SENTIMENT_COLORS.interested} maxBarSize={18} isAnimationActive />
+                    <Bar dataKey="needs_follow_up" stackId="sentiment" fill={SENTIMENT_COLORS.needs_follow_up} maxBarSize={18} isAnimationActive />
+                    <Bar dataKey="not_interested" stackId="sentiment" fill={SENTIMENT_COLORS.not_interested} maxBarSize={18} isAnimationActive />
+                    <Bar dataKey="unknown" stackId="sentiment" fill={SENTIMENT_COLORS.unknown} radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive>
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#5b6270" fontWeight={700} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <Legend items={EMPLOYEE_SENTIMENT_LEGEND} />
+              </>
             )}
           </div>
 

@@ -210,6 +210,10 @@ export interface SentimentBreakdownPoint {
 export interface TopEmployeePoint {
   name: string;
   count: number;
+  interested: number;
+  needsFollowUp: number;
+  notInterested: number;
+  unknown: number;
 }
 
 export interface BranchBreakdownPoint {
