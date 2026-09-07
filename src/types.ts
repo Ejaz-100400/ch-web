@@ -467,6 +467,8 @@ export interface ConversionSummary {
   purchasedEnquiries: number;
   callToSaleRate: number | null;
   walkInToSaleRate: number | null;
+  socialMediaToSaleRate: number | null;
+  overallConversionRate: number | null;
 }
 
 export interface UserDevice {

@@ -24,6 +24,8 @@ import {
   ThumbsUp,
   PlayCircle,
   Repeat2,
+  Share2,
+  Target,
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
@@ -141,6 +143,8 @@ export default function CustomerTracker() {
 
   const callRate = summary?.callToSaleRate;
   const walkInRate = summary?.walkInToSaleRate;
+  const socialRate = summary?.socialMediaToSaleRate;
+  const overallRate = summary?.overallConversionRate;
 
   return (
     <div>
@@ -155,6 +159,8 @@ export default function CustomerTracker() {
         <KpiCard icon={Users} label="Total enquiries" value={summary?.totalEnquiries} tint="var(--violet)" loading={summaryLoading} />
         <KpiCard icon={Phone} label="Call → Sale rate" value={callRate != null ? `${callRate}%` : "—"} tint="var(--brand)" loading={summaryLoading} />
         <KpiCard icon={Store} label="Walk-in → Sale rate" value={walkInRate != null ? `${walkInRate}%` : "—"} tint="var(--violet)" loading={summaryLoading} />
+        <KpiCard icon={Share2} label="Social media → Sale rate" value={socialRate != null ? `${socialRate}%` : "—"} tint="var(--brand)" loading={summaryLoading} />
+        <KpiCard icon={Target} label="Overall conversion" value={overallRate != null ? `${overallRate}%` : "—"} tint="var(--violet)" loading={summaryLoading} />
       </div>
 
       {summary && summary.salesBySource.length > 0 && (
