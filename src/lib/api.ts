@@ -579,7 +579,8 @@ export const api = {
 
   export: {
     calls: (format: "xlsx" | "pdf", q: CallsQuery = {}) => requestBlob(`/export/calls.${format}${query(q)}`),
-    history: () => request<AuditLogEntry[]>("/export/history"),
+    stock: (format: "xlsx" | "pdf", q: StockItemsQuery = {}) => requestBlob(`/export/stock.${format}${query(q)}`),
+    history: (entity?: "calls" | "stock") => request<AuditLogEntry[]>(`/export/history${query({ entity })}`),
   },
 
   import: {

@@ -2,89 +2,72 @@ import { useEffect, useState, type ReactNode } from "react";
 import { FileSpreadsheet, FileText, Download, ShieldAlert } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
-import { DateInput } from "../components/ui/DateInput";
-import { api, ApiError, downloadBlob, type CallsQuery } from "../lib/api";
+import { api, ApiError, downloadBlob, type StockItemsQuery } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { Spinner, LoadingText } from "../components/ui/Spinner";
 import { formatDateTime } from "../lib/format";
-import type { AuditLogEntry, Employee } from "../types";
+import type { AuditLogEntry } from "../types";
 
 type ExportFormat = "xlsx" | "pdf";
 
 const CATEGORY_LABELS: Record<string, string> = {
   car_glasses: "Car Glasses",
   car_modifications: "Car Modifications",
-  unknown: "Unknown",
 };
 
-// filters.category/employeeId may be a plain string on older audit log
-// entries logged before these became multi-select arrays -- normalize
-// either shape to an array so old history still renders correctly.
+const CATEGORY_OPTIONS = [
+  { value: "car_glasses", label: "Car Glasses" },
+  { value: "car_modifications", label: "Car Modifications" },
+];
+
+const ACTIVE_OPTIONS = [
+  { value: "true", label: "Active only" },
+  { value: "false", label: "Inactive only" },
+];
+
+const FORMATS: { value: ExportFormat; label: string; icon: typeof FileText; description: string }[] = [
+  { value: "xlsx", label: "Excel", icon: FileSpreadsheet, description: "One row per item, one column per branch + Warehouse" },
+  { value: "pdf", label: "PDF", icon: FileText, description: "Formatted report table" },
+];
+
 function asArray(value: unknown): string[] {
   if (Array.isArray(value)) return value as string[];
   if (typeof value === "string" && value) return [value];
   return [];
 }
 
-function summarizeFilters(filters: Record<string, unknown> | undefined, employees: Employee[]): string {
-  if (!filters) return "All calls";
+function summarizeFilters(filters: Record<string, unknown> | undefined): string {
+  if (!filters) return "All stock items";
   const parts: string[] = [];
   const categories = asArray(filters.category);
   if (categories.length) parts.push(categories.map((c) => CATEGORY_LABELS[c] ?? c).join(" or "));
-  const employeeIds = asArray(filters.employeeId);
-  if (employeeIds.length) {
-    parts.push(employeeIds.map((id) => employees.find((e) => e.id === id)?.name ?? "employee").join(", "));
-  }
-  if (filters.dateFrom || filters.dateTo) parts.push(`${filters.dateFrom ?? "…"} – ${filters.dateTo ?? "…"}`);
-  return parts.length ? parts.join(", ") : "All calls";
+  if (filters.active === true) parts.push("Active only");
+  if (filters.active === false) parts.push("Inactive only");
+  if (filters.search) parts.push(`"${filters.search}"`);
+  return parts.length ? parts.join(", ") : "All stock items";
 }
 
-const CATEGORY_OPTIONS = [
-  { value: "car_glasses", label: "Car Glasses" },
-  { value: "car_modifications", label: "Car Modifications" },
-  { value: "unknown", label: "Unknown" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "completed", label: "Completed" },
-  { value: "failed", label: "Failed" },
-];
-
-const FORMATS: { value: ExportFormat; label: string; icon: typeof FileText; description: string }[] = [
-  { value: "xlsx", label: "Excel", icon: FileSpreadsheet, description: "Spreadsheet with one row per call" },
-  { value: "pdf", label: "PDF", icon: FileText, description: "Formatted report table" },
-];
-
-export default function Export() {
+export default function StockExport() {
   const { appUser } = useAuth();
   const toast = useToast();
 
   const [category, setCategory] = useState<string[]>([]);
-  const [status, setStatus] = useState<string[]>([]);
-  const [employeeId, setEmployeeId] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [timeFrom, setTimeFrom] = useState("");
-  const [timeTo, setTimeTo] = useState("");
+  const [active, setActive] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
   const [format, setFormat] = useState<ExportFormat>("xlsx");
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [generating, setGenerating] = useState(false);
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
   useEffect(() => {
-    api.employees.list().then(setEmployees).catch(() => setEmployees([]));
     loadHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function loadHistory() {
     setHistoryLoading(true);
     return api.export
-      .history("calls")
+      .history("stock")
       .then(setHistory)
       .catch(() => setHistory([]))
       .finally(() => setHistoryLoading(false));
@@ -93,7 +76,7 @@ export default function Export() {
   if (!canManage(appUser?.role)) {
     return (
       <div>
-        <PageHeader eyebrow="Export" title="Export data" />
+        <PageHeader eyebrow="Stock Tracking" title="Export stock report" />
         <div style={{ ...cardStyle, textAlign: "center", padding: 40, color: "var(--text-faint)" }}>
           <ShieldAlert size={22} style={{ marginBottom: 8, opacity: 0.6 }} />
           <p style={{ fontWeight: 600, color: "var(--text-soft)" }}>Export requires manager or admin access</p>
@@ -105,19 +88,15 @@ export default function Export() {
 
   async function handleGenerate() {
     setGenerating(true);
-    const query: CallsQuery = {
-      category: category.length ? category : undefined,
-      status: status.length ? status : undefined,
-      employeeId: employeeId.length ? employeeId : undefined,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
-      timeFrom: dateFrom && timeFrom ? timeFrom : undefined,
-      timeTo: dateTo && timeTo ? timeTo : undefined,
+    const q: StockItemsQuery = {
+      category: category.length ? (category as ("car_glasses" | "car_modifications")[]) : undefined,
+      active: active.length === 1 ? active[0] === "true" : undefined,
+      search: search || undefined,
     };
     try {
-      const blob = await api.export.calls(format, query);
+      const blob = await api.export.stock(format, q);
       const dateStamp = new Date().toISOString().slice(0, 10);
-      downloadBlob(blob, `calls-export-${dateStamp}.${format}`);
+      downloadBlob(blob, `stock-export-${dateStamp}.${format}`);
       toast.show(`${format.toUpperCase()} export downloaded.`, "success");
       await loadHistory();
     } catch (err) {
@@ -127,55 +106,29 @@ export default function Export() {
     }
   }
 
-  const employeeOptions = employees.map((e) => ({ value: e.id, label: e.name }));
-
   return (
     <div>
       <PageHeader
-        eyebrow="Export"
-        title="Export calls"
-        description="Generate an Excel or PDF report of calls matching your filters, straight from the live data — same filters as the Calls page."
+        eyebrow="Stock Tracking"
+        title="Export stock report"
+        description="Generate an Excel or PDF report of stock on hand, broken down by branch and category -- straight from live data."
       />
 
       <div className="grid-responsive-2" style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 20, alignItems: "start" }}>
         {/* Configuration */}
         <div style={cardStyle}>
-          <SectionLabel>1. Filter which calls</SectionLabel>
+          <SectionLabel>1. Filter which items</SectionLabel>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 22 }}>
             <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} triggerStyle={{ width: "100%" }} />
-            <MultiSelectFilter label="Status" values={status} onChange={setStatus} options={STATUS_OPTIONS} triggerStyle={{ width: "100%" }} />
-            <MultiSelectFilter label="Employee" values={employeeId} onChange={setEmployeeId} options={employeeOptions} triggerStyle={{ width: "100%" }} />
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <label style={fieldLabelStyle}>From</label>
-                <DateInput value={dateFrom} onChange={setDateFrom} style={inputStyle} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={fieldLabelStyle}>To</label>
-                <DateInput value={dateTo} onChange={setDateTo} style={inputStyle} />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <label style={fieldLabelStyle}>From time</label>
-                <input
-                  type="time"
-                  value={timeFrom}
-                  onChange={(e) => setTimeFrom(e.target.value)}
-                  disabled={!dateFrom}
-                  style={{ ...inputStyle, opacity: dateFrom ? 1 : 0.5 }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={fieldLabelStyle}>To time</label>
-                <input
-                  type="time"
-                  value={timeTo}
-                  onChange={(e) => setTimeTo(e.target.value)}
-                  disabled={!dateTo}
-                  style={{ ...inputStyle, opacity: dateTo ? 1 : 0.5 }}
-                />
-              </div>
+            <MultiSelectFilter label="Status" values={active} onChange={(v) => setActive(v.slice(-1))} options={ACTIVE_OPTIONS} triggerStyle={{ width: "100%" }} />
+            <div>
+              <label style={fieldLabelStyle}>Search by name</label>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="e.g. 120W/4300K"
+                style={inputStyle}
+              />
             </div>
           </div>
 
@@ -183,7 +136,7 @@ export default function Export() {
           <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
             {FORMATS.map((f) => {
               const Icon = f.icon;
-              const active = format === f.value;
+              const activeFormat = format === f.value;
               return (
                 <button
                   key={f.value}
@@ -196,9 +149,9 @@ export default function Export() {
                     alignItems: "center",
                     gap: 6,
                     padding: "12px 8px",
-                    border: `1px solid ${active ? "var(--brand)" : "var(--border)"}`,
-                    background: active ? "var(--brand-soft)" : "var(--paper)",
-                    color: active ? "var(--brand-strong)" : "var(--text-soft)",
+                    border: `1px solid ${activeFormat ? "var(--brand)" : "var(--border)"}`,
+                    background: activeFormat ? "var(--brand-soft)" : "var(--paper)",
+                    color: activeFormat ? "var(--brand-strong)" : "var(--text-soft)",
                     borderRadius: "var(--radius-sm)",
                     fontSize: 12.5,
                     fontWeight: 700,
@@ -264,7 +217,7 @@ export default function Export() {
                     </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                        {summarizeFilters(h.details?.filters as Record<string, unknown> | undefined, employees)}
+                        {summarizeFilters(h.details?.filters as Record<string, unknown> | undefined)}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
                         {h.user?.name ?? "Unknown user"} · {format.toUpperCase()} · {formatDateTime(h.createdAt)}

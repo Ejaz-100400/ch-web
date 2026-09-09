@@ -55,6 +55,7 @@ const STOCK_NAV_ITEMS = [
   { to: "/stock", label: "Overview", icon: LayoutDashboard },
   { to: "/stock/items", label: "Stock Items", icon: Package },
   { to: "/stock/movements", label: "Movements", icon: ArrowLeftRight },
+  { to: "/stock/export", label: "Export", icon: Download },
 ];
 
 const ROLE_LABEL: Record<string, string> = { admin: "Admin", manager: "Manager", viewer: "Viewer" };

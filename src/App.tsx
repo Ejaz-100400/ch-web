@@ -23,6 +23,7 @@ import StockOverview from "./pages/StockOverview";
 import StockItems from "./pages/StockItems";
 import StockItemsByLocation from "./pages/StockItemsByLocation";
 import StockMovements from "./pages/StockMovements";
+import StockExport from "./pages/StockExport";
 import TeamCoverage from "./pages/TeamCoverage";
 import Team from "./pages/Team";
 import SetPassword from "./pages/SetPassword";
@@ -58,6 +59,7 @@ export default function App() {
                 <Route path="/stock/items" element={<StockItems />} />
                 <Route path="/stock/items/:location" element={<StockItemsByLocation />} />
                 <Route path="/stock/movements" element={<StockMovements />} />
+                <Route path="/stock/export" element={<StockExport />} />
               </Route>
               <Route path="/" element={<Navigate to="/customers" replace />} />
               <Route path="*" element={<Navigate to="/customers" replace />} />
