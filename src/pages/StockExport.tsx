@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { FileSpreadsheet, FileText, Download, ShieldAlert } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
+import { SuggestInput } from "../components/ui/SuggestInput";
 import { api, ApiError, downloadBlob, type StockExportQuery } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { Spinner, LoadingText } from "../components/ui/Spinner";
 import { formatDateTime } from "../lib/format";
-import type { AuditLogEntry, Branch, Product, StockLocation } from "../types";
+import type { AuditLogEntry, Branch, Product, StockItem, StockLocation } from "../types";
 
 type ExportFormat = "xlsx" | "pdf";
 
@@ -75,9 +76,11 @@ export default function StockExport() {
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
+  const [items, setItems] = useState<StockItem[]>([]);
 
   useEffect(() => {
     api.products.list().then(setProducts).catch(() => setProducts([]));
+    api.stock.items({}).then(setItems).catch(() => setItems([]));
     loadHistory();
   }, []);
 
@@ -91,6 +94,19 @@ export default function StockExport() {
         .filter((p) => category.length === 0 || category.includes(p.category))
         .map((p) => ({ value: p.id, label: p.name })),
     [products, category],
+  );
+
+  // Suggestions for the name search -- narrowed to whatever category/
+  // subcategory is already picked, same reasoning as productOptions, so
+  // the dropdown only ever shows names that could actually appear together
+  // with the other active filters.
+  const itemNameOptions = useMemo(
+    () =>
+      items
+        .filter((i) => category.length === 0 || category.includes(i.category))
+        .filter((i) => productId.length === 0 || (i.productId && productId.includes(i.productId)))
+        .map((i) => i.name),
+    [items, category, productId],
   );
 
   function loadHistory() {
@@ -167,12 +183,7 @@ export default function StockExport() {
             <MultiSelectFilter label="Status" values={active} onChange={(v) => setActive(v.slice(-1))} options={ACTIVE_OPTIONS} triggerStyle={{ width: "100%" }} />
             <div>
               <label style={fieldLabelStyle}>Search by name</label>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="e.g. 120W/4300K"
-                style={inputStyle}
-              />
+              <SuggestInput value={search} onChange={setSearch} options={itemNameOptions} placeholder="e.g. 120W/4300K" style={inputStyle} />
             </div>
           </div>
 
