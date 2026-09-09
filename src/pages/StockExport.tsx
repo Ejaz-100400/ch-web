@@ -1,13 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { FileSpreadsheet, FileText, Download, ShieldAlert } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { MultiSelectFilter } from "../components/ui/FilterBar";
-import { api, ApiError, downloadBlob, type StockItemsQuery } from "../lib/api";
+import { api, ApiError, downloadBlob, type StockExportQuery } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { Spinner, LoadingText } from "../components/ui/Spinner";
 import { formatDateTime } from "../lib/format";
-import type { AuditLogEntry } from "../types";
+import type { AuditLogEntry, Branch, Product, StockLocation } from "../types";
 
 type ExportFormat = "xlsx" | "pdf";
 
@@ -26,6 +26,15 @@ const ACTIVE_OPTIONS = [
   { value: "false", label: "Inactive only" },
 ];
 
+const BRANCH_LABELS: Record<Branch, string> = {
+  ambattur: "Ambattur (HQ)",
+  kattankulathur: "Kattankulathur",
+  sithalapakkam: "Sithalapakkam",
+  pondicherry: "Pondicherry",
+};
+const LOCATION_LABELS: Record<StockLocation, string> = { ...BRANCH_LABELS, warehouse: "Warehouse" };
+const LOCATION_OPTIONS = (Object.keys(LOCATION_LABELS) as StockLocation[]).map((value) => ({ value, label: LOCATION_LABELS[value] }));
+
 const FORMATS: { value: ExportFormat; label: string; icon: typeof FileText; description: string }[] = [
   { value: "xlsx", label: "Excel", icon: FileSpreadsheet, description: "One row per item, one column per branch + Warehouse" },
   { value: "pdf", label: "PDF", icon: FileText, description: "Formatted report table" },
@@ -37,11 +46,15 @@ function asArray(value: unknown): string[] {
   return [];
 }
 
-function summarizeFilters(filters: Record<string, unknown> | undefined): string {
+function summarizeFilters(filters: Record<string, unknown> | undefined, products: Product[]): string {
   if (!filters) return "All stock items";
   const parts: string[] = [];
   const categories = asArray(filters.category);
   if (categories.length) parts.push(categories.map((c) => CATEGORY_LABELS[c] ?? c).join(" or "));
+  const productIds = asArray(filters.productId);
+  if (productIds.length) parts.push(productIds.map((id) => products.find((p) => p.id === id)?.name ?? "subcategory").join(", "));
+  const locations = asArray(filters.location);
+  if (locations.length) parts.push(locations.map((l) => LOCATION_LABELS[l as StockLocation] ?? l).join(", "));
   if (filters.active === true) parts.push("Active only");
   if (filters.active === false) parts.push("Inactive only");
   if (filters.search) parts.push(`"${filters.search}"`);
@@ -53,16 +66,32 @@ export default function StockExport() {
   const toast = useToast();
 
   const [category, setCategory] = useState<string[]>([]);
+  const [productId, setProductId] = useState<string[]>([]);
+  const [location, setLocation] = useState<string[]>([]);
   const [active, setActive] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [format, setFormat] = useState<ExportFormat>("xlsx");
   const [generating, setGenerating] = useState(false);
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
+    api.products.list().then(setProducts).catch(() => setProducts([]));
     loadHistory();
   }, []);
+
+  // Subcategory options narrow to the selected category (if any) -- a
+  // product only ever belongs to one category, so showing every product
+  // regardless of the category filter would offer picks that could never
+  // actually match together.
+  const productOptions = useMemo(
+    () =>
+      products
+        .filter((p) => category.length === 0 || category.includes(p.category))
+        .map((p) => ({ value: p.id, label: p.name })),
+    [products, category],
+  );
 
   function loadHistory() {
     setHistoryLoading(true);
@@ -88,8 +117,10 @@ export default function StockExport() {
 
   async function handleGenerate() {
     setGenerating(true);
-    const q: StockItemsQuery = {
+    const q: StockExportQuery = {
       category: category.length ? (category as ("car_glasses" | "car_modifications")[]) : undefined,
+      productId: productId.length ? productId : undefined,
+      location: location.length ? (location as StockLocation[]) : undefined,
       active: active.length === 1 ? active[0] === "true" : undefined,
       search: search || undefined,
     };
@@ -119,7 +150,20 @@ export default function StockExport() {
         <div style={cardStyle}>
           <SectionLabel>1. Filter which items</SectionLabel>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 22 }}>
-            <MultiSelectFilter label="Category" values={category} onChange={setCategory} options={CATEGORY_OPTIONS} triggerStyle={{ width: "100%" }} />
+            <MultiSelectFilter
+              label="Category"
+              values={category}
+              onChange={(v) => {
+                setCategory(v);
+                // Drop any picked subcategory that no longer belongs to the
+                // narrowed category set -- a product only has one category,
+                // so a stale pick here could never actually match.
+                setProductId((ids) => ids.filter((id) => v.length === 0 || products.find((p) => p.id === id && v.includes(p.category))));
+              }}
+              options={CATEGORY_OPTIONS}
+              triggerStyle={{ width: "100%" }}
+            />
+            <MultiSelectFilter label="Subcategory" values={productId} onChange={setProductId} options={productOptions} triggerStyle={{ width: "100%" }} />
             <MultiSelectFilter label="Status" values={active} onChange={(v) => setActive(v.slice(-1))} options={ACTIVE_OPTIONS} triggerStyle={{ width: "100%" }} />
             <div>
               <label style={fieldLabelStyle}>Search by name</label>
@@ -132,7 +176,15 @@ export default function StockExport() {
             </div>
           </div>
 
-          <SectionLabel>2. File format</SectionLabel>
+          <SectionLabel>2. Which locations to include</SectionLabel>
+          <div style={{ marginBottom: 22 }}>
+            <MultiSelectFilter label="Branch / Warehouse" values={location} onChange={setLocation} options={LOCATION_OPTIONS} triggerStyle={{ width: "100%" }} />
+            <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 6 }}>
+              Leave empty to include every branch and the Warehouse as separate columns.
+            </p>
+          </div>
+
+          <SectionLabel>3. File format</SectionLabel>
           <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
             {FORMATS.map((f) => {
               const Icon = f.icon;
@@ -217,7 +269,7 @@ export default function StockExport() {
                     </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                        {summarizeFilters(h.details?.filters as Record<string, unknown> | undefined)}
+                        {summarizeFilters(h.details?.filters as Record<string, unknown> | undefined, products)}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
                         {h.user?.name ?? "Unknown user"} · {format.toUpperCase()} · {formatDateTime(h.createdAt)}

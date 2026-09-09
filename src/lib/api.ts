@@ -356,8 +356,16 @@ export interface CreateEnquiryInput {
 
 export interface StockItemsQuery {
   category?: ("car_glasses" | "car_modifications")[];
+  // The Product catalog link -- "subcategory" in the UI (e.g. "LED Fog").
+  productId?: string[];
   search?: string;
   active?: boolean;
+}
+
+export interface StockExportQuery extends StockItemsQuery {
+  // Export-only: which location columns the report renders. Unset/empty
+  // means all locations, same as every other multi-select filter.
+  location?: StockLocation[];
 }
 
 export interface StockMovementsQuery {
@@ -579,7 +587,7 @@ export const api = {
 
   export: {
     calls: (format: "xlsx" | "pdf", q: CallsQuery = {}) => requestBlob(`/export/calls.${format}${query(q)}`),
-    stock: (format: "xlsx" | "pdf", q: StockItemsQuery = {}) => requestBlob(`/export/stock.${format}${query(q)}`),
+    stock: (format: "xlsx" | "pdf", q: StockExportQuery = {}) => requestBlob(`/export/stock.${format}${query(q)}`),
     history: (entity?: "calls" | "stock") => request<AuditLogEntry[]>(`/export/history${query({ entity })}`),
   },
 
