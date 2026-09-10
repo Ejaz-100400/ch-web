@@ -33,6 +33,7 @@ import type {
   SentimentBreakdownPoint,
   SentimentType,
   StockItem,
+  StockItemDetail,
   StockLocation,
   StockMovement,
   StockMovementType,
@@ -637,6 +638,7 @@ export const api = {
   stock: {
     overview: (q: StockOverviewQuery = {}) => request<StockOverview>(`/stock/overview${query(q)}`),
     items: (q: StockItemsQuery = {}) => request<StockItem[]>(`/stock/items${query(q)}`),
+    item: (id: string) => request<StockItemDetail>(`/stock/items/${id}`),
     createItem: (dto: CreateStockItemInput) => request<StockItem>("/stock/items", { method: "POST", body: JSON.stringify(dto) }),
     updateItem: (id: string, dto: Partial<CreateStockItemInput>) =>
       request<StockItem>(`/stock/items/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),

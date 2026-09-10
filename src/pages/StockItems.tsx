@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Package, Plus, Pencil, Trash2, ShieldAlert, MapPin, Boxes, AlertTriangle, Box } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -246,7 +246,9 @@ export default function StockItems() {
                     <motion.div key={item.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle}>
                       <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden", opacity: item.active ? 1 : 0.5 }}>
                         <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.name}
+                          <Link to={`/stock/item/${item.id}`} style={{ color: "inherit", textDecoration: "none" }} title={`View ${item.name} movement history`}>
+                            {item.name}
+                          </Link>
                           {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
                         </span>
                         {item.boxNumber && (() => {

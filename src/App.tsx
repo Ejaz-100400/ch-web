@@ -24,6 +24,7 @@ import StockItems from "./pages/StockItems";
 import StockItemsByLocation from "./pages/StockItemsByLocation";
 import StockMovements from "./pages/StockMovements";
 import StockExport from "./pages/StockExport";
+import StockItemDetail from "./pages/StockItemDetail";
 import TeamCoverage from "./pages/TeamCoverage";
 import Team from "./pages/Team";
 import SetPassword from "./pages/SetPassword";
@@ -57,6 +58,7 @@ export default function App() {
                 <Route path="/customer-tracker" element={<CustomerTracker />} />
                 <Route path="/stock" element={<StockOverview />} />
                 <Route path="/stock/items" element={<StockItems />} />
+                <Route path="/stock/item/:id" element={<StockItemDetail />} />
                 <Route path="/stock/items/:location" element={<StockItemsByLocation />} />
                 <Route path="/stock/movements" element={<StockMovements />} />
                 <Route path="/stock/export" element={<StockExport />} />

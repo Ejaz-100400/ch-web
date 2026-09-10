@@ -421,6 +421,11 @@ export interface StockItem {
   quantities: StockItemQuantity[];
 }
 
+export interface StockItemDetail extends StockItem {
+  product: { id: string; name: string } | null;
+  totals: { in: number; out: number; net: number; movementCount: number };
+}
+
 export interface StockMovement {
   id: string;
   stockItemId: string;

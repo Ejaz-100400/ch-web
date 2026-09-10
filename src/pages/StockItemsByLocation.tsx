@@ -201,7 +201,9 @@ export default function StockItemsByLocation() {
                     return (
                       <motion.div key={item.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle(location)}>
                         <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.active ? 1 : 0.5 }}>
-                          {item.name}
+                          <Link to={`/stock/item/${item.id}`} style={{ color: "inherit", textDecoration: "none" }} title={`View ${item.name} movement history`}>
+                            {item.name}
+                          </Link>
                           {!item.active && <span style={{ fontWeight: 400, color: "var(--text-faint)", fontSize: 11 }}> (inactive)</span>}
                         </span>
                         {location === "warehouse" && (
