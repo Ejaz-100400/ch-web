@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowDownToLine,
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { CategoryBadge } from "../components/ui/StatusBadge";
-import { SkeletonRows } from "../components/ui/Skeleton";
+import { Skeleton } from "../components/ui/Skeleton";
 import { Pagination } from "../components/ui/Pagination";
 import { LoadingText } from "../components/ui/Spinner";
 import { api, ApiError } from "../lib/api";
@@ -183,54 +183,63 @@ export default function StockItemDetail() {
             ))}
           </div>
 
-          {/* Movement history */}
-          <SectionLabel>Movement history</SectionLabel>
-          <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginBottom: 10 }}>
-            {movementsLoading ? <LoadingText /> : `${total} movement${total === 1 ? "" : "s"}`}
-          </div>
-          <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
-            <div className="table-scroll">
-              <div style={{ minWidth: 680 }}>
-                <div className="mono" style={theadStyle}>
-                  <span>Date</span>
-                  <span>Location</span>
-                  <span>Type</span>
-                  <span>Qty</span>
-                  <span>Reason</span>
-                  <span>Entered by</span>
-                </div>
-
-                {movementsLoading && <SkeletonRows rows={6} />}
-
-                {!movementsLoading && (
-                  <motion.div variants={listContainerVariants} initial="hidden" animate="visible">
-                    <AnimatePresence initial={false}>
-                      {movements.map((m) => (
-                        <motion.div key={m.id} layout="position" variants={listItemVariants} exit="exit" style={trowStyle}>
-                          <span className="mono" style={{ color: "var(--text-soft)", fontSize: 12 }}>{formatDate(m.movementDate)}</span>
-                          <span style={{ color: "var(--text-soft)", fontSize: 12.5 }}>{LOCATION_LABELS[m.location]}</span>
-                          <span>{typeBadge(m)}</span>
-                          <span className="mono" style={{ fontWeight: 700 }}>{m.quantity}</span>
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reasonCell(m)}</span>
-                          <span style={{ color: "var(--text-faint)", fontSize: 12.5 }}>{m.enteredBy?.name ?? "—"}</span>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
+          {/* Movement history -- vertical timeline, styled after the call-history tracker */}
+          <SectionLabel>Movement history{!movementsLoading && ` · ${total}`}</SectionLabel>
+          <div style={{ background: "var(--paper-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 14, boxShadow: "var(--shadow-card)" }}>
+            {movementsLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} style={{ display: "flex", gap: 12 }}>
+                    <Skeleton width={12} height={12} radius={999} />
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <Skeleton width={170} height={12} />
+                      <Skeleton width={110} height={10} />
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-
-            {!movementsLoading && movements.length === 0 && (
-              <div style={{ padding: "40px 24px", textAlign: "center", color: "var(--text-faint)" }}>
+            ) : movements.length === 0 ? (
+              <div style={{ padding: "28px 8px", textAlign: "center", color: "var(--text-faint)" }}>
                 <ArrowRightLeft size={20} style={{ marginBottom: 8, opacity: 0.5 }} />
                 <p style={{ fontWeight: 600, color: "var(--text-soft)", marginBottom: 4 }}>No movements logged for this item yet</p>
                 <p style={{ fontSize: 13 }}>Its stock came in with the item and hasn't moved since.</p>
               </div>
+            ) : (
+              <div style={{ maxHeight: 440, overflowY: "auto", paddingRight: 4 }}>
+                <motion.div variants={listContainerVariants} initial="hidden" animate="visible" style={{ display: "flex", flexDirection: "column" }}>
+                  {movements.map((m, i) => {
+                    const color = movementColor(m);
+                    const last = i === movements.length - 1;
+                    return (
+                      <motion.div key={m.id} variants={listItemVariants} style={{ display: "flex", gap: 12 }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                          <span style={{ width: 12, height: 12, borderRadius: "50%", background: color, marginTop: 3, flexShrink: 0 }} />
+                          {!last && <span style={{ width: 2, flex: 1, minHeight: 24, background: "var(--border)", marginTop: 3 }} />}
+                        </div>
+                        <div style={{ paddingBottom: last ? 0 : 16, minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            {typeBadge(m)}
+                            <span style={{ fontSize: 13, fontWeight: 700 }}>
+                              {m.quantity} {m.type === "in" ? "in" : "out"} · {LOCATION_LABELS[m.location]}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12.5, color: "var(--text-soft)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {reasonCell(m)}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
+                            {formatDate(m.movementDate)}
+                            {m.enteredBy?.name ? ` · ${m.enteredBy.name}` : ""}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              </div>
             )}
           </div>
 
-          {!movementsLoading && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />}
+          {!movementsLoading && totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />}
         </>
       )}
     </div>
@@ -284,6 +293,12 @@ function typeBadge(m: StockMovement) {
   );
 }
 
+function movementColor(m: StockMovement): string {
+  if (m.transferId) return "var(--violet)";
+  if (m.swapId) return "var(--amber)";
+  return m.type === "in" ? "var(--brand-strong)" : "var(--coral)";
+}
+
 function reasonCell(m: StockMovement) {
   if (m.transferId && m.relatedLocation) {
     return (
@@ -309,30 +324,6 @@ const cardStyle: CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-md)",
   boxShadow: "var(--shadow-card)",
-};
-
-const gridColumns = "100px 1.1fr 90px 60px 1.3fr 1fr";
-
-const theadStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: gridColumns,
-  padding: "10px 18px",
-  fontSize: 11,
-  fontFamily: "var(--font-body)",
-  fontWeight: 700,
-  color: "var(--text-faint)",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  borderBottom: "1px solid var(--border-soft)",
-};
-
-const trowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: gridColumns,
-  alignItems: "center",
-  padding: "12px 18px",
-  borderBottom: "1px solid var(--border-soft)",
-  fontSize: 13,
 };
 
 const primaryButtonStyle: CSSProperties = {
