@@ -9,7 +9,7 @@ const POLL_INTERVAL_MS = 5 * 60_000;
 const BRANCH_LABELS: Record<Branch, string> = {
   ambattur: "Ambattur",
   kattankulathur: "Kattankulathur",
-  sithalapakkam: "Sithalapakkam",
+  sithalapakkam: "Velacherry",
   pondicherry: "Pondicherry",
 };
 

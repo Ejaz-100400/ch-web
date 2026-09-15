@@ -43,7 +43,7 @@ import type { Branch, ConversionSummary, Employee, EnquiryOutcome, InPersonEnqui
 const BRANCH_LABELS: Record<Branch, string> = {
   ambattur: "Ambattur (HQ)",
   kattankulathur: "Kattankulathur",
-  sithalapakkam: "Sithalapakkam",
+  sithalapakkam: "Velacherry",
   pondicherry: "Pondicherry",
 };
 const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));

@@ -47,7 +47,7 @@ const CATEGORY_OPTIONS: { value: BusinessCategory; label: string }[] = [
 const BRANCH_OPTIONS: { value: Branch; label: string }[] = [
   { value: "ambattur", label: "Ambattur (HQ)" },
   { value: "kattankulathur", label: "Kattankulathur" },
-  { value: "sithalapakkam", label: "Sithalapakkam" },
+  { value: "sithalapakkam", label: "Velacherry" },
   { value: "pondicherry", label: "Pondicherry" },
 ];
 

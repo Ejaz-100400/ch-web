@@ -32,7 +32,7 @@ const FOLLOWUP_STATUS_META: Record<FollowUpStatus, { label: string; color: strin
 const BRANCH_META: Record<Branch, { label: string; color: string; bg: string }> = {
   ambattur: { label: "Ambattur (HQ)", color: "var(--brand-strong)", bg: "var(--brand-soft)" },
   kattankulathur: { label: "Kattankulathur", color: "var(--violet)", bg: "var(--violet-soft)" },
-  sithalapakkam: { label: "Sithalapakkam", color: "var(--success)", bg: "var(--success-soft)" },
+  sithalapakkam: { label: "Velacherry", color: "var(--success)", bg: "var(--success-soft)" },
   pondicherry: { label: "Pondicherry", color: "var(--info)", bg: "var(--info-soft)" },
 };
 
