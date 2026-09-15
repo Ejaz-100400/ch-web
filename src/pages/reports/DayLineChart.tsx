@@ -18,13 +18,15 @@ interface DayLineChartProps {
   onNextDay: () => void;
   category: string[];
   employeeId: string[];
+  branch: string[];
+  status: string[];
   carMake: string[];
   carModel: string[];
   sentiment: string[];
   productId: string[];
 }
 
-export function DayLineChart({ day, onPrevDay, onNextDay, category, employeeId, carMake, carModel, sentiment, productId }: DayLineChartProps) {
+export function DayLineChart({ day, onPrevDay, onNextDay, category, employeeId, branch, status, carMake, carModel, sentiment, productId }: DayLineChartProps) {
   const toast = useToast();
   const [points, setPoints] = useState<CallsByPeriodPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,8 @@ export function DayLineChart({ day, onPrevDay, onNextDay, category, employeeId, 
     () => ({
       category: category.length ? category : undefined,
       employeeId: employeeId.length ? employeeId : undefined,
+      branch: branch.length ? branch : undefined,
+      status: status.length ? status : undefined,
       carMake: carMake.length ? carMake : undefined,
       carModel: carModel.length ? carModel : undefined,
       sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
@@ -40,7 +44,7 @@ export function DayLineChart({ day, onPrevDay, onNextDay, category, employeeId, 
       dateFrom: day,
       dateTo: day,
     }),
-    [day, category, employeeId, carMake, carModel, sentiment, productId],
+    [day, category, employeeId, branch, status, carMake, carModel, sentiment, productId],
   );
 
   useEffect(() => {

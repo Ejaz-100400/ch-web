@@ -57,6 +57,8 @@ interface CalendarHeatmapProps {
   month: string; // "YYYY-MM"
   category: string[];
   employeeId: string[];
+  branch: string[];
+  status: string[];
   carMake: string[];
   carModel: string[];
   sentiment: string[];
@@ -65,7 +67,7 @@ interface CalendarHeatmapProps {
   onSelectDay: (day: string) => void;
 }
 
-export function CalendarHeatmap({ month, category, employeeId, carMake, carModel, sentiment, productId, selectedDay, onSelectDay }: CalendarHeatmapProps) {
+export function CalendarHeatmap({ month, category, employeeId, branch, status, carMake, carModel, sentiment, productId, selectedDay, onSelectDay }: CalendarHeatmapProps) {
   const toast = useToast();
   const [metric, setMetric] = useState<Metric>("total");
   const [points, setPoints] = useState<CallsByPeriodPoint[]>([]);
@@ -80,6 +82,8 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
     () => ({
       category: category.length ? category : undefined,
       employeeId: employeeId.length ? employeeId : undefined,
+      branch: branch.length ? branch : undefined,
+      status: status.length ? status : undefined,
       carMake: carMake.length ? carMake : undefined,
       carModel: carModel.length ? carModel : undefined,
       sentiment: sentiment.length ? (sentiment as SentimentType[]) : undefined,
@@ -87,7 +91,7 @@ export function CalendarHeatmap({ month, category, employeeId, carMake, carModel
       dateFrom: `${month}-01`,
       dateTo: `${month}-${String(daysInMonth).padStart(2, "0")}`,
     }),
-    [month, category, employeeId, carMake, carModel, sentiment, productId, daysInMonth],
+    [month, category, employeeId, branch, status, carMake, carModel, sentiment, productId, daysInMonth],
   );
 
   // Both the counts (for the Total calls/Car Glasses/Car Modifications row)

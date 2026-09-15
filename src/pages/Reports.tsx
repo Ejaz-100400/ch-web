@@ -642,6 +642,8 @@ export default function Reports() {
             month={selectedMonth}
             category={category}
             employeeId={employeeId}
+            branch={branch}
+            status={status}
             carMake={carMake}
             carModel={carModel}
             sentiment={sentiment}

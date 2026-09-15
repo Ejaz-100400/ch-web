@@ -6,6 +6,8 @@ interface CalendarTabProps {
   month: string;
   category: string[];
   employeeId: string[];
+  branch: string[];
+  status: string[];
   carMake: string[];
   carModel: string[];
   sentiment: string[];
@@ -30,6 +32,8 @@ export function CalendarTab(props: CalendarTabProps) {
         onNextDay={() => setSelectedDay((d) => shiftDay(d, 1))}
         category={props.category}
         employeeId={props.employeeId}
+        branch={props.branch}
+        status={props.status}
         carMake={props.carMake}
         carModel={props.carModel}
         sentiment={props.sentiment}
