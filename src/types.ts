@@ -62,6 +62,29 @@ export interface Product {
   createdAt: string;
 }
 
+export interface WhatsAppConversationSummary {
+  id: string;
+  customer: { id: string; name: string | null; phoneNumber: string };
+  businessCategory: "car_glasses" | "car_modifications" | "unknown";
+  lastMessageAt: string;
+  lastMessagePreview: string | null;
+  lastMessageDirection: "inbound" | "outbound" | null;
+  // AI-classified against the Product catalog -- see product-color.ts for
+  // how each one gets its gradient.
+  products: { id: string; name: string; category: "car_glasses" | "car_modifications" }[];
+}
+
+export interface WhatsAppMessage {
+  id: string;
+  conversationId: string;
+  externalMessageId: string;
+  direction: "inbound" | "outbound";
+  messageType: string;
+  body: string | null;
+  timestamp: string;
+  createdAt: string;
+}
+
 export interface Transcript {
   id: string;
   callId: string;

@@ -43,6 +43,8 @@ import type {
   TopEmployeePoint,
   TopProductPoint,
   UserDevice,
+  WhatsAppConversationSummary,
+  WhatsAppMessage,
   UserRole,
 } from "../types";
 
@@ -324,6 +326,12 @@ export interface EnquiriesQuery {
   dateTo?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface WhatsAppConversationsQuery {
+  category?: ("car_glasses" | "car_modifications" | "unknown")[];
+  productId?: string[];
+  search?: string;
 }
 
 export interface ConversionSummaryQuery {
@@ -633,6 +641,11 @@ export const api = {
     list: (q: EnquiriesQuery = {}) => request<Paginated<InPersonEnquiry>>(`/enquiries${query(q)}`),
     create: (dto: CreateEnquiryInput) => request<InPersonEnquiry>("/enquiries", { method: "POST", body: JSON.stringify(dto) }),
     update: (id: string, dto: Partial<CreateEnquiryInput>) => request<InPersonEnquiry>(`/enquiries/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+  },
+
+  whatsapp: {
+    conversations: (q: WhatsAppConversationsQuery = {}) => request<WhatsAppConversationSummary[]>(`/whatsapp/conversations${query(q)}`),
+    messages: (conversationId: string) => request<WhatsAppMessage[]>(`/whatsapp/conversations/${conversationId}/messages`),
   },
 
   stock: {
