@@ -3,7 +3,7 @@ import { X, Box } from "lucide-react";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../ui/Toast";
 import { SuggestInput } from "../ui/SuggestInput";
-import { variantFieldsForProduct } from "../../lib/stock-variant-fields";
+import { SIDED_PRODUCT_SIDES, isSidedProduct, variantFieldsForProduct } from "../../lib/stock-variant-fields";
 import type { Branch, Product, StockItem, StockLocation } from "../../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
@@ -33,6 +33,10 @@ interface ItemFormState {
   storageType: "branch" | "warehouse";
   startingBranch: Branch;
   startingQuantity: string;
+  // Only used for Left/Right products (see isSidedProduct): one starting
+  // count per side instead of the single startingQuantity.
+  leftQuantity: string;
+  rightQuantity: string;
   boxNumber: string;
   price: string;
   attributes: Record<string, string>;
@@ -52,6 +56,8 @@ function emptyForm(defaultLocation?: StockLocation): ItemFormState {
     storageType: startsAtWarehouse ? "warehouse" : "branch",
     startingBranch: defaultLocation && !startsAtWarehouse ? defaultLocation : "ambattur",
     startingQuantity: "",
+    leftQuantity: "",
+    rightQuantity: "",
     boxNumber: "",
     price: "",
     attributes: {},
@@ -92,6 +98,8 @@ export function StockItemForm({
           storageType: "branch",
           startingBranch: "ambattur",
           startingQuantity: "",
+          leftQuantity: "",
+          rightQuantity: "",
           boxNumber: editing.boxNumber ?? "",
           price: editing.price != null ? String(editing.price) : "",
           attributes: editing.attributes ?? {},
@@ -112,6 +120,9 @@ export function StockItemForm({
 
   const selectedProductName = useMemo(() => products.find((p) => p.id === form.productChoice)?.name, [products, form.productChoice]);
   const variantFields = variantFieldsForProduct(selectedProductName);
+  // Creating (not editing) a Left/Right product makes two items at once --
+  // editing always touches the one item that was opened.
+  const sidedCreate = !editing && isSidedProduct(selectedProductName);
 
   // Same make/model suggestions the call edit form uses -- fetched only once
   // a subcategory that actually has make/model fields is picked, so the
@@ -148,11 +159,20 @@ export function StockItemForm({
       return;
     }
 
+    const startingLocation = form.storageType === "warehouse" ? ("warehouse" as const) : form.startingBranch;
     const startingQty = Number(form.startingQuantity);
-    const initialStock =
-      !editing && startingQty > 0
-        ? [{ location: form.storageType === "warehouse" ? ("warehouse" as const) : form.startingBranch, quantity: startingQty }]
-        : undefined;
+    const initialStock = !editing && !sidedCreate && startingQty > 0 ? [{ location: startingLocation, quantity: startingQty }] : undefined;
+
+    const sideQuantities = { Left: form.leftQuantity.trim(), Right: form.rightQuantity.trim() };
+    if (sidedCreate) {
+      for (const side of SIDED_PRODUCT_SIDES) {
+        const raw = sideQuantities[side];
+        if (raw && (!Number.isFinite(Number(raw)) || Number(raw) < 0)) {
+          toast.show(`${side} quantity must be a number, 0 or more.`, "error");
+          return;
+        }
+      }
+    }
 
     const trimmedAddQty = form.addStockQuantity.trim();
     if (trimmedAddQty && (!Number.isFinite(Number(trimmedAddQty)) || Number(trimmedAddQty) <= 0)) {
@@ -183,6 +203,31 @@ export function StockItemForm({
       if (editing) {
         await api.stock.updateItem(editing.id, dto);
         toast.show(dto.addStock ? `Stock item updated -- added ${dto.addStock.quantity} to ${LOCATION_LABELS[dto.addStock.location]}.` : "Stock item updated.", "success");
+      } else if (sidedCreate) {
+        // One item per side, each with its own name, side attribute and
+        // starting count -- they're separate physical parts, so each needs
+        // its own stock level and movement history. Sequential so a name
+        // clash on the second one can be reported without hiding that the
+        // first already went through.
+        const created: string[] = [];
+        for (const side of SIDED_PRODUCT_SIDES) {
+          const qty = Number(sideQuantities[side]);
+          try {
+            await api.stock.createItem({
+              ...dto,
+              name: `${dto.name} - ${side}`,
+              attributes: { ...dto.attributes, side },
+              initialStock: qty > 0 ? [{ location: startingLocation, quantity: qty }] : undefined,
+            });
+            created.push(side);
+          } catch (err) {
+            const reason = err instanceof ApiError ? err.message : "Failed to save stock item";
+            toast.show(created.length ? `${created.join(", ")} was added, but ${side} failed: ${reason}` : reason, "error");
+            if (created.length) onSaved();
+            return;
+          }
+        }
+        toast.show("Left and Right stock items added.", "success");
       } else {
         await api.stock.createItem(dto);
         toast.show("Stock item added.", "success");
@@ -234,7 +279,17 @@ export function StockItemForm({
 
       <label style={{ ...fieldLabelStyle, marginBottom: 12 }}>
         Product name
-        <input style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Amy Tricolor Fog" />
+        <input
+          style={inputStyle}
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          placeholder={sidedCreate ? "e.g. Honda City 2018 Headlight Glass" : "e.g. Amy Tricolor Fog"}
+        />
+        {sidedCreate && (
+          <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>
+            Left and Right are added as two separate items -- "{form.name.trim() || "…"} - Left" and "{form.name.trim() || "…"} - Right".
+          </span>
+        )}
       </label>
 
       {variantFields && (
@@ -249,14 +304,7 @@ export function StockItemForm({
               return (
                 <label key={field.key} style={fieldLabelStyle}>
                   {field.label}
-                  {field.input === "select" ? (
-                    <select style={inputStyle} value={value} onChange={(e) => setValue(e.target.value)}>
-                      <option value="">Select…</option>
-                      {field.options?.map((o) => (
-                        <option key={o} value={o}>{o}</option>
-                      ))}
-                    </select>
-                  ) : field.input === "suggest-make" || field.input === "suggest-model" ? (
+                  {field.input === "suggest-make" || field.input === "suggest-model" ? (
                     <SuggestInput
                       style={inputStyle}
                       value={value}
@@ -331,7 +379,7 @@ export function StockItemForm({
               );
             })}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: sidedCreate ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
             {form.storageType === "branch" && (
               <label style={fieldLabelStyle}>
                 Branch
@@ -342,17 +390,44 @@ export function StockItemForm({
                 </select>
               </label>
             )}
-            <label style={fieldLabelStyle}>
-              Quantity
-              <input
-                type="number"
-                min={0}
-                style={inputStyle}
-                value={form.startingQuantity}
-                onChange={(e) => setForm((f) => ({ ...f, startingQuantity: e.target.value }))}
-                placeholder="0"
-              />
-            </label>
+            {sidedCreate ? (
+              <>
+                <label style={fieldLabelStyle}>
+                  Left quantity
+                  <input
+                    type="number"
+                    min={0}
+                    style={inputStyle}
+                    value={form.leftQuantity}
+                    onChange={(e) => setForm((f) => ({ ...f, leftQuantity: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+                <label style={fieldLabelStyle}>
+                  Right quantity
+                  <input
+                    type="number"
+                    min={0}
+                    style={inputStyle}
+                    value={form.rightQuantity}
+                    onChange={(e) => setForm((f) => ({ ...f, rightQuantity: e.target.value }))}
+                    placeholder="0"
+                  />
+                </label>
+              </>
+            ) : (
+              <label style={fieldLabelStyle}>
+                Quantity
+                <input
+                  type="number"
+                  min={0}
+                  style={inputStyle}
+                  value={form.startingQuantity}
+                  onChange={(e) => setForm((f) => ({ ...f, startingQuantity: e.target.value }))}
+                  placeholder="0"
+                />
+              </label>
+            )}
             {form.storageType === "warehouse" && (
               <label style={fieldLabelStyle}>
                 Box number <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional)</span>

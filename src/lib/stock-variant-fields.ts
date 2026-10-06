@@ -8,11 +8,10 @@ export interface VariantField {
   key: string;
   label: string;
   placeholder: string;
-  // Default is a plain text input. "select" renders a fixed dropdown from
-  // `options`; "suggest" is a text input that offers existing car makes/
-  // models from call history but still accepts anything typed.
-  input?: "text" | "select" | "suggest-make" | "suggest-model";
-  options?: string[];
+  // Default is a plain text input. The suggest variants are a text input
+  // that offers existing car makes/models from call history but still
+  // accepts anything typed.
+  input?: "text" | "suggest-make" | "suggest-model";
 }
 
 const LED_FIELDS: VariantField[] = [
@@ -27,14 +26,23 @@ const RING_FIELDS: VariantField[] = [
   { key: "shape", label: "Shape", placeholder: "e.g. Round" },
 ];
 
-// Car glass is vehicle-specific, and a headlight glass is also side-specific
-// -- the left and right glass are separate parts with separate stock.
+// Car glass is vehicle-specific. A headlight glass is also side-specific, but
+// that isn't a spec field here: the left and right glass are separate parts
+// with separate stock, so the form creates one item per side (see
+// SIDED_PRODUCT_SIDES) and records which one in the item's `side` attribute.
 const HEADLIGHT_GLASS_FIELDS: VariantField[] = [
   { key: "carMake", label: "Car make", placeholder: "Pick or type a make", input: "suggest-make" },
   { key: "carModel", label: "Car model", placeholder: "Pick or type a model", input: "suggest-model" },
   { key: "modelYear", label: "Model year", placeholder: "e.g. 2018 or 2018-2021" },
-  { key: "side", label: "Side", placeholder: "", input: "select", options: ["Left", "Right"] },
 ];
+
+export const SIDED_PRODUCT_SIDES = ["Left", "Right"] as const;
+export type ProductSide = (typeof SIDED_PRODUCT_SIDES)[number];
+
+/** Products stocked as separate Left/Right items rather than one. */
+export function isSidedProduct(productName: string | undefined | null): boolean {
+  return productName?.trim().toLowerCase() === "headlight glass";
+}
 
 // Exact match for "LED" (not substring -- "Bi LED Projector" is a
 // different, unrelated product) and startsWith for "5D Ring" (there are
