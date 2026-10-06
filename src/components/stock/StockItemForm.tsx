@@ -1,7 +1,8 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { X, Box } from "lucide-react";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../ui/Toast";
+import { SuggestInput } from "../ui/SuggestInput";
 import { variantFieldsForProduct } from "../../lib/stock-variant-fields";
 import type { Branch, Product, StockItem, StockLocation } from "../../types";
 
@@ -111,6 +112,18 @@ export function StockItemForm({
 
   const selectedProductName = useMemo(() => products.find((p) => p.id === form.productChoice)?.name, [products, form.productChoice]);
   const variantFields = variantFieldsForProduct(selectedProductName);
+
+  // Same make/model suggestions the call edit form uses -- fetched only once
+  // a subcategory that actually has make/model fields is picked, so the
+  // other stock forms don't pay for two extra requests they never use.
+  const needsVehicleSuggestions = Boolean(variantFields?.some((f) => f.input === "suggest-make" || f.input === "suggest-model"));
+  const [knownCarMakes, setKnownCarMakes] = useState<string[]>([]);
+  const [knownCarModels, setKnownCarModels] = useState<string[]>([]);
+  useEffect(() => {
+    if (!needsVehicleSuggestions) return;
+    api.calls.carMakes().then(setKnownCarMakes).catch(() => setKnownCarMakes([]));
+    api.calls.carModels().then(setKnownCarModels).catch(() => setKnownCarModels([]));
+  }, [needsVehicleSuggestions]);
 
   // Box number only makes sense for Warehouse items -- hide it when we know
   // for certain we're editing from a specific branch's page. Still shown
@@ -230,17 +243,33 @@ export function StockItemForm({
             {selectedProductName} spec <span style={{ fontWeight: 400, color: "var(--text-faint)" }}>(optional)</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${variantFields.length}, 1fr)`, gap: 12 }}>
-            {variantFields.map((field) => (
-              <label key={field.key} style={fieldLabelStyle}>
-                {field.label}
-                <input
-                  style={inputStyle}
-                  value={form.attributes[field.key] ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, attributes: { ...f.attributes, [field.key]: e.target.value } }))}
-                  placeholder={field.placeholder}
-                />
-              </label>
-            ))}
+            {variantFields.map((field) => {
+              const value = form.attributes[field.key] ?? "";
+              const setValue = (v: string) => setForm((f) => ({ ...f, attributes: { ...f.attributes, [field.key]: v } }));
+              return (
+                <label key={field.key} style={fieldLabelStyle}>
+                  {field.label}
+                  {field.input === "select" ? (
+                    <select style={inputStyle} value={value} onChange={(e) => setValue(e.target.value)}>
+                      <option value="">Select…</option>
+                      {field.options?.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  ) : field.input === "suggest-make" || field.input === "suggest-model" ? (
+                    <SuggestInput
+                      style={inputStyle}
+                      value={value}
+                      onChange={setValue}
+                      options={field.input === "suggest-make" ? knownCarMakes : knownCarModels}
+                      placeholder={field.placeholder}
+                    />
+                  ) : (
+                    <input style={inputStyle} value={value} onChange={(e) => setValue(e.target.value)} placeholder={field.placeholder} />
+                  )}
+                </label>
+              );
+            })}
           </div>
         </div>
       )}

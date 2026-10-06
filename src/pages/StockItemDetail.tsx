@@ -22,6 +22,7 @@ import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
 import { formatDate, formatCurrency } from "../lib/format";
 import { boxColor } from "../lib/box-color";
+import { variantFieldsForProduct } from "../lib/stock-variant-fields";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
 import type { Branch, StockItemDetail as StockItemDetailData, StockLocation, StockMovement } from "../types";
 
@@ -107,7 +108,10 @@ export default function StockItemDetail() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const specFields = item?.attributes ? Object.entries(item.attributes).filter(([, v]) => v) : [];
+  // Stored keys are camelCase (carMake, modelYear...) -- show the field's
+  // own label where the product type defines one, else the raw key.
+  const specLabels = new Map((variantFieldsForProduct(item?.product?.name) ?? []).map((f) => [f.key, f.label]));
+  const specFields = item?.attributes ? Object.entries(item.attributes).filter(([, v]) => v).map(([k, v]) => [specLabels.get(k) ?? k, v] as const) : [];
 
   return (
     <div>
