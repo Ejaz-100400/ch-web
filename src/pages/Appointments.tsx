@@ -208,15 +208,13 @@ export default function Appointments() {
     setEditing(null);
   }
 
+  // Name, date and time are required -- the button below stays disabled until
+  // all three are filled, so a booking can't be submitted without a time (and
+  // there's no error to show after the fact).
+  const canSubmit = Boolean(form.customerName.trim() && form.date && form.time);
+
   async function handleSave() {
-    if (!form.customerName.trim()) {
-      toast.show("Customer name is required.", "error");
-      return;
-    }
-    if (!form.date || !form.time) {
-      toast.show("Pick the appointment date and time.", "error");
-      return;
-    }
+    if (!canSubmit) return;
     const dto = {
       customerName: form.customerName.trim(),
       // Sent even when empty so clearing a number on edit reaches the server.
@@ -301,7 +299,7 @@ export default function Appointments() {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginBottom: 12 }}>
             <label style={fieldLabelStyle}>
-              Customer name
+              <span>Customer name <RequiredMark /></span>
               <input style={inputStyle} value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} placeholder="e.g. Ravi Kumar" />
             </label>
             <label style={fieldLabelStyle}>
@@ -393,22 +391,27 @@ export default function Appointments() {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginBottom: 16 }}>
             <label style={fieldLabelStyle}>
-              Appointment date
+              <span>Appointment date <RequiredMark /></span>
               <DateInput value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} style={inputStyle} />
             </label>
             <label style={fieldLabelStyle}>
-              Appointment time
-              <input type="time" style={inputStyle} value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} />
+              <span>Appointment time <RequiredMark /></span>
+              <input type="time" required style={{ ...inputStyle, borderColor: form.time ? "var(--border)" : "var(--brand)" }} value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} />
             </label>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleSave} disabled={saving} style={primaryButtonStyle}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={handleSave}
+              disabled={saving || !canSubmit}
+              style={{ ...primaryButtonStyle, opacity: saving || !canSubmit ? 0.55 : 1, cursor: saving || !canSubmit ? "not-allowed" : "pointer" }}
+            >
               {saving ? "Saving…" : editing ? "Save changes" : "Book appointment"}
             </button>
             <button onClick={closeForm} style={secondaryButtonStyle}>
               Cancel
             </button>
+            {!canSubmit && !saving && <span style={{ fontSize: 12, color: "var(--text-faint)" }}>Add the customer name, date and time to continue.</span>}
           </div>
         </div>
       )}
@@ -635,6 +638,14 @@ const filterDateStyle: CSSProperties = {
   background: "var(--paper)",
   fontSize: 13,
 };
+
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" title="Required" style={{ color: "var(--coral)", fontWeight: 700 }}>
+      *
+    </span>
+  );
+}
 
 const matchHintStyle: CSSProperties = {
   display: "flex",
