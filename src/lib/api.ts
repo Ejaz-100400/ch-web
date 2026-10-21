@@ -343,6 +343,7 @@ export interface AppointmentsQuery {
 
 export interface CreateAppointmentInput {
   customerName: string;
+  customerPhone?: string;
   carMake?: string;
   carModel?: string;
   branch: Branch;

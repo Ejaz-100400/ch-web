@@ -67,6 +67,9 @@ export type AppointmentStatus = "scheduled" | "arrived" | "completed" | "no_show
 export interface Appointment {
   id: string;
   customerName: string;
+  customerPhone: string | null;
+  // Set when a phone was given -- links to the customer's page and call history.
+  customerId: string | null;
   carMake: string | null;
   carModel: string | null;
   branch: Branch;

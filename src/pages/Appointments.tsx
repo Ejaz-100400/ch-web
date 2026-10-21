@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarCheck, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarCheck, CheckCircle2, HelpCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
@@ -12,11 +13,11 @@ import { LoadingText } from "../components/ui/Spinner";
 import { api, ApiError } from "../lib/api";
 import { useAuth, canManage } from "../lib/auth-context";
 import { useToast } from "../components/ui/Toast";
-import { formatDateTime } from "../lib/format";
+import { formatDate, formatDateTime } from "../lib/format";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
 import { SOURCE_ICONS, SOURCE_LABELS, SOURCE_OPTIONS } from "../lib/sale-source";
 import { istDateTimeToIso, isoToIstParts, relativeToAppointment, todayIstDate } from "../lib/appointment-time";
-import type { Appointment, AppointmentStatus, Branch, Product, SaleSource } from "../types";
+import type { Appointment, AppointmentStatus, Branch, Product, SaleMatchResult, SaleSource } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
   ambattur: "Ambattur (HQ)",
@@ -40,6 +41,7 @@ const PAGE_SIZE = 20;
 
 interface FormState {
   customerName: string;
+  customerPhone: string;
   carMake: string;
   carModel: string;
   branch: Branch;
@@ -50,7 +52,7 @@ interface FormState {
 }
 
 function emptyForm(): FormState {
-  return { customerName: "", carMake: "", carModel: "", branch: "ambattur", productIds: [], source: "call", date: todayIstDate(), time: "" };
+  return { customerName: "", customerPhone: "", carMake: "", carModel: "", branch: "ambattur", productIds: [], source: "call", date: todayIstDate(), time: "" };
 }
 
 export default function Appointments() {
@@ -84,6 +86,8 @@ export default function Appointments() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [matchResult, setMatchResult] = useState<SaleMatchResult | null>(null);
+  const [matching, setMatching] = useState(false);
 
   useEffect(() => {
     api.products.list("car_modifications").then(setProducts).catch(() => setProducts([]));
@@ -143,6 +147,39 @@ export default function Appointments() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, search, branch, status, dateFrom, dateTo, page, refreshKey]);
 
+  // Same debounced call-history lookup the Customer Tracker's sales form
+  // does -- once the number looks plausible, say whether they've called
+  // before, and fill in any of name/make/model still left blank from what
+  // we already know (never overwriting something already typed).
+  useEffect(() => {
+    if (!formOpen) return;
+    const phoneValue = form.customerPhone.trim();
+    if (phoneValue.length < 6) {
+      setMatchResult(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setMatching(true);
+      api.sales
+        .match(phoneValue)
+        .then((res) => {
+          setMatchResult(res);
+          if (res.matched) {
+            setForm((f) => ({
+              ...f,
+              customerName: f.customerName || res.customer.name || "",
+              carMake: f.carMake || res.customer.carMake || "",
+              carModel: f.carModel || res.customer.carModel || "",
+            }));
+          }
+        })
+        .catch(() => setMatchResult(null))
+        .finally(() => setMatching(false));
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.customerPhone, formOpen]);
+
   function openCreate() {
     setEditing(null);
     setForm(emptyForm());
@@ -154,6 +191,7 @@ export default function Appointments() {
     setEditing(a);
     setForm({
       customerName: a.customerName,
+      customerPhone: a.customerPhone ?? "",
       carMake: a.carMake ?? "",
       carModel: a.carModel ?? "",
       branch: a.branch,
@@ -181,6 +219,8 @@ export default function Appointments() {
     }
     const dto = {
       customerName: form.customerName.trim(),
+      // Sent even when empty so clearing a number on edit reaches the server.
+      customerPhone: form.customerPhone.trim(),
       carMake: form.carMake.trim(),
       carModel: form.carModel.trim(),
       branch: form.branch,
@@ -265,6 +305,10 @@ export default function Appointments() {
               <input style={inputStyle} value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} placeholder="e.g. Ravi Kumar" />
             </label>
             <label style={fieldLabelStyle}>
+              Phone number
+              <input style={inputStyle} value={form.customerPhone} onChange={(e) => setForm((f) => ({ ...f, customerPhone: e.target.value }))} placeholder="9xxxxxxxxx" />
+            </label>
+            <label style={fieldLabelStyle}>
               Car make
               <SuggestInput style={inputStyle} value={form.carMake} onChange={(v) => setForm((f) => ({ ...f, carMake: v }))} options={knownCarMakes} placeholder="Pick or type a make" />
             </label>
@@ -273,6 +317,32 @@ export default function Appointments() {
               <SuggestInput style={inputStyle} value={form.carModel} onChange={(v) => setForm((f) => ({ ...f, carModel: v }))} options={knownCarModels} placeholder="Pick or type a model" />
             </label>
           </div>
+
+          {matching && (
+            <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12 }}>
+              <LoadingText label="Checking call history…" />
+            </div>
+          )}
+          {!matching && matchResult && (
+            <div style={{ ...matchHintStyle, background: matchResult.matched ? "var(--brand-soft)" : "var(--border-soft)" }}>
+              {matchResult.matched ? (
+                <CheckCircle2 size={14} color="var(--brand-strong)" style={{ flexShrink: 0, marginTop: 1 }} />
+              ) : (
+                <HelpCircle size={14} color="var(--text-faint)" style={{ flexShrink: 0, marginTop: 1 }} />
+              )}
+              <span style={{ fontSize: 12.5, color: matchResult.matched ? "var(--text)" : "var(--text-soft)" }}>
+                {matchResult.matched ? (
+                  <>
+                    <strong>{matchResult.customer.name ?? "This number"}</strong> has called before -- {matchResult.customer.calls.length} call
+                    {matchResult.customer.calls.length === 1 ? "" : "s"} on record
+                    {matchResult.customer.calls[0] ? ` (most recent ${formatDate(matchResult.customer.calls[0].callDate)})` : ""}.
+                  </>
+                ) : (
+                  "No call history for this number yet."
+                )}
+              </span>
+            </div>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginBottom: 12 }}>
             <label style={fieldLabelStyle}>
@@ -367,7 +437,7 @@ export default function Appointments() {
       </div>
 
       <FilterBar>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search customer name" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search customer name or phone" />
         <MultiSelectFilter label="Branch" values={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
         {view === "all" && (
           <>
@@ -426,8 +496,18 @@ export default function Appointments() {
                           )}
                         </span>
                         <span style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.customerName}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{[a.carMake, a.carModel].filter(Boolean).join(" ") || "—"}</div>
+                          <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {a.customerId ? (
+                              <Link to={`/customers/${a.customerId}`} title="View customer and call history" style={{ color: "inherit", textDecoration: "none" }}>
+                                {a.customerName}
+                              </Link>
+                            ) : (
+                              a.customerName
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: "var(--text-soft)" }}>
+                            {[[a.carMake, a.carModel].filter(Boolean).join(" "), a.customerPhone].filter(Boolean).join(" · ") || "—"}
+                          </div>
                         </span>
                         <span><BranchBadge branch={a.branch} /></span>
                         <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -554,6 +634,15 @@ const filterDateStyle: CSSProperties = {
   borderRadius: "var(--radius-sm)",
   background: "var(--paper)",
   fontSize: 13,
+};
+
+const matchHintStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 8,
+  padding: "9px 12px",
+  borderRadius: "var(--radius-sm)",
+  marginBottom: 12,
 };
 
 const productChipStyle: CSSProperties = {
