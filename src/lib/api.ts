@@ -43,6 +43,8 @@ import type {
   TopEmployeePoint,
   TopProductPoint,
   UserDevice,
+  Appointment,
+  AppointmentStatus,
   WhatsAppConversationSummary,
   WhatsAppMessage,
   UserRole,
@@ -326,6 +328,27 @@ export interface EnquiriesQuery {
   dateTo?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface AppointmentsQuery {
+  status?: AppointmentStatus[];
+  branch?: Branch[];
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  order?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CreateAppointmentInput {
+  customerName: string;
+  carMake?: string;
+  carModel?: string;
+  branch: Branch;
+  source?: SaleSource;
+  appointmentAt: string;
+  productIds?: string[];
 }
 
 export interface WhatsAppConversationsQuery {
@@ -641,6 +664,15 @@ export const api = {
     list: (q: EnquiriesQuery = {}) => request<Paginated<InPersonEnquiry>>(`/enquiries${query(q)}`),
     create: (dto: CreateEnquiryInput) => request<InPersonEnquiry>("/enquiries", { method: "POST", body: JSON.stringify(dto) }),
     update: (id: string, dto: Partial<CreateEnquiryInput>) => request<InPersonEnquiry>(`/enquiries/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+  },
+
+  appointments: {
+    list: (q: AppointmentsQuery = {}) => request<Paginated<Appointment>>(`/appointments${query(q)}`),
+    upcoming: () => request<Appointment[]>("/appointments/upcoming"),
+    create: (dto: CreateAppointmentInput) => request<Appointment>("/appointments", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: Partial<CreateAppointmentInput> & { status?: AppointmentStatus }) =>
+      request<Appointment>(`/appointments/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    remove: (id: string) => request<{ deleted: true }>(`/appointments/${id}`, { method: "DELETE" }),
   },
 
   whatsapp: {

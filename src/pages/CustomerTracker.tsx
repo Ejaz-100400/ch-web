@@ -7,7 +7,6 @@ import {
   TrendingUp,
   Users,
   Phone,
-  MessageCircle,
   Store,
   HelpCircle,
   CheckCircle2,
@@ -15,15 +14,7 @@ import {
   MinusCircle,
   ClipboardList,
   Handshake,
-  UserCog,
-  User,
-  UserCircle,
-  UserPlus,
   Pencil,
-  Camera,
-  ThumbsUp,
-  PlayCircle,
-  Repeat2,
   Share2,
   Target,
 } from "lucide-react";
@@ -38,6 +29,7 @@ import { useToast } from "../components/ui/Toast";
 import { LoadingText } from "../components/ui/Spinner";
 import { formatDate } from "../lib/format";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
+import { SOURCE_ICONS, SOURCE_LABELS, SOURCE_OPTIONS } from "../lib/sale-source";
 import type { Branch, ConversionSummary, Employee, EnquiryOutcome, InPersonEnquiry, Sale, SaleMatchResult, SaleSource } from "../types";
 
 const BRANCH_LABELS: Record<Branch, string> = {
@@ -47,36 +39,6 @@ const BRANCH_LABELS: Record<Branch, string> = {
   pondicherry: "Pondicherry",
 };
 const BRANCH_OPTIONS = (Object.keys(BRANCH_LABELS) as Branch[]).map((value) => ({ value, label: BRANCH_LABELS[value] }));
-
-const SOURCE_LABELS: Record<SaleSource, string> = {
-  call: "Call",
-  whatsapp: "WhatsApp",
-  walk_in: "Walk-in",
-  owner: "Owner",
-  dastagir: "Dastagir",
-  karthik: "Karthik",
-  referral: "Referral",
-  instagram: "Instagram",
-  facebook: "Facebook",
-  youtube: "YouTube",
-  regular_customer: "Regular Customer",
-  unknown: "Unknown",
-};
-const SOURCE_ICONS: Record<SaleSource, typeof Phone> = {
-  call: Phone,
-  whatsapp: MessageCircle,
-  walk_in: Store,
-  owner: UserCog,
-  dastagir: User,
-  karthik: UserCircle,
-  referral: UserPlus,
-  instagram: Camera,
-  facebook: ThumbsUp,
-  youtube: PlayCircle,
-  regular_customer: Repeat2,
-  unknown: HelpCircle,
-};
-const SOURCE_OPTIONS = (Object.keys(SOURCE_LABELS) as SaleSource[]).map((value) => ({ value, label: SOURCE_LABELS[value] }));
 
 const OUTCOME_LABELS: Record<EnquiryOutcome, string> = { purchased: "Purchased", not_purchased: "Not purchased", undecided: "Undecided" };
 const OUTCOME_OPTIONS = (Object.keys(OUTCOME_LABELS) as EnquiryOutcome[]).map((value) => ({ value, label: OUTCOME_LABELS[value] }));

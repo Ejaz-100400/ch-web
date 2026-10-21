@@ -62,6 +62,25 @@ export interface Product {
   createdAt: string;
 }
 
+export type AppointmentStatus = "scheduled" | "arrived" | "completed" | "no_show" | "cancelled";
+
+export interface Appointment {
+  id: string;
+  customerName: string;
+  carMake: string | null;
+  carModel: string | null;
+  branch: Branch;
+  source: SaleSource;
+  // A full instant; the UI shows it in IST like every other timestamp here.
+  appointmentAt: string;
+  status: AppointmentStatus;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  // The light upgrade(s) booked, from the Products catalog.
+  products: { id: string; name: string }[];
+}
+
 export interface WhatsAppConversationSummary {
   id: string;
   customer: { id: string; name: string | null; phoneNumber: string };

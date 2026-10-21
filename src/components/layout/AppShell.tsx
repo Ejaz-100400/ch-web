@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { NotificationBell } from "./NotificationBell";
 import { SalesEntryReminder } from "./SalesEntryReminder";
+import { AppointmentReminder } from "./AppointmentReminder";
 import { FadeIn } from "../ui/FadeIn";
 import { ThemeToggle } from "../ui/ThemeToggle";
 import { Spinner } from "../ui/Spinner";
@@ -93,6 +94,7 @@ export function AppShell() {
           </div>
         </header>
         <SalesEntryReminder />
+        <AppointmentReminder />
         <div className="app-main-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 40px 60px", width: "100%" }}>
           <FadeIn>
             <Outlet />
