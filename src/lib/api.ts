@@ -43,6 +43,7 @@ import type {
   TopEmployeePoint,
   TopProductPoint,
   UserDevice,
+  NoStockRequest,
   Appointment,
   AppointmentStatus,
   WhatsAppConversationSummary,
@@ -328,6 +329,24 @@ export interface EnquiriesQuery {
   dateTo?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface NoStockQuery {
+  category?: ("car_glasses" | "car_modifications")[];
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CreateNoStockInput {
+  customerName: string;
+  customerPhone: string;
+  location?: string;
+  itemName: string;
+  category: "car_glasses" | "car_modifications";
+  requestDate: string;
 }
 
 export interface AppointmentsQuery {
@@ -665,6 +684,13 @@ export const api = {
     list: (q: EnquiriesQuery = {}) => request<Paginated<InPersonEnquiry>>(`/enquiries${query(q)}`),
     create: (dto: CreateEnquiryInput) => request<InPersonEnquiry>("/enquiries", { method: "POST", body: JSON.stringify(dto) }),
     update: (id: string, dto: Partial<CreateEnquiryInput>) => request<InPersonEnquiry>(`/enquiries/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+  },
+
+  noStock: {
+    list: (q: NoStockQuery = {}) => request<Paginated<NoStockRequest>>(`/no-stock${query(q)}`),
+    create: (dto: CreateNoStockInput) => request<NoStockRequest>("/no-stock", { method: "POST", body: JSON.stringify(dto) }),
+    update: (id: string, dto: Partial<CreateNoStockInput>) => request<NoStockRequest>(`/no-stock/${id}`, { method: "PATCH", body: JSON.stringify(dto) }),
+    remove: (id: string) => request<{ deleted: true }>(`/no-stock/${id}`, { method: "DELETE" }),
   },
 
   appointments: {

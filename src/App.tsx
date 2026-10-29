@@ -14,6 +14,7 @@ import MissedCalls from "./pages/MissedCalls";
 import FollowUps from "./pages/FollowUps";
 import WhatsAppMessaging from "./pages/WhatsAppMessaging";
 import Appointments from "./pages/Appointments";
+import NoStock from "./pages/NoStock";
 import Reports from "./pages/Reports";
 import Export from "./pages/Export";
 import Import from "./pages/Import";
@@ -52,6 +53,7 @@ export default function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/whatsapp" element={<WhatsAppMessaging />} />
                 <Route path="/appointments" element={<Appointments />} />
+                <Route path="/no-stock" element={<NoStock />} />
                 <Route path="/export" element={<Export />} />
                 <Route path="/import" element={<Import />} />
                 <Route path="/employees" element={<Employees />} />

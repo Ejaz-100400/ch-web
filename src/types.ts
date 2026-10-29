@@ -62,6 +62,22 @@ export interface Product {
   createdAt: string;
 }
 
+export interface NoStockRequest {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  // Set because a phone is required -- links to the customer's page and call history.
+  customerId: string | null;
+  location: string | null;
+  itemName: string;
+  category: "car_glasses" | "car_modifications";
+  // A calendar date (midnight UTC), not an instant -- show it with formatDate.
+  requestDate: string;
+  enteredByUserId: string;
+  createdAt: string;
+  enteredBy?: { name: string } | null;
+}
+
 export type AppointmentStatus = "scheduled" | "arrived" | "completed" | "no_show" | "cancelled";
 
 export interface Appointment {
