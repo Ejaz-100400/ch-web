@@ -5,7 +5,6 @@ import { CheckCircle2, HelpCircle, PackageX, Pencil, Plus, Trash2, X } from "luc
 import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar, SearchInput, MultiSelectFilter, ClearFiltersButton } from "../components/ui/FilterBar";
 import { DateInput } from "../components/ui/DateInput";
-import { SuggestInput } from "../components/ui/SuggestInput";
 import { CategoryBadge } from "../components/ui/StatusBadge";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { Pagination } from "../components/ui/Pagination";
@@ -16,7 +15,7 @@ import { useToast } from "../components/ui/Toast";
 import { formatDate } from "../lib/format";
 import { listContainerVariants, listItemVariants } from "../lib/motion";
 import { todayIstDate } from "../lib/appointment-time";
-import type { NoStockRequest, SaleMatchResult, StockItem } from "../types";
+import type { NoStockRequest, SaleMatchResult } from "../types";
 
 type Category = "car_glasses" | "car_modifications";
 
@@ -64,13 +63,6 @@ export default function NoStock() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [matchResult, setMatchResult] = useState<SaleMatchResult | null>(null);
   const [matching, setMatching] = useState(false);
-
-  // Item-name suggestions from the stock catalog -- the thing asked for often
-  // exists there with nothing on hand. Only managers can add, so only they fetch it.
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  useEffect(() => {
-    if (manager) api.stock.items().then(setStockItems).catch(() => setStockItems([]));
-  }, [manager]);
 
   useEffect(() => {
     setPage(1);
@@ -159,13 +151,6 @@ export default function NoStock() {
   function closeForm() {
     setFormOpen(false);
     setEditing(null);
-  }
-
-  function setItemName(value: string) {
-    // Picking (or typing) a name that's already in the stock catalog also
-    // sets its category, so the two can't disagree.
-    const known = stockItems.find((s) => s.name.toLowerCase() === value.trim().toLowerCase());
-    setForm((f) => ({ ...f, itemName: value, category: known ? known.category : f.category }));
   }
 
   // Everything but location is required -- Save stays disabled until it's all
@@ -285,11 +270,10 @@ export default function NoStock() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginBottom: 16 }}>
             <label style={fieldLabelStyle}>
               <span>Item name <RequiredMark /></span>
-              <SuggestInput
+              <input
                 style={inputStyle}
                 value={form.itemName}
-                onChange={setItemName}
-                options={stockItems.map((s) => s.name)}
+                onChange={(e) => setForm((f) => ({ ...f, itemName: e.target.value }))}
                 placeholder="What they asked for"
               />
             </label>
